@@ -177,9 +177,13 @@ namespace UnityCombatLab.Tests.PlayMode
                     .GetComponent<UnityEngine.UI.Image>();
                 var trail = view.transform.Find("HealthBar/FillArea/UI_TrailingHealth")
                     .GetComponent<UnityEngine.UI.Image>();
-                var advance = typeof(UnitStatusView).GetMethod("AdvanceHealthAnimation",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
+
                 view.SetHealth(100, 100);
+                view.SetPreviewHealth(60, 100);
+                Assert.That(view.DisplayedHealth, Is.EqualTo(100));
+                Assert.That(bar.normalizedValue, Is.EqualTo(1f));
+                Assert.That(preview.enabled, Is.True);
+                Assert.That(preview.rectTransform.anchorMin.x, Is.EqualTo(0.6f).Within(0.001f));
                 view.SetHealth(60, 100);
                 view.ShowDamage(40, 0);
                 Assert.That(view.DisplayedHealth, Is.EqualTo(60));
@@ -189,21 +193,20 @@ namespace UnityCombatLab.Tests.PlayMode
                 Assert.That(preview.rectTransform.anchorMax.x, Is.EqualTo(1f));
                 Assert.That(preview.color, Is.EqualTo(colors.GetColor(Define.PaletteColor.DamagePreview)));
                 Assert.That(trail.color, Is.EqualTo(colors.GetColor(Define.PaletteColor.TrailingHealth)));
-                advance.Invoke(view, new object[] { 0.12f });
-                Assert.That(bar.normalizedValue, Is.EqualTo(1f));
-                advance.Invoke(view, new object[] { 0.12f });
+                view.Advance(0.12f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.8f).Within(0.001f));
-                advance.Invoke(view, new object[] { 0.12f });
+                view.Advance(0.12f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.6f).Within(0.001f));
                 Assert.That(preview.enabled, Is.False);
                 Assert.That(trail.enabled, Is.True);
                 Assert.That(trail.rectTransform.anchorMax.x, Is.EqualTo(1f));
-                advance.Invoke(view, new object[] { 0.215f });
+                view.Advance(0.335f);
                 Assert.That(trail.rectTransform.anchorMax.x, Is.EqualTo(0.8f).Within(0.001f));
+                view.SetPreviewHealth(40, 100);
                 view.SetHealth(40, 100);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.6f).Within(0.001f));
                 Assert.That(trail.rectTransform.anchorMax.x, Is.EqualTo(0.8f).Within(0.001f));
-                advance.Invoke(view, new object[] { 1f });
+                view.Advance(1f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.4f).Within(0.001f));
                 Assert.That(trail.enabled, Is.False);
                 Assert.That(preview.enabled, Is.False);
@@ -211,10 +214,10 @@ namespace UnityCombatLab.Tests.PlayMode
                 view.Initialize("騎士", Define.BattleTeam.Ally);
                 view.SetHealth(100, 100);
                 view.SetHealth(60, 100);
-                // 0.24 秒を 4 フレームに分けても、上の 2 フレームと同じ 80% に到着する。
+                // 0.12 秒を 4 フレームに分けても、上の 1 フレームと同じ 80% に到着する。
                 for (var frame = 0; frame < 4; frame++)
                 {
-                    advance.Invoke(view, new object[] { 0.06f });
+                    view.Advance(0.03f);
                 }
 
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.8f).Within(0.001f));
@@ -253,8 +256,7 @@ namespace UnityCombatLab.Tests.PlayMode
             entry.Presenter.Advance(0.04);
             Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(380));
             Assert.That(views.Single(v => v.name == "Unit_SkeletonWarrior").CurrentAnimation, Is.EqualTo("Attack"));
-            typeof(UnitStatusView).GetMethod("AdvanceHealthAnimation", BindingFlags.Instance | BindingFlags.NonPublic)
-                .Invoke(status, new object[] { 0.12f });
+            status.Advance(0.12f);
             var bar = status.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
             Assert.That(bar.normalizedValue, Is.EqualTo((1f + 380f / 420f) * 0.5f).Within(0.001f));
             entry.Presenter.Advance(0.09);
@@ -310,9 +312,7 @@ namespace UnityCombatLab.Tests.PlayMode
             var view = GameObject.Find("Unit_Knight").GetComponent<UnitView>();
             var runId = Guid.NewGuid();
             var position = view.transform.position;
-            var advance =
-                typeof(UnitView).GetMethod("AdvanceHitReaction", BindingFlags.Instance | BindingFlags.NonPublic);
-            var reaction = view.transform.Find("Unit_HitReaction");
+            var reaction = view.GetComponentInChildren<UnitHitReactionView>();
             var renderer = view.GetComponentInChildren<SkinnedMeshRenderer>();
             var block = new MaterialPropertyBlock();
             var emission = Shader.PropertyToID("_EmissionColor");
@@ -326,25 +326,32 @@ namespace UnityCombatLab.Tests.PlayMode
                 ((Texture2D)renderer.sharedMaterial.GetTexture(Shader.PropertyToID("_EmissionMap"))).GetPixel(0, 0)
                 .maxColorComponent,
                 Is.Zero);
-            advance.Invoke(view, new object[] { 0.045f });
+            reaction.Advance(0.045f);
             Assert.That(view.CurrentAnimation, Is.EqualTo("Attack"));
             Assert.That(view.transform.position, Is.EqualTo(position));
-            Assert.That(reaction.parent.TransformVector(reaction.localPosition).x, Is.LessThan(0));
-            Assert.That(reaction.parent.TransformVector(reaction.localPosition).magnitude,
+            Assert.That(reaction.Displacement.x, Is.LessThan(0));
+            Assert.That(reaction.Displacement.magnitude,
                 Is.EqualTo(0.14f).Within(0.001f));
             view.ShowDeath(runId);
-            var deathPosition = reaction.localPosition;
-            advance.Invoke(view, new object[] { 1f });
-            Assert.That(reaction.localPosition, Is.EqualTo(deathPosition));
+            var deathPosition = reaction.Displacement;
+            reaction.Advance(1f);
+            Assert.That(reaction.Displacement, Is.EqualTo(deathPosition));
             view.Release();
-            advance.Invoke(view, new object[] { 1f });
+            reaction.Advance(1f);
             renderer.GetPropertyBlock(block);
             Assert.That(block.GetColor(emission).maxColorComponent, Is.Zero);
-            Assert.That(reaction.localPosition, Is.EqualTo(Vector3.zero));
+            Assert.That(reaction.Displacement, Is.EqualTo(Vector3.zero));
             view.Bind(Guid.NewGuid());
             view.ShowHit(runId, position + Vector3.right);
-            advance.Invoke(view, new object[] { 1f });
-            Assert.That(reaction.localPosition, Is.EqualTo(Vector3.zero));
+            reaction.Advance(1f);
+            Assert.That(reaction.Displacement, Is.EqualTo(Vector3.zero));
+            reaction.Play(view.ImpactPosition + Vector3.right * 2);
+            reaction.Advance(0.045f);
+            reaction.Play(view.ImpactPosition + Vector3.right * 2);
+            reaction.Advance(0.045f);
+            Assert.That(reaction.Displacement.magnitude, Is.EqualTo(0.14f).Within(0.001f));
+            reaction.Advance(1f);
+            Assert.That(reaction.Displacement, Is.EqualTo(Vector3.zero));
             yield return null;
         }
 
@@ -400,8 +407,7 @@ namespace UnityCombatLab.Tests.PlayMode
                     .GetComponent<UnityEngine.UI.Image>();
                 var trail = view.transform.Find("HealthBar/FillArea/UI_TrailingHealth")
                     .GetComponent<UnityEngine.UI.Image>();
-                var advance = typeof(UnitStatusView).GetMethod("AdvanceHealthAnimation",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
+
                 view.Initialize("騎士", Define.BattleTeam.Ally);
                 view.SetHealth(40, 100);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.4f).Within(0.001f));
@@ -411,12 +417,12 @@ namespace UnityCombatLab.Tests.PlayMode
                 view.SetHealth(80, 100);
                 Assert.That(preview.enabled, Is.False);
                 Assert.That(trail.enabled, Is.False);
-                advance.Invoke(view, new object[] { 0.12f });
+                view.Advance(0.12f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.6f).Within(0.001f));
                 view.SetHealth(0, 100);
                 Assert.That(view.DisplayedHealth, Is.Zero);
                 Assert.That(view.transform.Find("UI_Defeated").gameObject.activeSelf, Is.True);
-                advance.Invoke(view, new object[] { 1f });
+                view.Advance(1f);
                 Assert.That(bar.normalizedValue, Is.Zero);
                 Assert.That(preview.enabled || trail.enabled, Is.False);
                 view.Initialize("騎士", Define.BattleTeam.Ally);
@@ -428,11 +434,11 @@ namespace UnityCombatLab.Tests.PlayMode
                 view.gameObject.SetActive(true);
                 view.Initialize("騎士", Define.BattleTeam.Ally);
                 view.SetHealth(75, 100);
-                advance.Invoke(view, new object[] { 2f });
+                view.Advance(2f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.75f).Within(0.001f));
                 view.SetHealth(50, 100);
                 view.ClearTransient();
-                advance.Invoke(view, new object[] { 2f });
+                view.Advance(2f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.5f).Within(0.001f));
                 Assert.That(preview.enabled || trail.enabled, Is.False);
             }
@@ -496,16 +502,16 @@ namespace UnityCombatLab.Tests.PlayMode
             view.ShowAttack(oldRun, view.transform.position + Vector3.right, true, false);
             var motionField = typeof(UnitView).GetField("_motion", BindingFlags.Instance | BindingFlags.NonPublic);
             var callback = ((Tween)motionField.GetValue(view)).onComplete;
-            var model = view.GetComponentInChildren<Animator>().transform;
+            var motionRoot = view.transform.Find("Unit_MotionRoot");
             view.Release();
             var newRun = Guid.NewGuid();
             view.Bind(newRun);
             view.ShowAttack(newRun, view.transform.position + Vector3.right, true, false);
             var currentMotion = motionField.GetValue(view);
-            var expectedPosition = model.localPosition + Vector3.forward;
-            model.localPosition = expectedPosition;
+            var expectedPosition = motionRoot.localPosition + Vector3.forward;
+            motionRoot.localPosition = expectedPosition;
             callback();
-            Assert.That(model.localPosition, Is.EqualTo(expectedPosition));
+            Assert.That(motionRoot.localPosition, Is.EqualTo(expectedPosition));
             Assert.That(motionField.GetValue(view), Is.SameAs(currentMotion));
             view.ShowDeath(oldRun);
             Assert.That(view.IsDead, Is.False);
@@ -528,14 +534,16 @@ namespace UnityCombatLab.Tests.PlayMode
             var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
             var view = entry.Hud.Units[0];
             const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
-            var tweenField = typeof(UnitStatusView).GetField("_damageTimers", Flags);
-            var textField = typeof(UnitStatusView).GetField("_damage", Flags);
+            var numbers = view.GetComponent<DamageNumberView>();
+            var slotsField = typeof(DamageNumberView).GetField("_slots", Flags);
+            var firstSlot = ((Array)slotsField.GetValue(numbers)).GetValue(0);
+            var timerField = firstSlot.GetType().GetField("_timer", Flags);
             view.ClearTransient();
             view.ShowDamage(12, 3);
-            var callback = ((Tween[])tweenField.GetValue(view))[0].onStepComplete;
+            var callback = ((Tween)timerField.GetValue(firstSlot)).onStepComplete;
             view.ClearTransient();
             view.ShowDamage(9, 6);
-            var label = (TMPro.TMP_Text)textField.GetValue(view);
+            var label = view.transform.Find("Damage").GetComponent<TMPro.TMP_Text>();
             var expectedText = label.text;
             var shieldLabel = view.transform.Find("UI_ShieldDamage").GetComponent<TMPro.TMP_Text>();
             var shieldIcon = view.transform.Find("UI_ShieldDamageIcon").gameObject;

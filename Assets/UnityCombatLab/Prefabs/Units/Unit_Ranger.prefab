@@ -30,7 +30,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 3150581999987695663}
+  - {fileID: 8486128693021361538}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7521576392360444608
@@ -47,6 +47,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityCombatLab.Presentation::UnityCombatLab.Presentation.Units.UnitView
   _animator: {fileID: 5494099267248549946}
   _model: {fileID: 3150581999987695663}
+  _motionRoot: {fileID: 8486128693021361538}
+  _hitReaction: {fileID: 4015959238859294098}
   _attackSeconds: 0.66
   _releaseNormalized: 0.35
   _flightSeconds: 0.18
@@ -56,13 +58,97 @@ MonoBehaviour:
   _impactPrefab: {fileID: 8746966916517843146, guid: f097c53d12c38d548a5f3f2be068f29d, type: 3}
   _strikePrefab: {fileID: 0}
   _deathPrefab: {fileID: 6156465146768680735, guid: a46a44f0859ead34687745d82b52a389, type: 3}
+--- !u!1 &6145554365601565313
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6798102566405512665}
+  - component: {fileID: 4015959238859294098}
+  m_Layer: 0
+  m_Name: Unit_HitReaction
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6798102566405512665
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6145554365601565313}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 3150581999987695663}
+  m_Father: {fileID: 8486128693021361538}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4015959238859294098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6145554365601565313}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 307e940dd3194e549b0a5111664df6b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityCombatLab.Presentation::UnityCombatLab.Presentation.Units.UnitHitReactionView
+  _visualRoot: {fileID: 3150581999987695663}
+  _flashSeconds: 0.1
+  _flashHoldSeconds: 0.035
+  _flashIntensity: 3
+  _recoilDistance: 0.14
+  _recoilSeconds: 0.18
+  _recoilOutSeconds: 0.045
+--- !u!1 &9129442694391438502
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8486128693021361538}
+  m_Layer: 0
+  m_Name: Unit_MotionRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8486128693021361538
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9129442694391438502}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6798102566405512665}
+  m_Father: {fileID: 5348731010603708149}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &3185070641577248708
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 5348731010603708149}
+    m_TransformParent: {fileID: 6798102566405512665}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 93dcf3e1d678002459f1bc4d482228d5, type: 3}
       propertyPath: m_LocalPosition.x

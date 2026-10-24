@@ -166,6 +166,8 @@ namespace UnityCombatLab.Bootstrap
                 foreach (var unit in _unitViews)
                 {
                     unit.ApplyPalette(_colors);
+                    // 色の適用とは別に効果を準備し、後の Bind は生成済みの効果を再利用する。
+                    unit.PrepareEffects();
                 }
 
                 _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors);

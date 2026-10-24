@@ -1,0 +1,313 @@
+using System;
+using UnityCombatLab.Common;
+using UnityCombatLab.Presentation.Styling;
+using UnityEngine;
+
+namespace UnityCombatLab.Presentation.Units
+{
+    /// <summary>
+    /// 移動軸の子で閃光と反動だけを描き、攻撃・戦闘判定・論理位置は変更しません。
+    /// [KO] 이동 축의 자식에서 섬광과 반동만 그리며 공격·전투 판정·논리 위치는 바꾸지 않습니다.
+    /// [EN] Renders only flash and recoil beneath the motion pivot without changing attacks, combat decisions or logical positions.
+    /// </summary>
+    public sealed class UnitHitReactionView : MonoBehaviour
+    {
+        /// <summary>
+        /// この反動軸の子にある、材質を一時上書きするモデル。
+        /// [KO] 이 반동 축의 자식에 있는 재질을 임시 오버라이드할 모델입니다.
+        /// [EN] Child model whose renderer properties are temporarily overridden.
+        /// </summary>
+        [SerializeField] private Transform _visualRoot;
+
+        /// <summary>
+        /// 閃光の全体秒数。
+        /// [KO] 섬광 전체 시간(초)입니다.
+        /// [EN] Total flash duration in seconds.
+        /// </summary>
+        [SerializeField] private float _flashSeconds = 0.1f;
+
+        /// <summary>
+        /// 最大輝度を保つ秒数。
+        /// [KO] 최대 밝기 유지 시간(초)입니다.
+        /// [EN] Seconds spent at full flash brightness.
+        /// </summary>
+        [SerializeField] private float _flashHoldSeconds = 0.035f;
+
+        /// <summary>
+        /// 共通パレットの明色へ掛ける発光の強さ。
+        /// [KO] 공통 팔레트의 밝은 색에 곱할 발광 강도입니다.
+        /// [EN] Emission intensity multiplying the shared palette's bright color.
+        /// </summary>
+        [SerializeField] private float _flashIntensity = 3f;
+
+        /// <summary>
+        /// 攻撃元の反対へ動く世界距離。親の縮尺に依存しません。
+        /// [KO] 공격 원점 반대로 움직일 월드 거리이며 부모 크기에 의존하지 않습니다.
+        /// [EN] World-space push distance, independent of parent scale.
+        /// </summary>
+        [SerializeField] private float _recoilDistance = 0.14f;
+
+        /// <summary>
+        /// 押されて元へ戻る全体秒数。
+        /// [KO] 밀렸다가 원위치로 돌아올 전체 시간(초)입니다.
+        /// [EN] Total seconds for push and return.
+        /// </summary>
+        [SerializeField] private float _recoilSeconds = 0.18f;
+
+        /// <summary>
+        /// 最大変位まで動く秒数。残り時間で元へ戻します。
+        /// [KO] 최대 변위까지 움직일 시간(초)이며 나머지 시간에 원위치로 돌아옵니다.
+        /// [EN] Seconds spent moving outward, with the remaining time used to return.
+        /// </summary>
+        [SerializeField] private float _recoilOutSeconds = 0.045f;
+
+        /// <summary>
+        /// ApplyPalette で借用し、個体の閃光色だけに使用する共通設定。
+        /// [KO] ApplyPalette로 빌려 개체 섬광색에만 사용할 공통 설정입니다.
+        /// [EN] Shared settings borrowed through ApplyPalette and used only for the instance flash color.
+        /// </summary>
+        private GameColorPalette _colors;
+
+        /// <summary>
+        /// 初期位置を保存し、反動終了・解除時に戻します。
+        /// [KO] 반동 종료·해제 때 돌아갈 초기 위치입니다.
+        /// [EN] Initial local position restored after recoil or release.
+        /// </summary>
+        private Vector3 _homePosition;
+
+        /// <summary>
+        /// この表示だけが上書きする Renderer 一覧。
+        /// [KO] 이 표시만 오버라이드할 Renderer 목록입니다.
+        /// [EN] Renderers whose properties this view overrides.
+        /// </summary>
+        private Renderer[] _renderers;
+
+        /// <summary>
+        /// 閃光終了時に個体ごとに復元する元の設定。
+        /// [KO] 섬광 종료 때 개체별로 복원할 원래 설정입니다.
+        /// [EN] Original per-renderer property blocks restored after the flash.
+        /// </summary>
+        private MaterialPropertyBlock[] _originalProperties;
+
+        /// <summary>
+        /// 閃光から戻すため保存した Renderer の元の色。
+        /// [KO] 섬광에서 복원하려고 저장한 Renderer 원래 색입니다.
+        /// [EN] Original renderer colors retained for flash restoration.
+        /// </summary>
+        private Color[] _originalColors;
+
+        /// <summary>
+        /// 描画中に使い回す個体の設定容器。共有材質は変更しません。
+        /// [KO] 그리는 동안 재사용할 개체 설정 컨테이너이며 공유 재질은 바꾸지 않습니다.
+        /// [EN] Reused property block for this instance, leaving shared materials unchanged.
+        /// </summary>
+        private MaterialPropertyBlock _flashProperties;
+
+        /// <summary>
+        /// 次の Advance が進める閃光の残り秒数。
+        /// [KO] 다음 Advance가 진행할 섬광 잔여 시간(초)입니다.
+        /// [EN] Flash seconds remaining for the next advance.
+        /// </summary>
+        private float _flashRemaining;
+
+        /// <summary>
+        /// 次の Advance が進める反動の残り秒数。
+        /// [KO] 다음 Advance가 진행할 반동 잔여 시간(초)입니다.
+        /// [EN] Recoil seconds remaining for the next advance.
+        /// </summary>
+        private float _recoilRemaining;
+
+        /// <summary>
+        /// 連続被弾の開始位置。現在の変位を維持して次へつなぎます。
+        /// [KO] 현재 변위를 유지해 다음 피격으로 이어갈 시작 위치입니다.
+        /// [EN] Current offset retained as the start of a repeated hit.
+        /// </summary>
+        private Vector3 _recoilStart;
+
+        /// <summary>
+        /// 現在の攻撃元から離れる、親座標での目標位置。
+        /// [KO] 현재 공격 원점에서 멀어질 부모 좌표의 목표 위치입니다.
+        /// [EN] Parent-space target position away from the current attacker.
+        /// </summary>
+        private Vector3 _recoilTarget;
+
+        /// <summary>
+        /// 死亡位置の反動を固定し、新しい反応を拒否する状態。
+        /// [KO] 사망 위치의 반동을 고정하고 새 반응을 거부할 상태입니다.
+        /// [EN] State freezing recoil at death and rejecting new reactions.
+        /// </summary>
+        private bool _isFrozen;
+
+        /// <summary>
+        /// 個体の基本色を上書きする URP プロパティ番号。
+        /// [KO] 개체 기본색을 오버라이드할 URP 프로퍼티 번호입니다.
+        /// [EN] URP property ID overriding the instance base color.
+        /// </summary>
+        private static readonly int _baseColor = Shader.PropertyToID("_BaseColor");
+
+        /// <summary>
+        /// 個体の発光色を上書きする URP プロパティ番号。
+        /// [KO] 개체 발광색을 오버라이드할 URP 프로퍼티 번호입니다.
+        /// [EN] URP property ID overriding the instance emission color.
+        /// </summary>
+        private static readonly int _emissionColor = Shader.PropertyToID("_EmissionColor");
+
+        /// <summary>
+        /// 閃光の間だけ内蔵白マップへ切り替える番号。
+        /// [KO] 섬광 동안만 내장 흰 맵으로 바꿀 번호입니다.
+        /// [EN] Property ID switching to the built-in white map during the flash.
+        /// </summary>
+        private static readonly int _emissionMap = Shader.PropertyToID("_EmissionMap");
+
+        /// <summary>
+        /// 移動軸を含めず、この反動だけを示す現在の世界変位。
+        /// [KO] 이동 축을 제외하고 이 반동만 나타낼 현재 월드 변위입니다.
+        /// [EN] Current world displacement from recoil alone, excluding attack movement.
+        /// </summary>
+        public Vector3 Displacement => transform.parent.TransformVector(transform.localPosition - _homePosition);
+
+        /// <summary>
+        /// 自体プレハブの参照と時間を確認し、元の材質設定を一度記録します。
+        /// [KO] 자체 프리팹 참조·시간을 확인하고 원래 재질 설정을 한 번 기록합니다.
+        /// [EN] Validates authored references and timings and caches original renderer properties once.
+        /// </summary>
+        private void Awake()
+        {
+            if (_visualRoot == null || !_visualRoot.IsChildOf(transform) || transform.parent == null ||
+                _flashSeconds <= 0 || _flashHoldSeconds < 0 || _flashHoldSeconds >= _flashSeconds ||
+                _flashIntensity <= 0 || _recoilDistance < 0 || _recoilSeconds <= 0 ||
+                _recoilOutSeconds <= 0 || _recoilOutSeconds >= _recoilSeconds)
+            {
+                throw new InvalidOperationException("Hit reaction references and timings must be valid.");
+            }
+
+            _homePosition = transform.localPosition;
+            _renderers = _visualRoot.GetComponentsInChildren<Renderer>();
+            _originalProperties = new MaterialPropertyBlock[_renderers.Length];
+            _originalColors = new Color[_renderers.Length];
+            _flashProperties = new MaterialPropertyBlock();
+            for (var i = 0; i < _renderers.Length; i++)
+            {
+                var block = new MaterialPropertyBlock();
+                _renderers[i].GetPropertyBlock(block);
+                _originalProperties[i] = block;
+                var material = _renderers[i].sharedMaterial;
+                _originalColors[i] = block.HasColor(_baseColor) ? block.GetColor(_baseColor) :
+                    material != null && material.HasProperty(_baseColor) ? material.GetColor(_baseColor) : default;
+            }
+        }
+
+        /// <summary>
+        /// UnitView が反応開始前に同じ共通パレットを渡します。設定アセットは借用します。
+        /// [KO] UnitView가 반응 시작 전에 같은 공통 팔레트를 전달하며 설정 에셋은 빌립니다.
+        /// [EN] UnitView supplies the borrowed shared palette before reactions begin.
+        /// </summary>
+        public void ApplyPalette(GameColorPalette colors)
+        {
+            _colors = colors != null ? colors : throw new ArgumentNullException(nameof(colors));
+        }
+
+        /// <summary>
+        /// 現在の攻撃元から離れる反動と閃光を開始します。連続被害は現在位置からつなぎます。
+        /// [KO] 현재 공격 원점에서 멀어질 반동·섬광을 시작하며 연속 피해는 현재 위치에서 이어갑니다.
+        /// [EN] Starts flash and recoil away from the attacker, continuing repeated hits from the current offset.
+        /// </summary>
+        public void Play(Vector3 sourcePosition)
+        {
+            if (_isFrozen || !isActiveAndEnabled) return;
+            if (_colors == null)
+                throw new InvalidOperationException("Apply the hit palette before playing a reaction.");
+            var direction = _visualRoot.position - sourcePosition;
+            direction.y = 0;
+            if (direction.sqrMagnitude < 0.001f) direction = -_visualRoot.forward;
+            // 例: 距離0.14を親の縮尺で換算し、モデルの大きさによらず同じ幅だけ動かす。
+            _recoilStart = transform.localPosition;
+            _recoilTarget = _homePosition +
+                            transform.parent.InverseTransformVector(direction.normalized * _recoilDistance);
+            _flashRemaining = _flashSeconds;
+            _recoilRemaining = _recoilSeconds;
+            RenderFlash(1f);
+        }
+
+        /// <summary>
+        /// UnitView が毎フレーム経過秒を渡し、この反応の時計だけを進めます。
+        /// [KO] UnitView가 매 프레임 경과 초를 전달해 이 반응의 시계만 진행합니다.
+        /// [EN] UnitView supplies elapsed seconds each frame to advance only this reaction's clock.
+        /// </summary>
+        public void Advance(float deltaSeconds)
+        {
+            if (float.IsNaN(deltaSeconds) || float.IsInfinity(deltaSeconds) || deltaSeconds < 0)
+                throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
+            if (_recoilRemaining > 0)
+            {
+                _recoilRemaining = Mathf.Max(0, _recoilRemaining - deltaSeconds);
+                var elapsed = _recoilSeconds - _recoilRemaining;
+                transform.localPosition = elapsed < _recoilOutSeconds
+                    ? Vector3.Lerp(_recoilStart, _recoilTarget, elapsed / _recoilOutSeconds)
+                    : Vector3.Lerp(_recoilTarget, _homePosition,
+                        (elapsed - _recoilOutSeconds) / (_recoilSeconds - _recoilOutSeconds));
+            }
+
+            if (_flashRemaining <= 0) return;
+            _flashRemaining = Mathf.Max(0, _flashRemaining - deltaSeconds);
+            RenderFlash(Mathf.Clamp01(_flashRemaining / (_flashSeconds - _flashHoldSeconds)));
+        }
+
+        /// <summary>
+        /// 死亡表示の位置を固定します。閃光だけは残り時間で消えます。
+        /// [KO] 사망 표시 위치를 고정하며 섬광만 남은 시간에 사라집니다.
+        /// [EN] Freezes the death position while the flash fades for its remaining duration.
+        /// </summary>
+        public void Freeze()
+        {
+            _isFrozen = true;
+            _recoilRemaining = 0;
+        }
+
+        /// <summary>
+        /// UnitView の解除・再接続で呼び、位置・閃光・死亡固定をすべて戻します。
+        /// [KO] UnitView 해제·재연결 때 호출해 위치·섬광·사망 고정을 모두 복원합니다.
+        /// [EN] Called on UnitView release or rebind to restore position, flash and the death freeze.
+        /// </summary>
+        public void Clear()
+        {
+            _flashRemaining = 0;
+            _recoilRemaining = 0;
+            _isFrozen = false;
+            if (_renderers == null) return;
+            transform.localPosition = _homePosition;
+            RenderFlash(0);
+        }
+
+        /// <summary>
+        /// 個体の設定だけを上書きし、終了時に記録した Block を復元します。
+        /// [KO] 개체 설정만 오버라이드하고 종료 때 기록한 Block을 복원합니다.
+        /// [EN] Overrides only instance properties and restores the cached blocks on completion.
+        /// </summary>
+        private void RenderFlash(float strength)
+        {
+            for (var i = 0; i < _renderers.Length; i++)
+            {
+                if (strength <= 0)
+                {
+                    _renderers[i].SetPropertyBlock(_originalProperties[i]);
+                    continue;
+                }
+
+                _renderers[i].GetPropertyBlock(_flashProperties);
+                var color = _colors.GetColor(Define.PaletteColor.OnAccent);
+                _flashProperties.SetColor(_baseColor, Color.Lerp(_originalColors[i], color, strength * 0.65f));
+                _flashProperties.SetTexture(_emissionMap, Texture2D.whiteTexture);
+                _flashProperties.SetColor(_emissionColor, color * (_flashIntensity * strength));
+                _renderers[i].SetPropertyBlock(_flashProperties);
+            }
+        }
+
+        /// <summary>
+        /// 非表示でも反動と個体の材質上書きを残しません。
+        /// [KO] 비활성화 때도 반동과 개체 재질 오버라이드를 남기지 않습니다.
+        /// [EN] Clears recoil and instance material overrides when disabled.
+        /// </summary>
+        private void OnDisable() => Clear();
+    }
+}

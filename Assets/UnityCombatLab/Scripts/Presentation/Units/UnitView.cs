@@ -14,34 +14,6 @@ namespace UnityCombatLab.Presentation.Units
     public sealed class UnitView : MonoBehaviour
     {
         /// <summary>
-        /// 閃光の全体秒数と、最大輝度を保つ秒数。
-        /// [KO] 섬광 전체 시간과 최대 밝기 유지 시간(초)입니다.
-        /// [EN] Total flash seconds and the time spent at full brightness.
-        /// </summary>
-        private const float HitFlashSeconds = 0.1f;
-
-        /// <summary>
-        /// 命中直後に白い姿を読めるよう保つ秒数。
-        /// [KO] 명중 직후 흰 실루엣을 읽을 수 있게 유지할 시간(초)입니다.
-        /// [EN] Seconds retaining a readable bright silhouette immediately after impact.
-        /// </summary>
-        private const float HitFlashHoldSeconds = 0.035f;
-
-        /// <summary>
-        /// 小さく押されて戻る全体秒数。
-        /// [KO] 살짝 밀렸다가 돌아올 전체 시간(초)입니다.
-        /// [EN] Total seconds for the small push and return.
-        /// </summary>
-        private const float RecoilSeconds = 0.18f;
-
-        /// <summary>
-        /// 押される動きを終えるまでの秒数。残り時間で元へ戻します。
-        /// [KO] 밀리는 동작을 끝낼 시간(초)이며 나머지 시간에 원위치로 돌아옵니다.
-        /// [EN] Seconds spent moving outward, with the remaining time used to return.
-        /// </summary>
-        private const float RecoilOutSeconds = 0.045f;
-
-        /// <summary>
         /// 自身の Animator。
         /// [KO] 자체 Animator입니다.
         /// [EN] Owned Animator.
@@ -54,6 +26,20 @@ namespace UnityCombatLab.Presentation.Units
         /// [EN] Model moved independently of the logical slot.
         /// </summary>
         [SerializeField] private Transform _model;
+
+        /// <summary>
+        /// 論理スロットの子に配置した、攻撃の接近・復帰だけを動かす軸。
+        /// [KO] 논리 슬롯의 자식에 배치한 공격 접근·복귀만 움직일 축입니다.
+        /// [EN] Authored pivot beneath the logical slot, moved only for attack approach and return.
+        /// </summary>
+        [SerializeField] private Transform _motionRoot;
+
+        /// <summary>
+        /// 移動軸の子で閃光・反動とその解除を担当する表示。
+        /// [KO] 이동 축의 자식에서 섬광·반동과 그 해제를 담당할 표시입니다.
+        /// [EN] Child view owning flash, recoil and their cleanup independently of attack movement.
+        /// </summary>
+        [SerializeField] private UnitHitReactionView _hitReaction;
 
         /// <summary>
         /// 次の攻撃周期より短い攻撃再生秒数。
@@ -140,11 +126,11 @@ namespace UnityCombatLab.Presentation.Units
         private bool _isBound;
 
         /// <summary>
-        /// 解除時に戻すモデルの元の姿勢。
-        /// [KO] 해제 때 복원할 모델 원래 자세입니다.
-        /// [EN] Model home transforms restored on release.
+        /// 解除時に戻す移動軸の初期位置。
+        /// [KO] 해제 때 복원할 이동 축 초기 위치입니다.
+        /// [EN] Home motion-pivot position restored on release.
         /// </summary>
-        private Vector3 _homePosition;
+        private Vector3 _homeMotionPosition;
 
         /// <summary>
         /// 解除時に戻すモデルの元の大きさ。
@@ -174,75 +160,6 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private float _attackRemaining;
 
-        /// <summary>
-        /// 命中の色を残す秒数。
-        /// [KO] 명중 색을 유지할 시간(초)입니다.
-        /// [EN] Remaining hit-tint seconds.
-        /// </summary>
-        private float _hitRemaining;
-
-        /// <summary>
-        /// 攻撃移動の親として生成し、被弾の変位だけを加える表示用の軸。
-        /// [KO] 공격 이동의 부모로 생성해 피격 변위만 더하는 표시용 축입니다.
-        /// [EN] Visual pivot created above attack movement to add only hit displacement.
-        /// </summary>
-        private Transform _reactionRoot;
-
-        /// <summary>
-        /// 次の Update が進める押し戻しの残り秒数。
-        /// [KO] 다음 Update가 진행할 밀림의 남은 시간(초)입니다.
-        /// [EN] Recoil seconds remaining for the next update.
-        /// </summary>
-        private float _recoilRemaining;
-
-        /// <summary>
-        /// 連続被弾でも位置を飛ばさないよう保存した開始変位。
-        /// [KO] 연속 피격에도 위치가 튀지 않도록 저장한 시작 변위입니다.
-        /// [EN] Starting offset retained to keep repeated hits continuous.
-        /// </summary>
-        private Vector3 _recoilStart;
-
-        /// <summary>
-        /// 攻撃元と反対へ世界距離0.14だけ動く、親座標での目標変位。
-        /// [KO] 공격 원점 반대로 월드 거리 0.14만큼 움직일 부모 좌표의 목표 변위입니다.
-        /// [EN] Parent-space offset corresponding to a world-space push of 0.14 away from the attacker.
-        /// </summary>
-        private Vector3 _recoilTarget;
-
-        /// <summary>
-        /// 色を読むため借用する共通パレット。
-        /// [KO] 색을 읽으려고 빌리는 공통 팔레트입니다.
-        /// [EN] Borrowed shared effect palette.
-        /// </summary>
-        private GameColorPalette _colors;
-
-        /// <summary>
-        /// 原本材質を変えず既存 Renderer 設定を復元するキャッシュ。
-        /// [KO] 원본 재질을 바꾸지 않고 기존 Renderer 설정을 복원할 캐시입니다.
-        /// [EN] Cache restoring renderer properties without changing original materials.
-        /// </summary>
-        private Renderer[] _renderers;
-
-        /// <summary>
-        /// 被弾色を解除する時に Renderer ごとに復元する設定。
-        /// [KO] 피격 색을 해제할 때 Renderer별로 복원할 설정입니다.
-        /// [EN] Per-renderer settings restored after hit tint.
-        /// </summary>
-        private MaterialPropertyBlock[] _originalProperties;
-
-        /// <summary>
-        /// 被弾色から元の色へ戻すため開始時に読む色。
-        /// [KO] 피격 색에서 원래 색으로 돌아가려고 시작 때 읽은 색입니다.
-        /// [EN] Starting colors used to fade hit tint back to the originals.
-        /// </summary>
-        private Color[] _originalColors;
-
-        /// <summary>
-        /// 被弾色を書き込む時に使い回す設定容器。
-        /// [KO] 피격 색을 기록할 때 재사용할 설정 컨테이너입니다.
-        /// [EN] Reusable property block used while applying hit tint.
-        /// </summary>
-        private MaterialPropertyBlock _flashProperties;
 
         /// <summary>
         /// View の寿命で生成し、最大三対象へ同時に飛ばす表示。
@@ -286,26 +203,6 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private BattleEffectView _death;
 
-        /// <summary>
-        /// 自身の URP 材質と Controller のプロパティ番号。
-        /// [KO] 자체 URP 재질과 Controller의 프로퍼티 번호입니다.
-        /// [EN] Property IDs for the owned URP material and controller.
-        /// </summary>
-        private static readonly int _baseColor = Shader.PropertyToID("_BaseColor");
-
-        /// <summary>
-        /// 個体ごとの発光色を渡す URP プロパティ。
-        /// [KO] 개체별 발광색을 전달할 URP 프로퍼티입니다.
-        /// [EN] URP property receiving the per-instance emission color.
-        /// </summary>
-        private static readonly int _emissionColor = Shader.PropertyToID("_EmissionColor");
-
-        /// <summary>
-        /// 通常の黒い発光マップを命中時だけ白へ切り替える番号。
-        /// [KO] 평소 검정 발광 맵을 명중 때만 흰색으로 바꿀 번호입니다.
-        /// [EN] Property switching the normally black emission map to white only on impact.
-        /// </summary>
-        private static readonly int _emissionMap = Shader.PropertyToID("_EmissionMap");
 
         /// <summary>
         /// 購入クリップを指定秒数で再生する Controller パラメーター。
@@ -371,46 +268,41 @@ namespace UnityCombatLab.Presentation.Units
         public Vector3 ImpactPosition => _model.position + Vector3.up * (1.25f * transform.lossyScale.y);
 
         /// <summary>
-        /// 元の姿勢・手・材質設定を一度記録します。
-        /// [KO] 원래 자세·손·재질 설정을 한 번 기록합니다.
-        /// [EN] Caches home transforms, hand and renderer properties once.
+        /// プレハブの移動・反動軸を確認し、元の攻撃姿勢と手を一度記録します。
+        /// [KO] 프리팹 이동·반동 축을 확인하고 원래 공격 자세와 손을 한 번 기록합니다.
+        /// [EN] Validates authored motion and reaction pivots and caches the home attack pose and hand once.
         /// </summary>
         private void Awake()
         {
-            if (_animator == null || _model == null || _attackSeconds <= 0 || _releaseNormalized <= 0 ||
+            if (_animator == null || _model == null || _motionRoot == null || _hitReaction == null ||
+                _motionRoot.parent != transform || _hitReaction.transform.parent != _motionRoot ||
+                !_model.IsChildOf(_hitReaction.transform) || _attackSeconds <= 0 || _releaseNormalized <= 0 ||
                 _releaseNormalized >= 1 || _attackClipSeconds <= 0 || _flightSeconds < 0)
-                throw new InvalidOperationException("Unit presentation references and timing must be valid.");
-            _homePosition = _model.localPosition;
+            {
+                throw new InvalidOperationException(
+                    "Unit presentation references, authored pivots and timings must be valid.");
+            }
+
+            _homeMotionPosition = _motionRoot.localPosition;
             _homeScale = _model.localScale;
             _homeRotation = _model.localRotation;
-            // 攻撃 Tween は従来のモデルを動かし、被弾は新しい親だけを動かすため競合しない。
-            _reactionRoot = new GameObject("Unit_HitReaction").transform;
-            _reactionRoot.SetParent(_model.parent, false);
-            _model.SetParent(_reactionRoot, false);
             _hand = _animator.GetBoneTransform(_usesLeftHand ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
-            _renderers = _model.GetComponentsInChildren<Renderer>();
-            _originalProperties = new MaterialPropertyBlock[_renderers.Length];
-            _originalColors = new Color[_renderers.Length];
-            _flashProperties = new MaterialPropertyBlock();
-            for (var i = 0; i < _renderers.Length; i++)
-            {
-                var block = new MaterialPropertyBlock();
-                _renderers[i].GetPropertyBlock(block);
-                _originalProperties[i] = block;
-                var material = _renderers[i].sharedMaterial;
-                _originalColors[i] = block.HasColor(_baseColor) ? block.GetColor(_baseColor) :
-                    material != null && material.HasProperty(_baseColor) ? material.GetColor(_baseColor) : default;
-            }
         }
 
         /// <summary>
-        /// EntryPoint が色を渡し、借用する効果を開始時に一度生成します。
-        /// [KO] EntryPoint가 색을 전달하고 사용할 효과를 시작 시 한 번 생성합니다.
-        /// [EN] EntryPoint supplies colors and creates owned effects once at startup.
+        /// 共通色だけを被弾表示へ渡します。効果の生成は PrepareEffects が担当します。
+        /// [KO] 공통 색상만 피격 표시에 전달하며 효과 생성은 PrepareEffects가 담당합니다.
+        /// [EN] Supplies only shared colors to hit reactions; PrepareEffects owns effect creation.
         /// </summary>
-        public void ApplyPalette(GameColorPalette colors)
+        public void ApplyPalette(GameColorPalette colors) => _hitReaction.ApplyPalette(colors);
+
+        /// <summary>
+        /// EntryPoint が接続前に呼び、ユニット所有の効果を一度準備します。再呼出しでは既存効果を再利用します。
+        /// [KO] EntryPoint가 연결 전에 호출하여 유닛 소유 효과를 한 번 준비하며 재호출 시 기존 효과를 재사용합니다.
+        /// [EN] Called by EntryPoint before binding to prepare unit-owned effects once, reusing them on subsequent calls.
+        /// </summary>
+        public void PrepareEffects()
         {
-            _colors = colors != null ? colors : throw new ArgumentNullException(nameof(colors));
             if (_projectilePrefab != null && _projectiles[0] == null)
             {
                 for (var i = 0; i < _projectiles.Length; i++)
@@ -482,7 +374,7 @@ namespace UnityCombatLab.Presentation.Units
             _attackRemaining = _attackSeconds;
             _animator.SetFloat(_attackSpeed, _attackClipSeconds / _attackSeconds);
             Play("Attack");
-            var direction = targetPosition - _model.position;
+            var direction = targetPosition - _motionRoot.position;
             direction.y = 0;
             if (direction.sqrMagnitude > 0.001f)
             {
@@ -497,11 +389,13 @@ namespace UnityCombatLab.Presentation.Units
                 // 前列の距離 3.6 なら、武器の間合い 1.35 を残す移動 2.25 を双方で半分ずつ使う。
                 // 後列へは片方だけが近づくため全距離を使う。論理スロットは動かさない。
                 var distance = Mathf.Max(0, direction.magnitude - 1.35f) * approachFraction;
-                var destination = _model.position + direction.normalized * distance;
-                var localDestination = _model.parent.InverseTransformPoint(destination);
-                sequence.Append(_model.DOLocalMove(localDestination, ReleaseDelay * 0.82f).SetEase(Ease.InOutSine));
+                var destination = _motionRoot.position + direction.normalized * distance;
+                var localDestination = _motionRoot.parent.InverseTransformPoint(destination);
+                sequence.Append(_motionRoot.DOLocalMove(localDestination, ReleaseDelay * 0.82f)
+                    .SetEase(Ease.InOutSine));
                 sequence.AppendInterval(ReleaseDelay * 0.18f);
-                sequence.Append(_model.DOLocalMove(_homePosition, _attackSeconds - ReleaseDelay).SetEase(Ease.OutSine));
+                sequence.Append(_motionRoot.DOLocalMove(_homeMotionPosition, _attackSeconds - ReleaseDelay)
+                    .SetEase(Ease.OutSine));
             }
             else
             {
@@ -517,7 +411,7 @@ namespace UnityCombatLab.Presentation.Units
                     return;
                 }
 
-                _model.localPosition = _homePosition;
+                _motionRoot.localPosition = _homeMotionPosition;
                 _model.localScale = _homeScale;
                 _model.localRotation = _homeRotation;
                 _attackRemaining = 0;
@@ -615,25 +509,9 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         public void ShowHit(Guid runId, Vector3 sourcePosition)
         {
-            if (!_isBound || IsDead || runId != _runId)
-            {
-                return;
-            }
-
-            if (!IsAttacking)
-            {
-                Play("Hit");
-            }
-
-            _hitRemaining = HitFlashSeconds;
-            var direction = _model.position - sourcePosition;
-            direction.y = 0;
-            if (direction.sqrMagnitude < 0.001f) direction = -_model.forward;
-            // 世界距離0.14を親の縮尺で換算し、ユニットの大きさによらず同じ小幅にする。
-            _recoilStart = _reactionRoot.localPosition;
-            _recoilTarget = _reactionRoot.parent.InverseTransformVector(direction.normalized * 0.14f);
-            _recoilRemaining = RecoilSeconds;
-            RenderHitFlash(1f);
+            if (!_isBound || IsDead || runId != _runId) return;
+            if (!IsAttacking) Play("Hit");
+            _hitReaction.Play(sourcePosition);
         }
 
         /// <summary>
@@ -644,59 +522,7 @@ namespace UnityCombatLab.Presentation.Units
         private void Update()
         {
             _attackRemaining = Mathf.Max(0, _attackRemaining - Time.deltaTime);
-            AdvanceHitReaction(Time.deltaTime);
-        }
-
-        /// <summary>
-        /// 表示用の親を押して戻し、短い保持後に閃光を消します。戦闘スロットは動かしません。
-        /// [KO] 표시용 부모를 밀었다가 되돌리고 짧은 유지 후 섬광을 지우며 전투 슬롯은 움직이지 않습니다.
-        /// [EN] Pushes and returns the visual parent and fades the flash after a brief hold without moving battle slots.
-        /// </summary>
-        private void AdvanceHitReaction(float deltaSeconds)
-        {
-            if (_recoilRemaining > 0)
-            {
-                _recoilRemaining = Mathf.Max(0, _recoilRemaining - deltaSeconds);
-                var elapsed = RecoilSeconds - _recoilRemaining;
-                _reactionRoot.localPosition = elapsed < RecoilOutSeconds
-                    ? Vector3.Lerp(_recoilStart, _recoilTarget, elapsed / RecoilOutSeconds)
-                    : Vector3.Lerp(_recoilTarget, Vector3.zero,
-                        (elapsed - RecoilOutSeconds) / (RecoilSeconds - RecoilOutSeconds));
-            }
-
-            if (_hitRemaining <= 0 || _colors == null)
-            {
-                return;
-            }
-
-            _hitRemaining = Mathf.Max(0, _hitRemaining - deltaSeconds);
-            RenderHitFlash(Mathf.Clamp01(_hitRemaining / (HitFlashSeconds - HitFlashHoldSeconds)));
-        }
-
-        /// <summary>
-        /// 共通パレットの明色を個体の PropertyBlock に渡し、共有材質は変更しません。
-        /// [KO] 공통 팔레트의 밝은 색을 개체 PropertyBlock에 전달하고 공유 재질은 바꾸지 않습니다.
-        /// [EN] Applies the shared palette's bright color through per-instance property blocks without changing shared materials.
-        /// </summary>
-        private void RenderHitFlash(float strength)
-        {
-            if (_colors == null) return;
-            for (var i = 0; i < _renderers.Length; i++)
-            {
-                if (strength <= 0)
-                {
-                    _renderers[i].SetPropertyBlock(_originalProperties[i]);
-                    continue;
-                }
-
-                _renderers[i].GetPropertyBlock(_flashProperties);
-                _flashProperties.SetColor(_baseColor,
-                    Color.Lerp(_originalColors[i], _colors.GetColor(Define.PaletteColor.OnAccent), strength * 0.65f));
-                _flashProperties.SetTexture(_emissionMap, Texture2D.whiteTexture);
-                _flashProperties.SetColor(_emissionColor,
-                    _colors.GetColor(Define.PaletteColor.OnAccent) * (3f * strength));
-                _renderers[i].SetPropertyBlock(_flashProperties);
-            }
+            _hitReaction.Advance(Time.deltaTime);
         }
 
         /// <summary>
@@ -712,8 +538,7 @@ namespace UnityCombatLab.Presentation.Units
             }
 
             StopMotion(false);
-            // 死亡位置は維持し、帰還中の反応で死体が滑らないようにする。
-            _recoilRemaining = 0;
+            _hitReaction.Freeze();
             IsDead = true;
             Play("Death");
             if (_death != null)
@@ -746,9 +571,7 @@ namespace UnityCombatLab.Presentation.Units
             _isBound = false;
             StopMotion();
             HideProjectiles(true);
-            _hitRemaining = 0;
-            _recoilRemaining = 0;
-            if (_reactionRoot != null) _reactionRoot.localPosition = Vector3.zero;
+            if (_hitReaction != null) _hitReaction.Clear();
             foreach (var impact in _impacts)
             {
                 if (impact != null)
@@ -759,14 +582,6 @@ namespace UnityCombatLab.Presentation.Units
 
             if (_strike != null) _strike.Clear();
             if (_death != null) _death.Clear();
-
-            if (_renderers == null)
-            {
-                return;
-            }
-
-            for (var i = 0; i < _renderers.Length; i++)
-                _renderers[i].SetPropertyBlock(_originalProperties[i]);
         }
 
         /// <summary>
@@ -785,7 +600,7 @@ namespace UnityCombatLab.Presentation.Units
                 return;
             }
 
-            _model.localPosition = _homePosition;
+            _motionRoot.localPosition = _homeMotionPosition;
             _model.localScale = _homeScale;
             _model.localRotation = _homeRotation;
         }

@@ -263,38 +263,26 @@ namespace UnityCombatLab.Presentation.Units
             if (double.IsNaN(deltaSeconds) || double.IsInfinity(deltaSeconds) || deltaSeconds < 0)
                 throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
             _time += deltaSeconds;
+            // 先に全命中を反映し、最後の攻撃を届けた死亡だけを表示してから結果を公開する。
+            AdvanceAttacks();
+            PresentDeaths();
+            CompleteWhenReady();
+        }
+
+        /// <summary>
+        /// 全予約を作成順に同時進行させ、命中済みで演出時間も過ぎた攻撃だけを除去します。
+        /// [KO] 모든 예약을 생성 순서로 동시에 진행하고 명중 및 연출 시간이 끝난 공격만 제거합니다.
+        /// [EN] Advances all cues concurrently in creation order and removes attacks only after impact and presentation finish.
+        /// </summary>
+        private void AdvanceAttacks()
+        {
             for (var index = 0; index < _attacks.Count; index++)
             {
                 var cue = _attacks[index];
                 var actor = _views[cue.Actor];
                 var elapsed = _time - cue.Started;
-                if (!cue.HasImpacted && elapsed >= actor.ReleaseDelay && actor.ImpactDelay > actor.ReleaseDelay)
-                {
-                    var progress = (float)Math.Min(1, (elapsed - actor.ReleaseDelay) /
-                                                      (actor.ImpactDelay - actor.ReleaseDelay));
-                    for (var target = 0; target < cue.Damage.Count; target++)
-                    {
-                        var targetView = _views[_indices[cue.Damage[target].TargetId]];
-                        actor.PresentProjectile(target, targetView.ImpactPosition, progress);
-                    }
-                }
-
-                if (!cue.HasImpacted && elapsed + 0.00001 >= actor.ImpactDelay)
-                {
-                    cue.HasImpacted = true;
-                    actor.HideProjectiles();
-                    actor.ShowStrike(_runId);
-                    for (var hit = 0; hit < cue.Damage.Count; hit++)
-                    {
-                        var damage = cue.Damage[hit];
-                        var target = _indices[damage.TargetId];
-                        // 到着順が異なっても確定損失を一度引く。後で古い絶対 HP を代入して体力を戻さない。
-                        _model.Units[target].ApplyDamage(damage.HealthDamage, damage.ShieldDamage);
-                        actor.ShowImpact(_runId, hit, _views[target].ImpactPosition);
-                        _views[target].ShowHit(_runId, actor.ImpactPosition);
-                        _hud.Units[target].ShowDamage(damage.HealthDamage, damage.ShieldDamage);
-                    }
-                }
+                AdvanceProjectiles(cue, actor, elapsed);
+                ApplyImpactWhenReady(cue, actor, elapsed);
 
                 if (cue.HasImpacted && elapsed >= Math.Max(actor.AttackDuration, actor.ImpactDelay))
                 {
@@ -302,7 +290,59 @@ namespace UnityCombatLab.Presentation.Units
                     index--;
                 }
             }
+        }
 
+        /// <summary>
+        /// 発射から命中までの間だけ、各対象の現在位置へ投射物を進めます。
+        /// [KO] 발사부터 명중 사이에만 각 대상의 현재 위치로 투사체를 진행합니다.
+        /// [EN] Advances projectiles toward each target current position only between release and impact.
+        /// </summary>
+        private void AdvanceProjectiles(AttackCue cue, UnitView actor, double elapsed)
+        {
+            if (!cue.HasImpacted && elapsed >= actor.ReleaseDelay && actor.ImpactDelay > actor.ReleaseDelay)
+            {
+                var progress = (float)Math.Min(1, (elapsed - actor.ReleaseDelay) /
+                                                  (actor.ImpactDelay - actor.ReleaseDelay));
+                for (var target = 0; target < cue.Damage.Count; target++)
+                {
+                    var targetView = _views[_indices[cue.Damage[target].TargetId]];
+                    actor.PresentProjectile(target, targetView.ImpactPosition, progress);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 命中時刻に一度だけ HP、効果、被弾、数字をこの順で反映します。
+        /// [KO] 명중 시각에 한 번만 HP·효과·피격·숫자를 이 순서로 반영합니다.
+        /// [EN] Applies health, effects, hit reaction and numbers once, in that order, at impact time.
+        /// </summary>
+        private void ApplyImpactWhenReady(AttackCue cue, UnitView actor, double elapsed)
+        {
+            if (!cue.HasImpacted && elapsed + 0.00001 >= actor.ImpactDelay)
+            {
+                cue.HasImpacted = true;
+                actor.HideProjectiles();
+                actor.ShowStrike(_runId);
+                for (var hit = 0; hit < cue.Damage.Count; hit++)
+                {
+                    var damage = cue.Damage[hit];
+                    var target = _indices[damage.TargetId];
+                    // 到着順が異なっても確定損失を一度引く。後で古い絶対 HP を代入して体力を戻さない。
+                    _model.Units[target].ApplyDamage(damage.HealthDamage, damage.ShieldDamage);
+                    actor.ShowImpact(_runId, hit, _views[target].ImpactPosition);
+                    _views[target].ShowHit(_runId, actor.ImpactPosition);
+                    _hud.Units[target].ShowDamage(damage.HealthDamage, damage.ShieldDamage);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 表示 HP が零になり、自分の最後の命中を届けたユニットだけを倒します。
+        /// [KO] 표시 HP가 0이고 자신의 마지막 명중을 전달한 유닛만 사망시킵니다.
+        /// [EN] Shows death only after displayed health reaches zero and the unit delivers its final impact.
+        /// </summary>
+        private void PresentDeaths()
+        {
             for (var index = 0; index < _views.Length; index++)
             {
                 if (_model.Units[index].Health.CurrentValue != 0 || _views[index].IsDead)
@@ -319,7 +359,15 @@ namespace UnityCombatLab.Presentation.Units
                 _views[index].ShowDeath(_runId);
                 _lastDeathTime = _time;
             }
+        }
 
+        /// <summary>
+        /// 確定結果があり、全攻撃と死亡待機が終わった時だけ結果を公開します。
+        /// [KO] 확정 결과가 있고 모든 공격과 사망 대기가 끝났을 때만 결과를 공개합니다.
+        /// [EN] Publishes the committed result only after all attacks and the death wait finish.
+        /// </summary>
+        private void CompleteWhenReady()
+        {
             if (_committedResult == Define.BattleResult.Ongoing || _attacks.Count != 0 ||
                 _time < _lastDeathTime + 0.82) return;
             foreach (var view in _views)

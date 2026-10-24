@@ -59,13 +59,13 @@ namespace UnityCombatLab.Presentation.UI
                     var status = view.Units[index];
                     status.Initialize(RoleName(unit.Input.Role), unit.Input.Team);
                     // Subscribe した時に現在 HP が一度届き、以後は HP が変わるたびに value に新しい HP が届く。
-                    // 例: 命中で 600 → 590 なら SetHealth(590, 600, true) を呼び、追加の予告待機を入れない。
+                    // 例: 命中で 600 → 590 なら SetHealth(590, 600) を呼び、追加の予告待機を入れない。
                     // AddTo はこの接続を解除用リストへ入れる。Presenter.Dispose でまとめて通知を止める。
                     unit.Health.Subscribe(value =>
                     {
                         if (!_isDisposed && status != null)
                         {
-                            status.SetHealth(value, unit.Input.MaxHealth, true);
+                            status.SetHealth(value, unit.Input.MaxHealth);
                         }
                     }).AddTo(_subscriptions);
                     // 予約被害は数字を変えず予告範囲だけに伝える。命中した値は上の Health 接続から届く。
