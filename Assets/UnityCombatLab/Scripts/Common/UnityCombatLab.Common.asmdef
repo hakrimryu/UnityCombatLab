@@ -1,0 +1,6 @@
+{
+    "name": "UnityCombatLab.Common",
+    "rootNamespace": "UnityCombatLab.Common",
+    "references": [],
+    "noEngineReferences": true
+}

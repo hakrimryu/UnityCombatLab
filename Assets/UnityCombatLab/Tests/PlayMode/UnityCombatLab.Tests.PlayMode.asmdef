@@ -1,7 +1,18 @@
 {
     "name": "UnityCombatLab.Tests.PlayMode",
     "rootNamespace": "UnityCombatLab.Tests.PlayMode",
-    "references": ["UnityCombatLab.Bootstrap", "VContainer", "UnityEngine.UI"],
-    "optionalUnityReferences": ["TestAssemblies"],
-    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+    "references": [
+        "UnityCombatLab.Bootstrap",
+        "VContainer",
+        "UnityEngine.UI",
+        "UniTask",
+        "UnityCombatLab.Common",
+        "UnityCombatLab.Infrastructure"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ]
 }

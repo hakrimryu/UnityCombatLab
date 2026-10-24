@@ -1,0 +1,8 @@
+{
+    "name": "UnityCombatLab.Infrastructure",
+    "rootNamespace": "UnityCombatLab.Infrastructure",
+    "references": [
+        "UnityCombatLab.Common",
+        "UniTask"
+    ]
+}

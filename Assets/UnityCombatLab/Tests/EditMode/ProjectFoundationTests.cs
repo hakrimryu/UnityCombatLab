@@ -1,6 +1,9 @@
 using System.Reflection;
+using System.Linq;
 using NUnit.Framework;
+using UnityCombatLab.Common;
 using UnityEditor;
+using UnityEngine.SceneManagement;
 
 namespace UnityCombatLab.Tests.EditMode
 {
@@ -43,6 +46,32 @@ namespace UnityCombatLab.Tests.EditMode
             Assert.That(PlayerSettings.allowedAutorotateToPortraitUpsideDown, Is.False);
             Assert.That(PlayerSettings.allowedAutorotateToLandscapeLeft, Is.True);
             Assert.That(PlayerSettings.allowedAutorotateToLandscapeRight, Is.True);
+        }
+
+        /// <summary>
+        /// 列挙値とビルド順序が正しいシーンアセットに対応することを検証します。
+        /// [KO] enum 값과 빌드 순서가 올바른 씬 에셋에 대응하는지 검증합니다.
+        /// [EN] Verifies enum values and build order correspond to the correct scene assets.
+        /// </summary>
+        [Test]
+        public void SceneIndicesResolveToExpectedBuildAssets()
+        {
+            Assert.That((int)Define.SceneType.Boot, Is.EqualTo(0));
+            Assert.That((int)Define.SceneType.Dungeon, Is.EqualTo(1));
+            var expectedPaths = new[]
+            {
+                "Assets/UnityCombatLab/Scenes/Boot.unity",
+                "Assets/UnityCombatLab/Scenes/Dungeon.unity"
+            };
+            var scenes = EditorBuildSettings.scenes.Where(scene => scene.enabled).ToArray();
+            Assert.That(scenes.Length, Is.GreaterThanOrEqualTo(expectedPaths.Length));
+            for (var index = 0; index < expectedPaths.Length; index++)
+            {
+                Assert.That(scenes[index].path, Is.EqualTo(expectedPaths[index]));
+                Assert.That(SceneUtility.GetScenePathByBuildIndex(index), Is.EqualTo(expectedPaths[index]));
+                Assert.That(scenes.Count(scene => scene.path == expectedPaths[index]), Is.EqualTo(1));
+                Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(expectedPaths[index]), Is.Not.Null);
+            }
         }
     }
 }
