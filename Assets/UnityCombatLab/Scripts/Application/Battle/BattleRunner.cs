@@ -142,7 +142,8 @@ namespace UnityCombatLab.Application.Battle
                     for (var index = 0; index < _simulation.EventCount; index++)
                     {
                         // コアの再利用配列ではなく、イベント一件の値を取り出す。
-                        // 先に表示用 HP を更新すると R3 が HUD を更新し、次に EventOccurred で演出を呼ぶ。
+                        // 先に計算上の確定状態を更新し、EventOccurred で表示予約へ値をコピーする。
+                        // HUD は別の表示モデルを購読するため、この更新では命中前の数字を変えない。
                         var battleEvent = _simulation.GetEvent(index);
                         ReadModel.Apply(battleEvent);
                         EventOccurred?.Invoke(battleEvent);

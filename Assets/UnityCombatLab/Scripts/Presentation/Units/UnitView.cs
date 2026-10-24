@@ -14,6 +14,76 @@ namespace UnityCombatLab.Presentation.Units
     public sealed class UnitView : MonoBehaviour
     {
         /// <summary>
+        /// 接近後に武器の間合いとして残すワールド距離。
+        /// [KO] 접근 후 무기 간격으로 남길 월드 거리입니다.
+        /// [EN] World-space weapon reach retained after approaching.
+        /// </summary>
+        private const float MeleeReachWorldUnits = 1.35f;
+
+        /// <summary>
+        /// 発射までの時間のうち接近移動に使う比率。
+        /// [KO] 발사까지의 시간 중 접근 이동에 사용하는 비율입니다.
+        /// [EN] Fraction of the release delay spent approaching.
+        /// </summary>
+        private const float ApproachTravelFraction = 0.82f;
+
+        /// <summary>
+        /// 接近後、発射まで姿勢を保つ時間比率。
+        /// [KO] 접근 후 발사까지 자세를 유지하는 시간 비율입니다.
+        /// [EN] Fraction of the release delay spent holding the approach pose.
+        /// </summary>
+        private const float ApproachHoldFraction = 0.18f;
+
+        /// <summary>
+        /// 特殊な遠距離攻撃でモデルを拡大する倍率。
+        /// [KO] 특수 원거리 공격에서 모델을 확대하는 배율입니다.
+        /// [EN] Model scale multiplier for a special ranged attack.
+        /// </summary>
+        private const float SpecialAttackScaleMultiplier = 1.06f;
+
+        /// <summary>
+        /// 通常の遠距離攻撃でモデルを拡大する倍率。
+        /// [KO] 일반 원거리 공격에서 모델을 확대하는 배율입니다.
+        /// [EN] Model scale multiplier for a normal ranged attack.
+        /// </summary>
+        private const float NormalAttackScaleMultiplier = 1.025f;
+
+        /// <summary>
+        /// 飛行の中央で投射物を持ち上げるワールド高さ。
+        /// [KO] 비행 중간에서 투사체를 들어 올리는 월드 높이입니다.
+        /// [EN] World-space projectile height at the middle of its arc.
+        /// </summary>
+        private const float ProjectileArcHeightWorldUnits = 0.25f;
+
+        /// <summary>
+        /// 手から剣先効果を前方へずらすワールド距離。
+        /// [KO] 손에서 검 끝 효과를 앞쪽으로 옮길 월드 거리입니다.
+        /// [EN] World-space forward offset of the blade effect from the hand.
+        /// </summary>
+        private const float StrikeForwardOffsetWorldUnits = 0.3f;
+
+        /// <summary>
+        /// ルート縮尺一倍での胴体命中高さ。
+        /// [KO] 루트 스케일 1배일 때 몸통 명중 높이입니다.
+        /// [EN] Torso impact height at unit root scale one.
+        /// </summary>
+        private const float ImpactHeightPerUnitScale = 1.25f;
+
+        /// <summary>
+        /// ルート縮尺一倍での死亡効果の高さ。
+        /// [KO] 루트 스케일 1배일 때 사망 효과 높이입니다.
+        /// [EN] Death-effect height at unit root scale one.
+        /// </summary>
+        private const float DeathHeightPerUnitScale = 0.5f;
+
+        /// <summary>
+        /// ほぼ同じ位置で不定な向きを作らないための距離二乗。
+        /// [KO] 거의 같은 위치에서 불확정 방향을 만들지 않을 제곱 거리 기준입니다.
+        /// [EN] Squared-distance threshold avoiding an undefined direction at nearly identical positions.
+        /// </summary>
+        private const float MinimumDirectionSqrMagnitude = 0.001f;
+
+        /// <summary>
         /// 自身の Animator。
         /// [KO] 자체 Animator입니다.
         /// [EN] Owned Animator.
@@ -265,7 +335,8 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] 움직이는 모델 몸통 위치이며 현재 상대를 조준하는 데 씁니다.
         /// [EN] Moving torso position used to aim at the current target.
         /// </summary>
-        public Vector3 ImpactPosition => _model.position + Vector3.up * (1.25f * transform.lossyScale.y);
+        public Vector3 ImpactPosition =>
+            _model.position + Vector3.up * (ImpactHeightPerUnitScale * transform.lossyScale.y);
 
         /// <summary>
         /// プレハブの移動・反動軸を確認し、元の攻撃姿勢と手を一度記録します。
@@ -376,30 +447,33 @@ namespace UnityCombatLab.Presentation.Units
             Play("Attack");
             var direction = targetPosition - _motionRoot.position;
             direction.y = 0;
-            if (direction.sqrMagnitude > 0.001f)
+            if (direction.sqrMagnitude > MinimumDirectionSqrMagnitude)
             {
                 _model.rotation = Quaternion.LookRotation(direction);
             }
 
             var generation = _generation;
-            var sequence = DOTween.Sequence();
+            // 現在の DOTween 既定値と同じ Normal/scaled を明示し、表示時計と時間基準を揃える。
+            var sequence = DOTween.Sequence().SetUpdate(UpdateType.Normal, false);
             _motion = sequence;
             if (isMelee)
             {
                 // 前列の距離 3.6 なら、武器の間合い 1.35 を残す移動 2.25 を双方で半分ずつ使う。
                 // 後列へは片方だけが近づくため全距離を使う。論理スロットは動かさない。
-                var distance = Mathf.Max(0, direction.magnitude - 1.35f) * approachFraction;
+                var distance = Mathf.Max(0, direction.magnitude - MeleeReachWorldUnits) * approachFraction;
                 var destination = _motionRoot.position + direction.normalized * distance;
                 var localDestination = _motionRoot.parent.InverseTransformPoint(destination);
-                sequence.Append(_motionRoot.DOLocalMove(localDestination, ReleaseDelay * 0.82f)
+                sequence.Append(_motionRoot.DOLocalMove(localDestination, ReleaseDelay * ApproachTravelFraction)
                     .SetEase(Ease.InOutSine));
-                sequence.AppendInterval(ReleaseDelay * 0.18f);
+                sequence.AppendInterval(ReleaseDelay * ApproachHoldFraction);
                 sequence.Append(_motionRoot.DOLocalMove(_homeMotionPosition, _attackSeconds - ReleaseDelay)
                     .SetEase(Ease.OutSine));
             }
             else
             {
-                sequence.Append(_model.DOScale(_homeScale * (isSpecial ? 1.06f : 1.025f), ReleaseDelay));
+                sequence.Append(_model.DOScale(
+                    _homeScale * (isSpecial ? SpecialAttackScaleMultiplier : NormalAttackScaleMultiplier),
+                    ReleaseDelay));
                 sequence.Append(_model.DOScale(_homeScale, _attackSeconds - ReleaseDelay));
             }
 
@@ -443,9 +517,10 @@ namespace UnityCombatLab.Presentation.Units
             }
 
             projectile.transform.position = Vector3.Lerp(start, targetPosition, progress) +
-                                            Vector3.up * (Mathf.Sin(progress * Mathf.PI) * 0.25f);
+                                            Vector3.up *
+                                            (Mathf.Sin(progress * Mathf.PI) * ProjectileArcHeightWorldUnits);
             var direction = targetPosition - start;
-            if (direction.sqrMagnitude > 0.001f)
+            if (direction.sqrMagnitude > MinimumDirectionSqrMagnitude)
             {
                 projectile.transform.rotation = Quaternion.LookRotation(direction);
             }
@@ -498,7 +573,7 @@ namespace UnityCombatLab.Presentation.Units
             if (_isBound && !IsDead && runId == _runId && _strike != null)
             {
                 var position = _hand != null ? _hand.position : ImpactPosition;
-                _strike.Play(position + _model.forward * 0.3f, _model.forward);
+                _strike.Play(position + _model.forward * StrikeForwardOffsetWorldUnits, _model.forward);
             }
         }
 
@@ -521,8 +596,10 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void Update()
         {
-            _attackRemaining = Mathf.Max(0, _attackRemaining - Time.deltaTime);
-            _hitReaction.Advance(Time.deltaTime);
+            // 攻撃保護と反動は表示と同じ scaled 秒。20Hz の計算時間はここでは進めない。
+            var presentationDeltaSeconds = Time.deltaTime;
+            _attackRemaining = Mathf.Max(0, _attackRemaining - presentationDeltaSeconds);
+            _hitReaction.Advance(presentationDeltaSeconds);
         }
 
         /// <summary>
@@ -543,7 +620,8 @@ namespace UnityCombatLab.Presentation.Units
             Play("Death");
             if (_death != null)
             {
-                _death.Play(_model.position + Vector3.up * (0.5f * transform.lossyScale.y), Vector3.forward);
+                _death.Play(_model.position + Vector3.up * (DeathHeightPerUnitScale * transform.lossyScale.y),
+                    Vector3.forward);
             }
         }
 

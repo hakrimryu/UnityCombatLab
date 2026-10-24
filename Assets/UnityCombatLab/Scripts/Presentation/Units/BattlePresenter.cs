@@ -17,6 +17,20 @@ namespace UnityCombatLab.Presentation.Units
     public sealed class BattlePresenter : IDisposable
     {
         /// <summary>
+        /// 表示時計と予約の判断だけを所有する純粋 C#。View と HUD への呼出しはこの Presenter が担当します。
+        /// [KO] 표시 시계와 예약 판단만 소유하는 순수 C#이며 View·HUD 호출은 이 Presenter가 담당합니다.
+        /// [EN] Pure C# owner of presentation time and cue decisions; this presenter owns view and HUD calls.
+        /// </summary>
+        private readonly BattlePresentationTimeline _timeline = new();
+
+        /// <summary>
+        /// 前列同士の接近を双方で半分ずつ分担する比率。
+        /// [KO] 전열끼리의 접근을 양쪽이 절반씩 분담하는 비율입니다.
+        /// [EN] Fraction splitting front-line approach equally between both actors.
+        /// </summary>
+        private const float SharedFrontApproachFraction = 0.5f;
+
+        /// <summary>
         /// 確定イベントを同期的に受け取る借用 Runner。
         /// [KO] 확정 이벤트를 동기로 받는 빌린 Runner입니다.
         /// [EN] Borrowed runner supplying committed events synchronously.
@@ -66,34 +80,6 @@ namespace UnityCombatLab.Presentation.Units
         private readonly int _wave;
 
         /// <summary>
-        /// 他の攻撃を待たず並行して進む、この戦闘の予約。
-        /// [KO] 다른 공격을 기다리지 않고 병렬로 진행할 이번 전투 예약입니다.
-        /// [EN] Battle-owned cues progressing concurrently without waiting for other attacks.
-        /// </summary>
-        private readonly List<AttackCue> _attacks = new();
-
-        /// <summary>
-        /// 表示だけの経過秒・最後の死亡・確定勝敗と解除状態。
-        /// [KO] 표시 전용 경과 시간·마지막 사망·확정 승패와 해제 상태입니다.
-        /// [EN] Presentation clock, final death time, committed result and disposal state.
-        /// </summary>
-        private double _time;
-
-        /// <summary>
-        /// 最後に死亡表示を開始した秒数。初期値は待機を発生させない過去。
-        /// [KO] 마지막 사망 표시를 시작한 시각(초)이며 초기값은 대기를 만들지 않는 과거입니다.
-        /// [EN] Last death start in seconds, initially far enough in the past to cause no wait.
-        /// </summary>
-        private double _lastDeathTime = -100;
-
-        /// <summary>
-        /// Runner が既に確定した、最後の演出後に表示する勝敗。
-        /// [KO] Runner가 이미 확정했고 마지막 연출 후 표시할 승패입니다.
-        /// [EN] Runner-committed result published after final effects.
-        /// </summary>
-        private Define.BattleResult _committedResult;
-
-        /// <summary>
         /// 解除後のイベントとフレーム更新を拒否する状態。
         /// [KO] 해제 후 이벤트·프레임 갱신을 거부할 상태입니다.
         /// [EN] State rejecting events and frame updates after disposal.
@@ -105,7 +91,7 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] 미완료 동시 공격 수이며 종료·검증에 사용합니다.
         /// [EN] Number of unfinished simultaneous attacks used for completion and validation.
         /// </summary>
-        public int PendingAttackCount => _attacks.Count;
+        public int PendingAttackCount => _timeline.Attacks.Count;
 
         /// <summary>
         /// 最後の命中・死亡まで画面に届いた状態。
@@ -113,61 +99,6 @@ namespace UnityCombatLab.Presentation.Units
         /// [EN] Whether final hits and deaths have reached the screen.
         /// </summary>
         public bool IsComplete { get; private set; }
-
-        /// <summary>
-        /// 一回の攻撃へコピーした値だけを持つ内部予約。元のイベント配列は保持しません。
-        /// [KO] 공격 한 번에 복사한 값만 보관하는 내부 예약이며 원래 이벤트 배열은 보관하지 않습니다.
-        /// [EN] Internal cue containing only copied values for one attack, never the reused event buffer.
-        /// </summary>
-        private sealed class AttackCue
-        {
-            /// <summary>
-            /// 同じ actor・tick の被害を、この開始時刻と攻撃表示へ結び付けます。
-            /// [KO] 같은 actor·tick 피해를 이 시작 시각·공격 표시에 연결합니다.
-            /// [EN] Connects damage from the same actor and tick to this start time and attack.
-            /// </summary>
-            public readonly int Actor;
-
-            /// <summary>
-            /// この攻撃と同じ tick の被害だけを探す番号。
-            /// [KO] 이 공격과 같은 틱의 피해만 찾을 번호입니다.
-            /// [EN] Tick identifying damage belonging to this attack.
-            /// </summary>
-            public readonly int Tick;
-
-            /// <summary>
-            /// 他の攻撃とは独立した、この攻撃の開始秒数。
-            /// [KO] 다른 공격과 독립적인 이 공격 시작 시각(초)입니다.
-            /// [EN] Start time in seconds, independent of other attacks.
-            /// </summary>
-            public readonly double Started;
-
-            /// <summary>
-            /// 同期消費中に値としてコピーした、最大三対象の確定被害。
-            /// [KO] 동기 소비 중 값으로 복사한 최대 세 대상의 확정 피해입니다.
-            /// [EN] Committed damage copied by value during synchronous consumption for up to three targets.
-            /// </summary>
-            public readonly List<BattleEvent> Damage = new(Define.SlotsPerTeam);
-
-            /// <summary>
-            /// 同じ確定被害を二度表示しないための到着済み状態。
-            /// [KO] 같은 확정 피해를 두 번 표시하지 않기 위한 도착 상태입니다.
-            /// [EN] Arrival flag preventing the same committed loss from being presented twice.
-            /// </summary>
-            public bool HasImpacted;
-
-            /// <summary>
-            /// 同期通知の時刻と行動者を一度記録します。
-            /// [KO] 동기 알림 시각과 행동자를 한 번 기록합니다.
-            /// [EN] Records the synchronous notification time and actor once.
-            /// </summary>
-            public AttackCue(int actor, int tick, double started)
-            {
-                Actor = actor;
-                Tick = tick;
-                Started = started;
-            }
-        }
 
         /// <summary>
         /// EntryPoint が同じ順のモデルと View を渡し、この戦闘のイベント接続を開始します。
@@ -210,7 +141,7 @@ namespace UnityCombatLab.Presentation.Units
 
             if (item.Kind == Define.BattleEventKind.BattleEnded)
             {
-                _committedResult = item.Result;
+                _timeline.CommitResult(item.Result);
                 return;
             }
 
@@ -229,20 +160,15 @@ namespace UnityCombatLab.Presentation.Units
                 var targetPosition = isArea ? view.transform.position : _views[target].transform.position;
                 var shareApproach = !isArea && input.Slot == Define.BattleSlot.Front &&
                                     _model.Units[target].Input.Slot == Define.BattleSlot.Front;
-                view.ShowAttack(_runId, targetPosition, isMelee, isSpecial, shareApproach ? 0.5f : 1f);
-                _attacks.Add(new AttackCue(actor, item.Tick, _time));
+                view.ShowAttack(_runId, targetPosition, isMelee, isSpecial,
+                    shareApproach ? SharedFrontApproachFraction : 1f);
+                _timeline.BeginAttack(actor, item.Tick, view.AttackDuration, view.ReleaseDelay, view.ImpactDelay);
             }
             else if (item.Kind == Define.BattleEventKind.DamageApplied)
             {
                 var actor = _indices[item.ActorId];
-                var cue = _attacks.LastOrDefault(a => a.Actor == actor && a.Tick == item.Tick);
-                if (cue == null)
-                {
-                    throw new InvalidOperationException("Committed damage requires its attack cue.");
-                }
-
-                // BattleEvent は不変の値型。コピー後は Runner が Acknowledge して配列を再利用できる。
-                cue.Damage.Add(item);
+                // コピーしたイベントだけを予約し、Runner の再利用バッファを非同期表示へ渡さない。
+                _timeline.ReserveDamage(actor, item);
                 _model.Units[_indices[item.TargetId]].ReserveDamage(item.HealthDamage);
             }
             // 死亡は既に確定しているが、画面では予約被害が到着して HP 0 になった時に一度だけ示す。
@@ -253,16 +179,14 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] EntryPoint가 매 프레임 호출해 모든 공격을 동시에 진행하며 누군가의 연출 때문에 전투 틱을 멈추지 않습니다.
         /// [EN] EntryPoint advances every attack concurrently each frame, never blocking combat ticks for another unit's animation.
         /// </summary>
-        public void Advance(double deltaSeconds)
+        public void Advance(double scaledDeltaSeconds)
         {
             if (_isDisposed || IsComplete)
             {
                 return;
             }
 
-            if (double.IsNaN(deltaSeconds) || double.IsInfinity(deltaSeconds) || deltaSeconds < 0)
-                throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
-            _time += deltaSeconds;
+            _timeline.Advance(scaledDeltaSeconds);
             // 先に全命中を反映し、最後の攻撃を届けた死亡だけを表示してから結果を公開する。
             AdvanceAttacks();
             PresentDeaths();
@@ -276,19 +200,13 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void AdvanceAttacks()
         {
-            for (var index = 0; index < _attacks.Count; index++)
+            for (var index = 0; index < _timeline.Attacks.Count; index++)
             {
-                var cue = _attacks[index];
+                var cue = _timeline.Attacks[index];
                 var actor = _views[cue.Actor];
-                var elapsed = _time - cue.Started;
-                AdvanceProjectiles(cue, actor, elapsed);
-                ApplyImpactWhenReady(cue, actor, elapsed);
-
-                if (cue.HasImpacted && elapsed >= Math.Max(actor.AttackDuration, actor.ImpactDelay))
-                {
-                    _attacks.RemoveAt(index);
-                    index--;
-                }
+                AdvanceProjectiles(index, cue, actor);
+                ApplyImpactWhenReady(index, cue, actor);
+                if (_timeline.RemoveIfFinished(index)) index--;
             }
         }
 
@@ -297,17 +215,13 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] 발사부터 명중 사이에만 각 대상의 현재 위치로 투사체를 진행합니다.
         /// [EN] Advances projectiles toward each target current position only between release and impact.
         /// </summary>
-        private void AdvanceProjectiles(AttackCue cue, UnitView actor, double elapsed)
+        private void AdvanceProjectiles(int index, BattlePresentationTimeline.AttackCue cue, UnitView actor)
         {
-            if (!cue.HasImpacted && elapsed >= actor.ReleaseDelay && actor.ImpactDelay > actor.ReleaseDelay)
+            if (!_timeline.TryGetProjectileProgress(index, out var progress)) return;
+            for (var target = 0; target < cue.Damage.Count; target++)
             {
-                var progress = (float)Math.Min(1, (elapsed - actor.ReleaseDelay) /
-                                                  (actor.ImpactDelay - actor.ReleaseDelay));
-                for (var target = 0; target < cue.Damage.Count; target++)
-                {
-                    var targetView = _views[_indices[cue.Damage[target].TargetId]];
-                    actor.PresentProjectile(target, targetView.ImpactPosition, progress);
-                }
+                var targetView = _views[_indices[cue.Damage[target].TargetId]];
+                actor.PresentProjectile(target, targetView.ImpactPosition, progress);
             }
         }
 
@@ -316,23 +230,20 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] 명중 시각에 한 번만 HP·효과·피격·숫자를 이 순서로 반영합니다.
         /// [EN] Applies health, effects, hit reaction and numbers once, in that order, at impact time.
         /// </summary>
-        private void ApplyImpactWhenReady(AttackCue cue, UnitView actor, double elapsed)
+        private void ApplyImpactWhenReady(int index, BattlePresentationTimeline.AttackCue cue, UnitView actor)
         {
-            if (!cue.HasImpacted && elapsed + 0.00001 >= actor.ImpactDelay)
+            if (!_timeline.TryImpact(index)) return;
+            actor.HideProjectiles();
+            actor.ShowStrike(_runId);
+            for (var hit = 0; hit < cue.Damage.Count; hit++)
             {
-                cue.HasImpacted = true;
-                actor.HideProjectiles();
-                actor.ShowStrike(_runId);
-                for (var hit = 0; hit < cue.Damage.Count; hit++)
-                {
-                    var damage = cue.Damage[hit];
-                    var target = _indices[damage.TargetId];
-                    // 到着順が異なっても確定損失を一度引く。後で古い絶対 HP を代入して体力を戻さない。
-                    _model.Units[target].ApplyDamage(damage.HealthDamage, damage.ShieldDamage);
-                    actor.ShowImpact(_runId, hit, _views[target].ImpactPosition);
-                    _views[target].ShowHit(_runId, actor.ImpactPosition);
-                    _hud.Units[target].ShowDamage(damage.HealthDamage, damage.ShieldDamage);
-                }
+                var damage = cue.Damage[hit];
+                var target = _indices[damage.TargetId];
+                // 到着順が異なっても確定損失を一度引く。古い絶対 HP は代入しない。
+                _model.Units[target].ApplyDamage(damage.HealthDamage, damage.ShieldDamage);
+                actor.ShowImpact(_runId, hit, _views[target].ImpactPosition);
+                _views[target].ShowHit(_runId, actor.ImpactPosition);
+                _hud.Units[target].ShowDamage(damage.HealthDamage, damage.ShieldDamage);
             }
         }
 
@@ -345,19 +256,10 @@ namespace UnityCombatLab.Presentation.Units
         {
             for (var index = 0; index < _views.Length; index++)
             {
-                if (_model.Units[index].Health.CurrentValue != 0 || _views[index].IsDead)
-                {
+                if (!_timeline.CanPresentDeath(index, _model.Units[index].Health.CurrentValue, _views[index].IsDead))
                     continue;
-                }
-
-                // 同じ tick で既に確定した最後の斬撃・発射だけを届けてから倒す。他人の攻撃は待たない。
-                if (_attacks.Any(a => a.Actor == index && !a.HasImpacted))
-                {
-                    continue;
-                }
-
                 _views[index].ShowDeath(_runId);
-                _lastDeathTime = _time;
+                _timeline.RecordDeath();
             }
         }
 
@@ -368,14 +270,13 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void CompleteWhenReady()
         {
-            if (_committedResult == Define.BattleResult.Ongoing || _attacks.Count != 0 ||
-                _time < _lastDeathTime + 0.82) return;
+            if (!_timeline.CanComplete) return;
             foreach (var view in _views)
             {
                 view.FinishBattle();
             }
 
-            _model.Complete(_committedResult);
+            _model.Complete(_timeline.Result);
             IsComplete = true;
         }
 
@@ -393,7 +294,7 @@ namespace UnityCombatLab.Presentation.Units
 
             _isDisposed = true;
             _runner.EventOccurred -= HandleEventOccurred;
-            _attacks.Clear();
+            _timeline.Clear();
             foreach (var view in _views)
                 if (view != null)
                     view.Release();

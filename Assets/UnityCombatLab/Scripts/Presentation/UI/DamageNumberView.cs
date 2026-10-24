@@ -120,7 +120,7 @@ namespace UnityCombatLab.Presentation.UI
                         _timer = null;
                         Clear();
                     }
-                }, false);
+                }, false).SetUpdate(UpdateType.Normal, false);
             }
 
             /// <summary>

@@ -183,9 +183,9 @@ namespace UnityCombatLab.Bootstrap
         }
 
         /// <summary>
-        /// VContainer が毎フレーム呼びます。前フレームからの秒数を Runner に渡し、20Hz の計算を進めます。
-        /// [KO] VContainer가 매 프레임 호출합니다. 지난 프레임부터 흐른 초를 Runner에 전달해 20Hz 계산을 진행합니다.
-        /// [EN] Called each frame by VContainer; passes elapsed seconds to the runner, which advances simulation at 20 Hz.
+        /// VContainer が毎フレーム呼び、実経過秒で計算を、scaled 秒で表示を順に進めます。
+        /// [KO] VContainer가 매 프레임 호출하여 실제 경과 시간으로 계산을, scaled 시간으로 표시를 차례로 진행합니다.
+        /// [EN] Called each frame by VContainer to advance simulation with unscaled seconds, then presentation with scaled seconds.
         /// </summary>
         public void Tick()
         {
@@ -196,10 +196,12 @@ namespace UnityCombatLab.Bootstrap
 
             try
             {
-                // Unity の timeScale で縮めていない実経過秒を使う。0.05 秒が戦闘の 1 tick に相当する。
-                Runner.Advance(Time.unscaledDeltaTime);
-                // Domain が終了しても、既に確定した最後の命中・死亡・結果表示は毎フレーム進める。
-                _presenter.Advance(Time.deltaTime);
+                // 計算は実経過秒を20Hzへ換算する。表示時計の遅れを計算へ戻さない。
+                var simulationDeltaSeconds = Time.unscaledDeltaTime;
+                Runner.Advance(simulationDeltaSeconds);
+                // 命中予約・View.Update・Normal Tween は scaled 秒を使う。Domain 終了後も最後の表示を進める。
+                var presentationDeltaSeconds = Time.deltaTime;
+                _presenter.Advance(presentationDeltaSeconds);
             }
             catch
             {

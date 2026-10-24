@@ -4,7 +4,8 @@
   "references": [
     "UnityCombatLab.Domain",
     "UnityCombatLab.Common",
-    "UnityCombatLab.Application"
+    "UnityCombatLab.Application",
+    "UnityCombatLab.Presentation"
   ],
   "includePlatforms": [
     "Editor"

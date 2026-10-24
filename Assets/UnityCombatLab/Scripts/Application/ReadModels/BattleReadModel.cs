@@ -8,16 +8,16 @@ using UnityCombatLab.Domain.Battle;
 namespace UnityCombatLab.Application.ReadModels
 {
     /// <summary>
-    /// 各ユニットの画面用 HP・防御膜と戦闘結果をまとめます。実際の戦闘判定は BattleSimulation が行います。
-    /// [KO] 유닛별 화면용 HP·방어막과 전투 결과를 모읍니다. 실제 전투 판정은 BattleSimulation이 수행합니다.
-    /// [EN] Groups display health, shields and outcome. BattleSimulation remains responsible for combat decisions.
+    /// 各ユニットの計算上の確定 HP・盾・結果を保持します。命中時刻の HUD は別の表示モデルを使います。
+    /// [KO] 유닛별 계산상 확정 HP·방어막·결과를 보관하며 명중 시각의 HUD는 별도 표시 모델을 사용합니다.
+    /// [EN] Stores committed simulation health, shields and outcome; impact-timed HUD uses a separate presentation model.
     /// </summary>
     public sealed class BattleReadModel : IDisposable
     {
         /// <summary>
-        /// 画面用のユニットを一度だけ作って保持します。内部ではこの配列を直接巡回し、外部には Units で同じ内容を公開します。
-        /// [KO] 화면용 유닛을 한 번만 만들어 보관합니다. 내부에서는 이 배열을 직접 순회하고 외부에는 Units로 같은 내용을 보여줍니다.
-        /// [EN] Stores display units created once; internal code iterates this array while Units exposes the same contents to callers.
+        /// 確定状態のユニットを一度だけ作って保持します。内部ではこの配列を直接巡回し、外部には Units で同じ内容を公開します。
+        /// [KO] 확정 상태 유닛을 한 번만 만들어 보관합니다. 내부에서는 이 배열을 직접 순회하고 외부에는 Units로 같은 내용을 보여줍니다.
+        /// [EN] Stores committed-state units created once; internal code iterates this array while Units exposes the same contents to callers.
         /// </summary>
         private readonly UnitReadModel[] _unitReadModels;
 
@@ -29,23 +29,23 @@ namespace UnityCombatLab.Application.ReadModels
         private readonly ReactiveProperty<Define.BattleResult> _result = new(Define.BattleResult.Ongoing);
 
         /// <summary>
-        /// 表示するユニット一覧。外部から項目の追加・入替はできませんが、各ユニットの表示 HP は変わります。
-        /// [KO] 표시할 유닛 목록입니다. 외부에서 항목을 추가·교체할 수 없지만 각 유닛의 표시 HP는 바뀝니다.
-        /// [EN] Display unit list; callers cannot add or replace items, while each unit’s displayed health can change.
+        /// 確定状態の一覧。外部から項目の追加・入替はできませんが、イベントで各 HP は変わります。
+        /// [KO] 확정 상태 목록이며 외부에서 항목을 추가·교체할 수 없지만 이벤트로 각 HP는 바뀝니다.
+        /// [EN] Committed-state list; callers cannot add or replace items, while events update each health value.
         /// </summary>
         public IReadOnlyList<UnitReadModel> Units { get; }
 
         /// <summary>
-        /// 確定した表示結果。
-        /// [KO] 확정된 표시 결과.
-        /// [EN] Committed display outcome.
+        /// 計算が確定した結果。画面へ公開する時刻は表示側が決めます。
+        /// [KO] 계산이 확정한 결과이며 화면 공개 시각은 표시 측에서 결정합니다.
+        /// [EN] Simulation-committed outcome; presentation decides when to publish it on screen.
         /// </summary>
         public ReadOnlyReactiveProperty<Define.BattleResult> Result => _result;
 
         /// <summary>
-        /// Runner から開始データを受け取り、各ユニットの初期 HP と防御膜を画面用にコピーします。
-        /// [KO] Runner에서 시작 데이터를 받아 각 유닛의 초기 HP와 방어막을 화면 표시용으로 복사합니다.
-        /// [EN] Receives starting inputs from the runner and copies initial health and shield for display.
+        /// Runner から開始データを受け取り、各ユニットの初期 HP と盾を確定状態として保持します。
+        /// [KO] Runner에서 시작 데이터를 받아 각 유닛의 초기 HP와 방어막을 확정 상태로 보관합니다.
+        /// [EN] Receives starting inputs from the runner and stores initial health and shield as committed state.
         /// </summary>
         internal BattleReadModel(IReadOnlyList<BattleUnitInput> inputs)
         {
@@ -55,9 +55,9 @@ namespace UnityCombatLab.Application.ReadModels
         }
 
         /// <summary>
-        /// Runner がイベントごとに呼びます。被害対象の表示 HP を減らし、終了イベントなら結果の文字を更新させます。
-        /// [KO] Runner가 이벤트마다 호출합니다. 피해 대상의 표시 HP를 줄이고, 종료 이벤트라면 결과 문구 갱신을 알립니다.
-        /// [EN] Called by the runner for each event to update the damaged unit or notify the HUD of the battle outcome.
+        /// Runner がイベントごとに呼び、被害対象の確定 HP・盾または確定結果を更新します。
+        /// [KO] Runner가 이벤트마다 호출하여 피해 대상의 확정 HP·방어막 또는 확정 결과를 갱신합니다.
+        /// [EN] Called by the runner for each event to update committed unit values or the committed outcome.
         /// </summary>
         internal void Apply(BattleEvent battleEvent)
         {
@@ -79,7 +79,7 @@ namespace UnityCombatLab.Application.ReadModels
 
             if (battleEvent.Kind == Define.BattleEventKind.BattleEnded)
             {
-                // 結果の値が変わると、R3 を通して BattleHudPresenter.HandleResultChanged が呼ばれる。
+                // これは即時の確定結果。画面への公開時刻は表示側が別に管理する。
                 _result.Value = battleEvent.Result;
             }
         }
