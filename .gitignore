@@ -115,6 +115,14 @@ Thumbs.db
 
 # Add restricted asset exclusions only after verifying actual import paths.
 
+# Verified Kay Lousberg package root; original content is restored from My Assets.
+/Assets/KayKit/
+/Assets/KayKit.meta
+
+# Materials adapted from purchased textures remain local.
+/Assets/UnityCombatLab/Art/Restricted/
+/Assets/UnityCombatLab/Art/Restricted.meta
+
 # NuGetForUnity restores these generated dependencies from Assets/packages.config.
 /Assets/Packages/
 
