@@ -25,7 +25,11 @@ namespace UnityCombatLab.Tests.EditMode
             var assembly = Assembly.Load("UnityCombatLab.Domain");
             foreach (var reference in assembly.GetReferencedAssemblies())
             {
-                Assert.That(reference.Name, Does.Not.StartWith("Unity"));
+                if (reference.Name != "UnityCombatLab.Common")
+                {
+                    Assert.That(reference.Name, Does.Not.StartWith("Unity"));
+                }
+
                 Assert.That(reference.Name, Does.Not.StartWith("VContainer"));
                 Assert.That(reference.Name, Does.Not.StartWith("R3"));
                 Assert.That(reference.Name, Does.Not.StartWith("UniTask"));
