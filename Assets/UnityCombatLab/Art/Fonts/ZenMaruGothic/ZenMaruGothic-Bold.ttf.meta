@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 7531b2b84ea39734b8e417ffa75d6882
+guid: 1bf3a3b8d47a028489df668e8e23ea12
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,7 +9,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - Noto Sans CJK JP
+  - Zen Maru Gothic
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

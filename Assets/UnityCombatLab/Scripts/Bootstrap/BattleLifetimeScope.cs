@@ -4,6 +4,7 @@ using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Common;
 using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Presentation.UI;
+using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.Units;
 using UnityEngine;
 using VContainer;
@@ -40,6 +41,13 @@ namespace UnityCombatLab.Bootstrap
         [SerializeField] private BattleHudView _hudPrefab;
 
         /// <summary>
+        /// Dungeon のカメラを HUD に渡し、固定スロットの頭上へ状態パネルを投影します。
+        /// [KO] Dungeon 카메라를 HUD에 전달하여 고정 슬롯 머리 위에 상태 패널을 투영합니다.
+        /// [EN] Passes the Dungeon camera to the HUD to project status panels above fixed slots.
+        /// </summary>
+        [SerializeField] private Camera _battleCamera;
+
+        /// <summary>
         /// Boot から残った AppLifetimeScope を DI の親にします。Hierarchy の親子関係は変更しません。
         /// [KO] Boot에서 유지된 AppLifetimeScope를 DI 부모로 사용합니다. Hierarchy의 부모·자식 관계는 바꾸지 않습니다.
         /// [EN] Uses the AppLifetimeScope retained from Boot as the DI parent without changing the Hierarchy.
@@ -59,10 +67,11 @@ namespace UnityCombatLab.Bootstrap
             if (_definitions == null || _definitions.Length != Define.MaxBattleUnitCount ||
                 _definitions.Any(definition => definition == null) || _unitViews == null ||
                 _unitViews.Length != _definitions.Length || _unitViews.Any(view => view == null) ||
-                _unitViews.Distinct().Count() != _unitViews.Length || _hudPrefab == null || Parent == null)
+                _unitViews.Distinct().Count() != _unitViews.Length || _hudPrefab == null ||
+                _battleCamera == null || Parent == null)
             {
                 throw new InvalidOperationException(
-                    "Battle requires six distinct views, definitions, HUD and AppRoot.");
+                    "Battle requires six distinct views, definitions, HUD, camera and AppRoot.");
             }
 
             var canvas = Parent.GetComponentInChildren<Canvas>(true);
@@ -84,14 +93,15 @@ namespace UnityCombatLab.Bootstrap
             const int InitialWave = 1;
             // Boot の RegisterEntryPoint<AppEntryPoint>() は登録済みの型から引数を自動でそろえる。
             // ここはシーンの配列・HUD・今回だけの runId を渡すため、生成方法をラムダで指定する。
-            // _ は VContainer が渡す検索用オブジェクトだが、ここでは使わない。ラムダは毎フレーム呼ばれない。
+            // resolver から親 App Scope の共通パレットを取得する。ラムダは毎フレーム呼ばれない。
             // new BattleRunner(...) は計算担当、その後の引数は同じ戦闘 ID・wave と表示対象。
             // runId/wave を両方へ渡すのは、Runner が出すイベントと Presenter が受け取る戦闘を一致させるため。
             // Scoped はこの Dungeon のコンテナで一つを共有し、破棄時に Dispose する指定。
             // AsSelf はテストなどで具体的な型 BattleEntryPoint としても取得できるようにする指定。
-            builder.RegisterEntryPoint(_ => new BattleEntryPoint(
+            builder.RegisterEntryPoint(resolver => new BattleEntryPoint(
                 new BattleRunner(runId, InitialWave, inputs), runId, InitialWave,
-                _unitViews, _hudPrefab, canvas.transform), Lifetime.Scoped).AsSelf();
+                _unitViews, _hudPrefab, canvas.transform, _battleCamera,
+                resolver.Resolve<GameColorPalette>()), Lifetime.Scoped).AsSelf();
         }
     }
 }

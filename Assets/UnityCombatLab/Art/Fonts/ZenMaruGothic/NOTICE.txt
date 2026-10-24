@@ -1,0 +1,5 @@
+Zen Maru Gothic Bold
+Copyright 2021 The Zen Maru Gothic Project Authors (https://github.com/googlefonts/zen-marugothic)
+Source: https://github.com/google/fonts/tree/main/ofl/zenmarugothic
+License: SIL Open Font License 1.1 (OFL.txt in this directory).
+The original font file is unmodified. UI_BattleJapanese is a generated TextMeshPro atlas using this font and remains subject to the same license.

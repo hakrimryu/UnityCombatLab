@@ -2,7 +2,7 @@ using System;
 using R3;
 using UnityCombatLab.Application.ReadModels;
 using UnityCombatLab.Common;
-using UnityEngine;
+using UnityCombatLab.Presentation.Styling;
 
 namespace UnityCombatLab.Presentation.UI
 {
@@ -39,7 +39,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] BattleEntryPoint.Start가 호출합니다. 초기 HP를 즉시 표시하고 이후에는 값이 바뀔 때 같은 HUD를 갱신합니다.
         /// [EN] Called by BattleEntryPoint.Start to display initial health immediately and then update the HUD on changes.
         /// </summary>
-        public BattleHudPresenter(BattleReadModel model, BattleHudView view)
+        public BattleHudPresenter(BattleReadModel model, BattleHudView view, GameColorPalette colors)
         {
             _view = view != null ? view : throw new ArgumentNullException(nameof(view));
             if (model == null)
@@ -50,15 +50,14 @@ namespace UnityCombatLab.Presentation.UI
             view.Validate(model.Units.Count);
             try
             {
+                // 同じパレットを固定表示と状態別表示へ渡してから、R3 の初期通知を受け取る。
+                view.ApplyPalette(colors);
                 for (var index = 0; index < model.Units.Count; index++)
                 {
                     // データと HUD は同じ配列順。例: index 0 の騎士の HP は index 0 のカードだけへ表示する。
                     var unit = model.Units[index];
                     var status = view.Units[index];
-                    var color = unit.Input.Team == Define.BattleTeam.Ally
-                        ? new Color(0.2f, 0.85f, 0.72f)
-                        : new Color(0.95f, 0.35f, 0.36f);
-                    status.Initialize(RoleName(unit.Input.Role), color);
+                    status.Initialize(RoleName(unit.Input.Role), unit.Input.Team);
                     // Subscribe した時に現在 HP が一度届き、以後は HP が変わるたびに value に新しい HP が届く。
                     // 例: 600 → 590 なら SetHealth(590, 600) を呼ぶ。毎フレーム HUD を書き直す処理ではない。
                     // AddTo はこの接続を解除用リストへ入れる。Presenter.Dispose でまとめて通知を止める。
@@ -127,7 +126,7 @@ namespace UnityCombatLab.Presentation.UI
                 Define.BattleResult.Defeat => "パーティが全滅しました。",
                 Define.BattleResult.Timeout => "制限時間に達しました。",
                 _ => throw new ArgumentOutOfRangeException(nameof(result))
-            });
+            }, result != Define.BattleResult.Ongoing);
         }
 
         /// <summary>

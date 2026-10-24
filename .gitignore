@@ -135,3 +135,7 @@ Thumbs.db
 # Keep bundled third-party sample resources out of the public repository.
 /Assets/TextMesh Pro/
 /Assets/TextMesh Pro.meta
+
+# Verified GUI Pro - Minimal Game Light originals imported by the asset owner.
+/Assets/Layer Lab/
+/Assets/Layer Lab.meta

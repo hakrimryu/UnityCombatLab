@@ -1,6 +1,8 @@
 using System;
 using DG.Tweening;
 using TMPro;
+using UnityCombatLab.Common;
+using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
 
 namespace UnityCombatLab.Presentation.UI
@@ -41,11 +43,18 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private TMP_Text _shield;
 
         /// <summary>
-        /// 割合だけを表示する HP バー。
-        /// [KO] 비율만 표시하는 HP 바.
-        /// [EN] Health ratio bar.
+        /// HP バーの塗り部分。Initialize が陣営色を適用します。
+        /// [KO] HP 바의 채움 부분입니다. Initialize가 팀 색상을 적용합니다.
+        /// [EN] Health-bar fill image whose team color is set by Initialize.
         /// </summary>
         [SerializeField] private UnityEngine.UI.Image _fill;
+
+        /// <summary>
+        /// 購入プレハブの表示専用 Slider。SetHealth が HP 比率を渡し、枠を変形せず塗り幅だけを変えます。
+        /// [KO] 구매 프리팹의 표시 전용 Slider입니다. SetHealth가 HP 비율을 전달해 테두리 변형 없이 채움 너비만 바꿉니다.
+        /// [EN] Display-only slider from the purchased prefab; SetHealth supplies the HP ratio to resize its fill without distorting the border.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Slider _healthBar;
 
         /// <summary>
         /// HP 損失と盾吸収を区別する短い表示。
@@ -53,6 +62,55 @@ namespace UnityCombatLab.Presentation.UI
         /// [EN] Brief label separating health loss and shield absorption.
         /// </summary>
         [SerializeField] private TMP_Text _damage;
+
+        /// <summary>
+        /// HP 損失と同時に発生しても別の行で読める、防御膜吸収の数字。
+        /// [KO] HP 손실과 동시에 발생해도 별도 줄로 읽을 수 있는 방어막 흡수 수치입니다.
+        /// [EN] Shield absorption number on a separate line, readable alongside simultaneous HP loss.
+        /// </summary>
+        [SerializeField] private TMP_Text _shieldDamage;
+
+        /// <summary>
+        /// 防御膜吸収の数字に添える購入スプライト。数字と一緒に表示・解除します。
+        /// [KO] 방어막 흡수 수치 옆의 구매 스프라이트입니다. 수치와 함께 표시·해제합니다.
+        /// [EN] Purchased icon beside the absorption number, shown and cleared with that number.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Image _shieldDamageIcon;
+
+        /// <summary>
+        /// 現在の防御膜の数字に添えるアイコン。戦闘不能時は隠します。
+        /// [KO] 현재 방어막 수치 옆의 아이콘입니다. 전투 불능이면 숨깁니다.
+        /// [EN] Icon beside the current shield value, hidden when defeated.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Image _shieldIcon;
+
+        /// <summary>
+        /// 名前の左に置く役割アイコンの背景。陣営色を使い、死亡時は非活性色にします。
+        /// [KO] 이름 왼쪽 역할 아이콘 배경입니다. 팀 색상을 쓰며 사망 시 비활성 색으로 바꿉니다.
+        /// [EN] Role-icon background beside the name; uses the team color and the muted color on death.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Image _badge;
+
+        /// <summary>
+        /// HP 0 を色だけでなく「戦闘不能」と伝える表示先。
+        /// [KO] HP 0을 색뿐 아니라 '전투 불능' 문구로 알리는 표시 대상입니다.
+        /// [EN] Label explicitly identifying defeat at zero HP rather than relying on color alone.
+        /// </summary>
+        [SerializeField] private TMP_Text _defeated;
+
+        /// <summary>
+        /// 再バインド時にも生存色へ戻せるよう Initialize で記録する陣営色。
+        /// [KO] 재바인딩 시 생존 색으로 복원하도록 Initialize에서 저장하는 팀 색입니다.
+        /// [EN] Team color recorded by Initialize so rebinding can restore the living appearance.
+        /// </summary>
+        private Color _teamColor;
+
+        /// <summary>
+        /// BattleHudView が通知開始前に渡す共通設定。HP と防御膜の状態色もここから読みます。
+        /// [KO] BattleHudView가 알림 연결 전에 전달하는 공통 설정입니다. HP와 방어막 상태 색도 여기에서 읽습니다.
+        /// [EN] Shared settings supplied by BattleHudView before subscriptions, including health and shield state colors.
+        /// </summary>
+        private GameColorPalette _colors;
 
         /// <summary>
         /// 最新の表示だけを消す所有 Tween。
@@ -94,16 +152,38 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 재사용 전에 짧은 연출을 제거합니다.
         /// [EN] Removes transient presentation before reuse.
         /// </summary>
-        public void Initialize(string displayName, Color color)
+        public void Initialize(string displayName, Define.BattleTeam team)
         {
-            if (_name == null || _health == null || _shield == null || _fill == null || _damage == null)
+            if (_name == null || _health == null || _shield == null || _fill == null || _healthBar == null ||
+                _damage == null ||
+                _shieldDamage == null || _shieldDamageIcon == null || _shieldIcon == null ||
+                _badge == null || _defeated == null || _colors == null)
             {
                 throw new InvalidOperationException("Unit status references must be assigned.");
             }
 
             ClearTransient();
             _name.text = displayName;
-            _fill.color = color;
+            _teamColor = _colors.GetTeamColor(team);
+            _fill.color = _teamColor;
+            _badge.color = _teamColor;
+        }
+
+        /// <summary>
+        /// BattleHudView が開始時に色設定と HUD 所有の共有材質を渡します。購入材質は変更しません。
+        /// [KO] BattleHudView가 시작 시 색상 설정과 HUD 소유 공유 재질을 전달합니다. 구매 재질은 수정하지 않습니다.
+        /// [EN] BattleHudView supplies shared colors and its owned damage material at startup, leaving purchased materials untouched.
+        /// </summary>
+        public void ApplyPalette(GameColorPalette colors, Material damageMaterial)
+        {
+            _colors = colors != null ? colors : throw new ArgumentNullException(nameof(colors));
+            if (_damage == null || _shieldDamage == null || damageMaterial == null)
+            {
+                throw new InvalidOperationException("Damage labels and their HUD material must be assigned.");
+            }
+
+            _damage.fontSharedMaterial = damageMaterial;
+            _shieldDamage.fontSharedMaterial = damageMaterial;
         }
 
         /// <summary>
@@ -115,10 +195,16 @@ namespace UnityCombatLab.Presentation.UI
         {
             DisplayedHealth = health;
             HealthRenderCount++;
-            _health.text = health == 0 ? "戦闘不能  0 / " + maxHealth : health + " / " + maxHealth;
-            // Image の fillAmount は 0〜1。例: HP 75/100 は 0.75 でバーを 75% 表示する。
+            _health.text = health + " / " + maxHealth;
+            _defeated.gameObject.SetActive(health == 0);
+            _shield.gameObject.SetActive(health > 0);
+            _shieldIcon.gameObject.SetActive(health > 0);
+            _badge.color = health == 0 ? _colors.GetColor(Define.PaletteColor.MutedText) : _teamColor;
+            _name.color = _colors.GetColor(health == 0 ? Define.PaletteColor.MutedText : Define.PaletteColor.Text);
+            // Slider の範囲は 0〜1。例: HP 75/100 は 0.75 で塗り幅を 75% にする。
             // float に変換しない整数除算では 75/100 が 0 になり、残 HP があってもバーが空になる。
-            _fill.fillAmount = (float)health / maxHealth;
+            // 表示専用なので値変更イベントは送らず、ReadModel への逆向きの入力を作らない。
+            _healthBar.SetValueWithoutNotify((float)health / maxHealth);
         }
 
         /// <summary>
@@ -130,6 +216,7 @@ namespace UnityCombatLab.Presentation.UI
         {
             DisplayedShield = shield;
             _shield.text = "シールド " + shield;
+            _shield.color = _colors.GetColor(shield > 0 ? Define.PaletteColor.Shield : Define.PaletteColor.MutedText);
         }
 
         /// <summary>
@@ -142,17 +229,17 @@ namespace UnityCombatLab.Presentation.UI
             ClearTransient();
             // 今回の表示番号を保存する。別の被害表示に切り替わったら番号が変わるため、古いタイマーは何もしない。
             var generation = _generation;
-            _damage.text = healthDamage > 0 ? "−" + healthDamage : "";
-            if (shieldDamage > 0)
-            {
-                _damage.text += "  シールド −" + shieldDamage;
-            }
+            _damage.text = healthDamage > 0 ? "-" + healthDamage : "";
+            _shieldDamage.text = shieldDamage > 0 ? "-" + shieldDamage : "";
+            _shieldDamageIcon.gameObject.SetActive(shieldDamage > 0);
 
             _damageTween = DOVirtual.DelayedCall(DamageLabelSeconds, () =>
             {
                 if (this != null && generation == _generation)
                 {
                     _damage.text = "";
+                    _shieldDamage.text = "";
+                    _shieldDamageIcon.gameObject.SetActive(false);
                     _damageTween = null;
                 }
             }, false);
@@ -171,6 +258,16 @@ namespace UnityCombatLab.Presentation.UI
             if (_damage != null)
             {
                 _damage.text = "";
+            }
+
+            if (_shieldDamage != null)
+            {
+                _shieldDamage.text = "";
+            }
+
+            if (_shieldDamageIcon != null)
+            {
+                _shieldDamageIcon.gameObject.SetActive(false);
             }
         }
 

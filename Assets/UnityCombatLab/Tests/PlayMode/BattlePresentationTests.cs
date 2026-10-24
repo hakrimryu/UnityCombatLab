@@ -9,6 +9,7 @@ using UnityCombatLab.Bootstrap;
 using UnityCombatLab.Common;
 using UnityCombatLab.Infrastructure.Scenes;
 using UnityCombatLab.Presentation.UI;
+using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.Units;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -109,6 +110,14 @@ namespace UnityCombatLab.Tests.PlayMode
                     var snapshot = runner.GetUnit(model.Input.Team, model.Input.Slot);
                     Assert.That(entry.Hud.Units[index].DisplayedHealth, Is.EqualTo(snapshot.Health));
                     Assert.That(entry.Hud.Units[index].DisplayedShield, Is.EqualTo(snapshot.Shield));
+                    var status = entry.Hud.Units[index];
+                    var healthLabel = status.transform.Find("Health").GetComponent<TMPro.TMP_Text>();
+                    var healthBar = status.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
+                    Assert.That(healthLabel.text, Is.EqualTo(snapshot.Health + " / " + model.Input.MaxHealth));
+                    Assert.That(healthBar.normalizedValue,
+                        Is.EqualTo((float)snapshot.Health / model.Input.MaxHealth).Within(0.001f));
+                    Assert.That(status.transform.Find("UI_Defeated").gameObject.activeSelf,
+                        Is.EqualTo(snapshot.Health == 0));
                 }
             }
 
@@ -136,7 +145,8 @@ namespace UnityCombatLab.Tests.PlayMode
             var hud = Object.Instantiate(entry.Hud);
             var inputs = entry.Runner.ReadModel.Units.Select(unit => unit.Input).ToArray();
             using var runner = new BattleRunner(Guid.NewGuid(), 1, inputs);
-            var presenter = new BattleHudPresenter(runner.ReadModel, hud);
+            var colors = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<GameColorPalette>();
+            var presenter = new BattleHudPresenter(runner.ReadModel, hud, colors);
             var initial = hud.Units.Select(unit => unit.HealthRenderCount).ToArray();
             runner.Advance(0.4);
             Assert.That(hud.Units.Select(unit => unit.HealthRenderCount), Is.EqualTo(initial));
@@ -144,7 +154,7 @@ namespace UnityCombatLab.Tests.PlayMode
             presenter.Dispose();
             runner.Advance(0.1);
             Assert.That(hud.Units.Select(unit => unit.HealthRenderCount), Is.EqualTo(initial));
-            using (new BattleHudPresenter(runner.ReadModel, hud))
+            using (new BattleHudPresenter(runner.ReadModel, hud, colors))
             {
                 for (var index = 0; index < inputs.Length; index++)
                 {
@@ -209,12 +219,67 @@ namespace UnityCombatLab.Tests.PlayMode
             view.ShowDamage(12, 3);
             var callback = ((Tween)tweenField.GetValue(view)).onStepComplete;
             view.ClearTransient();
-            view.ShowDamage(9, 0);
+            view.ShowDamage(9, 6);
             var label = (TMPro.TMP_Text)textField.GetValue(view);
             var expectedText = label.text;
+            var shieldLabel = view.transform.Find("UI_ShieldDamage").GetComponent<TMPro.TMP_Text>();
+            var shieldIcon = view.transform.Find("UI_ShieldDamageIcon").gameObject;
             callback();
             Assert.That(label.text, Is.EqualTo(expectedText));
+            Assert.That(shieldLabel.text, Is.EqualTo("-6"));
+            Assert.That(shieldIcon.activeSelf, Is.True);
             view.ClearTransient();
+            Assert.That(shieldLabel.text, Is.Empty);
+            Assert.That(shieldIcon.activeSelf, Is.False);
+            yield return null;
+        }
+
+        /// <summary>
+        /// ノッチを想定した内側の安全領域でも 6 枚が重ならず、名前と HP が切れないことを確認します。
+        /// [KO] 노치를 가정한 안쪽 안전 영역에서도 패널 6개가 겹치지 않고 이름·HP가 잘리지 않는지 확인합니다.
+        /// [EN] Checks that all six panels remain separate and their names and HP fit inside an inset safe area.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator PanelsFitInsetSafeAreaWithoutOverlap()
+        {
+            var hud = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>().Hud;
+            var safe = (RectTransform)hud.transform.Find("SafeArea");
+            var size = new Vector2Int(Screen.width, Screen.height);
+            var inset = new Rect(size.x * 0.08f, size.y * 0.04f, size.x * 0.84f, size.y * 0.92f);
+            try
+            {
+                hud.UpdateLayout(inset, size);
+                Canvas.ForceUpdateCanvases();
+                hud.UpdateLayout(inset, size);
+                var panels = hud.Units.Select(unit => (RectTransform)unit.transform).ToArray();
+                var bounds = panels.Select(panel => new Rect((Vector2)panel.localPosition -
+                                                             new Vector2(panel.rect.width * 0.5f, 0), panel.rect.size))
+                    .ToArray();
+                for (var index = 0; index < bounds.Length; index++)
+                {
+                    Assert.That(bounds[index].xMin, Is.GreaterThanOrEqualTo(safe.rect.xMin));
+                    Assert.That(bounds[index].xMax, Is.LessThanOrEqualTo(safe.rect.xMax));
+                    Assert.That(bounds[index].yMin, Is.GreaterThanOrEqualTo(safe.rect.yMin));
+                    Assert.That(bounds[index].yMax, Is.LessThanOrEqualTo(safe.rect.yMax - 140));
+                    for (var other = index + 1; other < bounds.Length; other++)
+                    {
+                        Assert.That(bounds[index].Overlaps(bounds[other]), Is.False,
+                            "Status panels " + index + " and " + other + " overlap.");
+                    }
+
+                    foreach (var name in new[] { "Role", "Health", "Shield", "UI_Defeated" })
+                    {
+                        var text = panels[index].Find(name).GetComponent<TMPro.TMP_Text>();
+                        text.ForceMeshUpdate(true);
+                        Assert.That(text.isTextOverflowing, Is.False, text.name + " text is clipped.");
+                    }
+                }
+            }
+            finally
+            {
+                hud.UpdateLayout(Screen.safeArea, size);
+            }
+
             yield return null;
         }
 

@@ -1,6 +1,8 @@
 using System;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Presentation.UI;
+using UnityCombatLab.Presentation.Styling;
+using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Units;
 using UnityEngine;
 using VContainer.Unity;
@@ -41,6 +43,20 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Models owned by Dungeon.
         /// </summary>
         private readonly UnitView[] _unitViews;
+
+        /// <summary>
+        /// Dungeon が所有するカメラ。背景色と HUD の座標変換に使い、このクラスでは破棄しません。
+        /// [KO] Dungeon이 소유한 카메라입니다. 배경색과 HUD 좌표 변환에 사용하며 이 클래스에서 파괴하지 않습니다.
+        /// [EN] Dungeon-owned camera used for the background color and HUD projection; this class does not destroy it.
+        /// </summary>
+        private readonly Camera _battleCamera;
+
+        /// <summary>
+        /// App Scope から借りる色アセット。HUD とカメラへ同じ設定を渡し、この戦闘では破棄しません。
+        /// [KO] App Scope에서 빌리는 색상 에셋입니다. HUD와 카메라에 같은 설정을 전달하며 이 전투에서 파괴하지 않습니다.
+        /// [EN] Shared app-scope colors passed to the HUD and camera without transferring asset ownership.
+        /// </summary>
+        private readonly GameColorPalette _colors;
 
         /// <summary>
         /// 表示寿命識別子。
@@ -97,7 +113,7 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Receives the runner and scene display references prepared by BattleLifetimeScope; does not advance combat yet.
         /// </summary>
         public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, UnitView[] unitViews,
-            BattleHudView hudPrefab, Transform hudParent)
+            BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors)
         {
             Runner = runner;
             _runId = runId;
@@ -105,6 +121,8 @@ namespace UnityCombatLab.Bootstrap
             _unitViews = unitViews;
             _hudPrefab = hudPrefab;
             _hudParent = hudParent;
+            _battleCamera = battleCamera;
+            _colors = colors;
         }
 
         /// <summary>
@@ -124,8 +142,11 @@ namespace UnityCombatLab.Bootstrap
                 // 共通 Canvas の下に置くが、この戦闘が作った HUD はこのクラスの Dispose で削除する。
                 Hud = UnityEngine.Object.Instantiate(_hudPrefab, _hudParent);
                 Hud.name = "UI_BattleHud";
+                // スロット位置だけを記録するので、攻撃中のモデルの踏み込みにパネルは追従しない。
+                Hud.BindLayout(_battleCamera, _unitViews);
+                _battleCamera.backgroundColor = _colors.GetColor(Define.PaletteColor.Background);
                 // 先に R3 の HP 通知を接続して初期値を表示し、その後に攻撃・被弾・死亡イベントを接続する。
-                _hudPresenter = new BattleHudPresenter(Runner.ReadModel, Hud);
+                _hudPresenter = new BattleHudPresenter(Runner.ReadModel, Hud, _colors);
                 _presenter = new BattlePresenter(Runner, _runId, _wave, _unitViews, Hud);
                 // 接続途中に Tick が来ても進まないよう、すべて成功した後で開始済みにする。
                 _isStarted = true;

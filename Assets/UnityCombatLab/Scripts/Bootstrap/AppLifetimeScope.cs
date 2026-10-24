@@ -1,4 +1,6 @@
 using UnityCombatLab.Infrastructure.Scenes;
+using UnityCombatLab.Common;
+using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
 using UnityEngine.UI;
 using VContainer;
@@ -26,6 +28,13 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] The startup label owned by AppRoot.
         /// </summary>
         [SerializeField] private Text _statusText;
+
+        /// <summary>
+        /// 全画面が共有する唯一の色アセット。子の Dungeon Scope も同じインスタンスを受け取ります。
+        /// [KO] 모든 화면이 공유하는 색상 에셋 하나입니다. 자식 Dungeon Scope도 같은 인스턴스를 받습니다.
+        /// [EN] The shared color asset also resolved by the child Dungeon scope.
+        /// </summary>
+        [SerializeField] private GameColorPalette _colors;
 
         /// <summary>
         /// 共通ルートだけをシーンの寿命から分離してから DI を起動します。
@@ -99,6 +108,14 @@ namespace UnityCombatLab.Bootstrap
             }
 
             builder.RegisterComponent(_statusText);
+            if (_colors == null)
+            {
+                throw new System.InvalidOperationException("The shared color palette must be assigned in Boot.");
+            }
+
+            // アセットは借用するだけで、AppRoot や戦闘の終了時に破棄しない。
+            builder.RegisterInstance(_colors);
+            _statusText.color = _colors.GetColor(Define.PaletteColor.OnBackground);
             builder.Register<SceneTransitionManager>(Lifetime.Singleton);
             builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
         }

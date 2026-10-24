@@ -7,6 +7,123 @@ namespace UnityCombatLab.Common
     /// </summary>
     public static class Define
     {
+        #region Presentation
+
+        /// <summary>
+        /// Inspector の UI 部品を共通パレットの色へ結び付ける固定キー。値はアセットに保存するため番号を維持します。
+        /// [KO] Inspector의 UI 요소를 공통 팔레트 색에 연결하는 고정 키입니다. 에셋에 저장되므로 번호를 유지합니다.
+        /// [EN] Stable keys connecting Inspector UI graphics to shared palette colors; keep their serialized numeric values.
+        /// </summary>
+        public enum PaletteColor
+        {
+            /// <summary>
+            /// 味方の見出し・HP・役割印。
+            /// [KO] 아군 제목·HP·역할 배지 색입니다.
+            /// [EN] Ally headings, health and role badges.
+            /// </summary>
+            Ally = 0,
+
+            /// <summary>
+            /// 敵の見出し・HP・役割印。
+            /// [KO] 적 제목·HP·역할 배지 색입니다.
+            /// [EN] Enemy headings, health and role badges.
+            /// </summary>
+            Enemy = 1,
+
+            /// <summary>
+            /// パネルと吹き出しの明るい面。
+            /// [KO] 패널과 말풍선의 밝은 면 색입니다.
+            /// [EN] Light panel and callout surfaces.
+            /// </summary>
+            Surface = 2,
+
+            /// <summary>
+            /// 明るい面に置く本文と HP 数字。
+            /// [KO] 밝은 면 위의 본문과 HP 숫자 색입니다.
+            /// [EN] Body text and HP numbers on light surfaces.
+            /// </summary>
+            Text = 3,
+
+            /// <summary>
+            /// 戦闘不能と防御膜ゼロの表示。
+            /// [KO] 전투 불능과 방어막 0의 표시 색입니다.
+            /// [EN] Defeated states and zero-shield labels.
+            /// </summary>
+            MutedText = 4,
+
+            /// <summary>
+            /// 役割アイコンと HP 損失の数字。
+            /// [KO] 역할 아이콘과 HP 피해 숫자 색입니다.
+            /// [EN] Role icons and health-damage numbers.
+            /// </summary>
+            OnAccent = 5,
+
+            /// <summary>
+            /// 暗い背景に置くタイトルと起動表示。
+            /// [KO] 어두운 배경 위 제목과 시작 안내 색입니다.
+            /// [EN] Title and startup text on the dark background.
+            /// </summary>
+            OnBackground = 6,
+
+            /// <summary>
+            /// 残っている防御膜の数字。
+            /// [KO] 남아 있는 방어막 수치 색입니다.
+            /// [EN] Remaining shield values.
+            /// </summary>
+            Shield = 7,
+
+            /// <summary>
+            /// 現在の防御膜に添えるアイコン。
+            /// [KO] 현재 방어막 수치 옆의 아이콘 색입니다.
+            /// [EN] Icons beside current shield values.
+            /// </summary>
+            ShieldIcon = 8,
+
+            /// <summary>
+            /// 防御膜の吸収数字とアイコン。
+            /// [KO] 방어막 흡수 숫자와 아이콘 색입니다.
+            /// [EN] Shield-absorption numbers and icons.
+            /// </summary>
+            ShieldDamage = 9,
+
+            /// <summary>
+            /// HP ゲージの固定枠。
+            /// [KO] HP 게이지의 고정 테두리 색입니다.
+            /// [EN] Fixed health-gauge borders.
+            /// </summary>
+            BarBorder = 10,
+
+            /// <summary>
+            /// HP ゲージの減った領域。
+            /// [KO] HP 게이지의 소모된 영역 색입니다.
+            /// [EN] Depleted areas of health gauges.
+            /// </summary>
+            BarEmpty = 11,
+
+            /// <summary>
+            /// パネルの影。透明度もこの値で指定します。
+            /// [KO] 패널 그림자 색입니다. 투명도도 이 값에서 지정합니다.
+            /// [EN] Panel shadows, including their opacity.
+            /// </summary>
+            Shadow = 12,
+
+            /// <summary>
+            /// 戦闘カメラが描く舞台の外側。
+            /// [KO] 전투 카메라가 그리는 무대 바깥 배경색입니다.
+            /// [EN] Camera background outside the battle stage.
+            /// </summary>
+            Background = 13,
+
+            /// <summary>
+            /// HP 損失と吸収数字の輪郭。
+            /// [KO] HP 손실과 흡수 숫자의 외곽선 색입니다.
+            /// [EN] Outlines around health-loss and absorption numbers.
+            /// </summary>
+            DamageOutline = 14
+        }
+
+        #endregion
+
         #region Scenes
 
         /// <summary>

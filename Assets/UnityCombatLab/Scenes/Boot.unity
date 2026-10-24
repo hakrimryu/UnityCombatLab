@@ -1379,6 +1379,7 @@ MonoBehaviour:
   autoRun: 1
   autoInjectGameObjects: []
   _statusText: {fileID: 250126896}
+  _colors: {fileID: 11400000, guid: 37ff58f362dcfd04884c039410255d53, type: 2}
 --- !u!4 &2124495723
 Transform:
   m_ObjectHideFlags: 0
