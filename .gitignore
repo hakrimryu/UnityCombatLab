@@ -114,3 +114,6 @@ Thumbs.db
 *.jks
 
 # Add restricted asset exclusions only after verifying actual import paths.
+
+# NuGetForUnity restores these generated dependencies from Assets/packages.config.
+/Assets/Packages/
