@@ -134,7 +134,7 @@ namespace UnityCombatLab.Tests.EditMode
                 var stepMs = stopwatch.Elapsed.TotalMilliseconds;
                 var report = new StringBuilder();
                 report.AppendLine("Headless Battle Benchmark (Editor EditMode, synchronous core only)");
-                report.AppendLine("Unity=" + Application.unityVersion + "; Runtime=" + Environment.Version + "; OS=" +
+                report.AppendLine("Unity=" + UnityEngine.Application.unityVersion + "; Runtime=" + Environment.Version + "; OS=" +
                                   SystemInfo.operatingSystem);
                 report.AppendLine("CPU=" + SystemInfo.processorType + "; StopwatchFrequency=" + Stopwatch.Frequency);
                 report.AppendLine("Warmup=" + Warmup + "; Repetitions=" + Repetitions + "; RunId=" +
@@ -163,7 +163,7 @@ namespace UnityCombatLab.Tests.EditMode
                     "Fixture/batch array/report/assertions/file I/O excluded; " +
                     "Step includes event value consumption/FNV/acknowledgement. " +
                     "Editor/hardware dependent; not Android/WebGL/FPS/peak memory evidence.");
-                var folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../../_Development/Evidence/M2"));
+                var folder = Path.GetFullPath(Path.Combine(UnityEngine.Application.dataPath, "../../_Development/Evidence/M2"));
                 Directory.CreateDirectory(folder);
                 File.WriteAllText(
                     Path.Combine(folder, "benchmark-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + ".txt"),

@@ -1,17 +1,23 @@
 {
-    "name": "UnityCombatLab.Tests.EditMode",
-    "rootNamespace": "UnityCombatLab.Tests.EditMode",
-    "references": [
-        "UnityCombatLab.Domain",
-        "UnityCombatLab.Common"
-    ],
-    "includePlatforms": [
-        "Editor"
-    ],
-    "optionalUnityReferences": [
-        "TestAssemblies"
-    ],
-    "defineConstraints": [
-        "UNITY_INCLUDE_TESTS"
-    ]
+  "name": "UnityCombatLab.Tests.EditMode",
+  "rootNamespace": "UnityCombatLab.Tests.EditMode",
+  "references": [
+    "UnityCombatLab.Domain",
+    "UnityCombatLab.Common",
+    "UnityCombatLab.Application"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "R3.dll"
+  ]
 }

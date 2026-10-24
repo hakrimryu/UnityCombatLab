@@ -55,7 +55,7 @@ namespace UnityCombatLab.Infrastructure.Scenes
             }
 
             var buildIndex = (int)sceneType;
-            if (!Application.CanStreamedLevelBeLoaded(buildIndex))
+            if (!UnityEngine.Application.CanStreamedLevelBeLoaded(buildIndex))
             {
                 throw new InvalidOperationException("The destination scene must be enabled in the build scene list.");
             }
