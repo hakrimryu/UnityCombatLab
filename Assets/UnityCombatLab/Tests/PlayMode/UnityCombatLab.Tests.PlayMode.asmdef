@@ -1,18 +1,28 @@
 {
-    "name": "UnityCombatLab.Tests.PlayMode",
-    "rootNamespace": "UnityCombatLab.Tests.PlayMode",
-    "references": [
-        "UnityCombatLab.Bootstrap",
-        "VContainer",
-        "UnityEngine.UI",
-        "UniTask",
-        "UnityCombatLab.Common",
-        "UnityCombatLab.Infrastructure"
-    ],
-    "optionalUnityReferences": [
-        "TestAssemblies"
-    ],
-    "defineConstraints": [
-        "UNITY_INCLUDE_TESTS"
-    ]
+  "name": "UnityCombatLab.Tests.PlayMode",
+  "rootNamespace": "UnityCombatLab.Tests.PlayMode",
+  "references": [
+    "UnityCombatLab.Bootstrap",
+    "VContainer",
+    "UnityEngine.UI",
+    "UniTask",
+    "UnityCombatLab.Common",
+    "UnityCombatLab.Infrastructure",
+    "UnityCombatLab.Application",
+    "UnityCombatLab.Presentation",
+    "UnityCombatLab.Domain",
+    "Unity.TextMeshPro"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "R3.dll",
+    "DOTween.dll"
+  ]
 }
