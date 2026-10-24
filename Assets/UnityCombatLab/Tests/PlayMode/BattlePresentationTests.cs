@@ -9,6 +9,7 @@ using UnityCombatLab.Bootstrap;
 using UnityCombatLab.Common;
 using UnityCombatLab.Infrastructure.Scenes;
 using UnityCombatLab.Presentation.UI;
+using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.Units;
 using UnityEngine;
@@ -108,20 +109,27 @@ namespace UnityCombatLab.Tests.PlayMode
                 {
                     var model = runner.ReadModel.Units[index];
                     var snapshot = runner.GetUnit(model.Input.Team, model.Input.Slot);
-                    Assert.That(entry.Hud.Units[index].DisplayedHealth, Is.EqualTo(snapshot.Health));
-                    Assert.That(entry.Hud.Units[index].DisplayedShield, Is.EqualTo(snapshot.Shield));
+                    Assert.That(model.Health.CurrentValue, Is.EqualTo(snapshot.Health));
+                    Assert.That(model.Shield.CurrentValue, Is.EqualTo(snapshot.Shield));
+                    Assert.That(entry.Hud.Units[index].DisplayedHealth,
+                        Is.EqualTo(entry.Presentation.Units[index].Health.CurrentValue));
                     var status = entry.Hud.Units[index];
                     var healthLabel = status.transform.Find("Health").GetComponent<TMPro.TMP_Text>();
                     var healthBar = status.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
-                    Assert.That(healthLabel.text, Is.EqualTo(snapshot.Health + " / " + model.Input.MaxHealth));
+                    Assert.That(healthLabel.text,
+                        Is.EqualTo(entry.Presentation.Units[index].Health.CurrentValue + " / " +
+                                   model.Input.MaxHealth));
                     Assert.That(healthBar.normalizedValue,
                         Is.InRange((float)snapshot.Health / model.Input.MaxHealth, 1f));
                     Assert.That(status.transform.Find("UI_Defeated").gameObject.activeSelf,
-                        Is.EqualTo(snapshot.Health == 0));
+                        Is.EqualTo(entry.Presentation.Units[index].Health.CurrentValue == 0));
                 }
             }
 
             Assert.That(runner.Result, Is.EqualTo(Define.BattleResult.Victory));
+            Assert.That(entry.Hud.ResultText, Is.EqualTo("戦闘中"));
+            entry.Presenter.Advance(3);
+            entry.Presenter.Advance(1);
             Assert.That(entry.Hud.ResultText, Is.EqualTo("勝利"));
             Assert.That(lastEventCount, Is.EqualTo(1));
             Assert.That(views.Count(view => view.IsDead), Is.EqualTo(3));
@@ -220,6 +228,159 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
+        /// 六人が同時に攻撃を始め、各自の命中時刻でだけ HP が画面へ届くことを確認します。
+        /// [KO] 여섯 명이 동시에 공격을 시작하고 각 명중 시각에만 HP가 화면에 도착하는지 확인합니다.
+        /// [EN] Verifies six concurrent attacks and HUD health changes only at each attack's own impact time.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ConcurrentAttacksPresentDamageAtTheirOwnImpact()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            entry.Runner.Advance(0.5);
+            Assert.That(entry.Presenter.PendingAttackCount, Is.EqualTo(6));
+            var views = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
+            Assert.That(views.All(v => v.IsAttacking && v.CurrentAnimation == "Attack"), Is.True);
+            Assert.That(entry.Runner.ReadModel.Units[1].Health.CurrentValue, Is.EqualTo(288));
+            Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(420));
+            var status = entry.Hud.Units[1];
+            var preview = status.transform.Find("HealthBar/FillArea/UI_DamagePreview")
+                .GetComponent<UnityEngine.UI.Image>();
+            Assert.That(preview.enabled, Is.True);
+            entry.Presenter.Advance(0.3);
+            Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(420));
+            var ranger = views.Single(v => v.name == "Unit_Ranger");
+            Assert.That(ranger.transform.Find("VFX_Projectile0").gameObject.activeSelf, Is.True);
+            entry.Presenter.Advance(0.04);
+            Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(380));
+            Assert.That(views.Single(v => v.name == "Unit_SkeletonWarrior").CurrentAnimation, Is.EqualTo("Attack"));
+            typeof(UnitStatusView).GetMethod("AdvanceHealthAnimation", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(status, new object[] { 0.12f });
+            var bar = status.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
+            Assert.That(bar.normalizedValue, Is.EqualTo((1f + 380f / 420f) * 0.5f).Within(0.001f));
+            entry.Presenter.Advance(0.09);
+            Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(346));
+            Assert.That(entry.Hud.Units[0].DisplayedHealth, Is.EqualTo(575));
+            Assert.That(entry.Hud.Units[2].DisplayedHealth, Is.EqualTo(328));
+            Assert.That(ranger.transform.Find("VFX_Projectile0").GetComponent<BattleEffectView>().IsEmitting, Is.False);
+            entry.Presenter.Advance(0.2);
+            Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(288));
+            Assert.That(entry.Presentation.Units[1].Health.CurrentValue, Is.EqualTo(288));
+            yield return null;
+        }
+
+        /// <summary>
+        /// 異なる到着順でも HP が増えず、解除した予約が HUD を更新しないことを確認します。
+        /// [KO] 도착 순서가 달라도 HP가 늘지 않고 해제한 예약이 HUD를 갱신하지 않는지 확인합니다.
+        /// [EN] Verifies differing arrival order cannot restore health and disposed cues cannot update the HUD.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ArrivalOrderAndDisposedCuesCannotRestoreOrChangeHealth()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            using (var state = new UnitPresentationReadModel(entry.Runner.ReadModel.Units[0].Input))
+            {
+                state.ReserveDamage(40);
+                state.ReserveDamage(30);
+                Assert.That(state.Health.CurrentValue, Is.EqualTo(600));
+                Assert.That(state.PreviewHealth.CurrentValue, Is.EqualTo(530));
+                state.ApplyDamage(30, 0);
+                Assert.That(state.Health.CurrentValue, Is.EqualTo(570));
+                state.ApplyDamage(40, 0);
+                Assert.That(state.Health.CurrentValue, Is.EqualTo(530));
+            }
+
+            entry.Runner.Advance(0.5);
+            var health = entry.Hud.Units.Select(v => v.DisplayedHealth).ToArray();
+            entry.Presenter.Dispose();
+            entry.Presenter.Advance(10);
+            Assert.That(entry.Presenter.PendingAttackCount, Is.Zero);
+            Assert.That(entry.Hud.Units.Select(v => v.DisplayedHealth), Is.EqualTo(health));
+            Assert.That(Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None).All(v => !v.IsBound), Is.True);
+            yield return null;
+        }
+
+        /// <summary>
+        /// 閃光・小さな押し戻しが攻撃や論理座標を変えず、死亡・解除後に戻らないことを確認します。
+        /// [KO] 섬광·작은 밀림이 공격이나 논리 좌표를 바꾸지 않고 사망·해제 후 되살아나지 않는지 확인합니다.
+        /// [EN] Verifies flash and recoil preserve attacks and logical positions without resuming after death or release.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator HitFlashAndRecoilPreserveAttackAndReleaseCleanly()
+        {
+            var view = GameObject.Find("Unit_Knight").GetComponent<UnitView>();
+            var runId = Guid.NewGuid();
+            var position = view.transform.position;
+            var advance =
+                typeof(UnitView).GetMethod("AdvanceHitReaction", BindingFlags.Instance | BindingFlags.NonPublic);
+            var reaction = view.transform.Find("Unit_HitReaction");
+            var renderer = view.GetComponentInChildren<SkinnedMeshRenderer>();
+            var block = new MaterialPropertyBlock();
+            var emission = Shader.PropertyToID("_EmissionColor");
+            view.Bind(runId);
+            view.ShowAttack(runId, position + Vector3.right * 3, true, false);
+            view.ShowHit(runId, view.ImpactPosition + Vector3.right * 2);
+            renderer.GetPropertyBlock(block);
+            Assert.That(block.GetColor(emission).maxColorComponent, Is.GreaterThan(1));
+            Assert.That(renderer.sharedMaterial.IsKeywordEnabled("_EMISSION"), Is.True);
+            Assert.That(
+                ((Texture2D)renderer.sharedMaterial.GetTexture(Shader.PropertyToID("_EmissionMap"))).GetPixel(0, 0)
+                .maxColorComponent,
+                Is.Zero);
+            advance.Invoke(view, new object[] { 0.045f });
+            Assert.That(view.CurrentAnimation, Is.EqualTo("Attack"));
+            Assert.That(view.transform.position, Is.EqualTo(position));
+            Assert.That(reaction.parent.TransformVector(reaction.localPosition).x, Is.LessThan(0));
+            Assert.That(reaction.parent.TransformVector(reaction.localPosition).magnitude,
+                Is.EqualTo(0.14f).Within(0.001f));
+            view.ShowDeath(runId);
+            var deathPosition = reaction.localPosition;
+            advance.Invoke(view, new object[] { 1f });
+            Assert.That(reaction.localPosition, Is.EqualTo(deathPosition));
+            view.Release();
+            advance.Invoke(view, new object[] { 1f });
+            renderer.GetPropertyBlock(block);
+            Assert.That(block.GetColor(emission).maxColorComponent, Is.Zero);
+            Assert.That(reaction.localPosition, Is.EqualTo(Vector3.zero));
+            view.Bind(Guid.NewGuid());
+            view.ShowHit(runId, position + Vector3.right);
+            advance.Invoke(view, new object[] { 1f });
+            Assert.That(reaction.localPosition, Is.EqualTo(Vector3.zero));
+            yield return null;
+        }
+
+        /// <summary>
+        /// 攻撃中の Hit は攻撃を中断せず、同時の三被害数字がそれぞれ残ることを確認します。
+        /// [KO] 공격 중 Hit가 공격을 중단하지 않고 동시 피해 숫자 세 개가 각각 남는지 확인합니다.
+        /// [EN] Verifies hits preserve attacks and three concurrent damage numbers remain independently visible.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator HitProtectsAttackAndDamageNumbersRemainSeparate()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var view = GameObject.Find("Unit_Knight").GetComponent<UnitView>();
+            var runId = Guid.NewGuid();
+            view.Bind(runId);
+            view.ShowAttack(runId, view.transform.position + Vector3.right * 3, true, false);
+            view.ShowHit(runId, view.ImpactPosition + Vector3.right * 2);
+            Assert.That(view.CurrentAnimation, Is.EqualTo("Attack"));
+            Assert.That(view.IsAttacking, Is.True);
+            var status = entry.Hud.Units[0];
+            status.ClearTransient();
+            status.ShowDamage(40, 0);
+            status.ShowDamage(34, 0);
+            status.ShowDamage(58, 0);
+            var labels = new[] { "Damage", "UI_Damage1", "UI_Damage2" }
+                .Select(name => status.transform.Find(name).GetComponent<TMPro.TMP_Text>().text).ToArray();
+            Assert.That(labels, Is.EqualTo(new[] { "-40", "-34", "-58" }));
+            view.ShowDeath(runId);
+            Assert.That(view.CurrentAnimation, Is.EqualTo("Death"));
+            status.ClearTransient();
+            Assert.That(new[] { "Damage", "UI_Damage1", "UI_Damage2" }
+                .All(name => status.transform.Find(name).GetComponent<TMPro.TMP_Text>().text == ""), Is.True);
+            yield return null;
+        }
+
+        /// <summary>
         /// 回復・致死被害・非表示・再初期化で古い HP 演出が新しい値を上書きしないことを確認します。
         /// [KO] 회복·치명 피해·비활성화·재초기화 때 이전 HP 연출이 새 값을 덮어쓰지 않는지 확인합니다.
         /// [EN] Checks that healing, lethal damage, hiding and reinitialization cannot revive stale gauge transitions.
@@ -295,21 +456,24 @@ namespace UnityCombatLab.Tests.PlayMode
             var hud = Object.Instantiate(entry.Hud);
             var inputs = entry.Runner.ReadModel.Units.Select(unit => unit.Input).ToArray();
             using var runner = new BattleRunner(Guid.NewGuid(), 1, inputs);
+            using var presented = new BattlePresentationReadModel(inputs);
             var colors = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<GameColorPalette>();
-            var presenter = new BattleHudPresenter(runner.ReadModel, hud, colors);
+            var presenter = new BattleHudPresenter(presented, hud, colors);
             var initial = hud.Units.Select(unit => unit.HealthRenderCount).ToArray();
             runner.Advance(0.4);
             Assert.That(hud.Units.Select(unit => unit.HealthRenderCount), Is.EqualTo(initial));
             presenter.Dispose();
             presenter.Dispose();
             runner.Advance(0.1);
+            presented.Units[0].ReserveDamage(10);
+            presented.Units[0].ApplyDamage(10, 0);
             Assert.That(hud.Units.Select(unit => unit.HealthRenderCount), Is.EqualTo(initial));
-            using (new BattleHudPresenter(runner.ReadModel, hud, colors))
+            using (new BattleHudPresenter(presented, hud, colors))
             {
                 for (var index = 0; index < inputs.Length; index++)
                 {
                     Assert.That(hud.Units[index].DisplayedHealth,
-                        Is.EqualTo(runner.ReadModel.Units[index].Health.CurrentValue));
+                        Is.EqualTo(presented.Units[index].Health.CurrentValue));
                     Assert.That(hud.Units[index].HealthRenderCount, Is.EqualTo(initial[index] + 1));
                 }
             }
@@ -364,10 +528,11 @@ namespace UnityCombatLab.Tests.PlayMode
             var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
             var view = entry.Hud.Units[0];
             const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
-            var tweenField = typeof(UnitStatusView).GetField("_damageTween", Flags);
+            var tweenField = typeof(UnitStatusView).GetField("_damageTimers", Flags);
             var textField = typeof(UnitStatusView).GetField("_damage", Flags);
+            view.ClearTransient();
             view.ShowDamage(12, 3);
-            var callback = ((Tween)tweenField.GetValue(view)).onStepComplete;
+            var callback = ((Tween[])tweenField.GetValue(view))[0].onStepComplete;
             view.ClearTransient();
             view.ShowDamage(9, 6);
             var label = (TMPro.TMP_Text)textField.GetValue(view);

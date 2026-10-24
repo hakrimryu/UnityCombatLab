@@ -4,6 +4,8 @@ using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Units;
+using UnityCombatLab.Presentation.ReadModels;
+using System.Linq;
 using UnityEngine;
 using VContainer.Unity;
 
@@ -87,6 +89,20 @@ namespace UnityCombatLab.Bootstrap
         private BattleHudPresenter _hudPresenter;
 
         /// <summary>
+        /// 命中時刻へ合わせた HUD 状態。Runner の確定状態とは別に所有します。
+        /// [KO] 명중 시각에 맞춘 HUD 상태이며 Runner 확정 상태와 별도로 소유합니다.
+        /// [EN] Owned impact-timed HUD state, separate from the runner's committed state.
+        /// </summary>
+        public BattlePresentationReadModel Presentation { get; private set; }
+
+        /// <summary>
+        /// この戦闘の同時演出を進める Presenter。
+        /// [KO] 이번 전투의 동시 연출을 진행할 Presenter입니다.
+        /// [EN] Presenter advancing this battle's concurrent effects.
+        /// </summary>
+        public BattlePresenter Presenter => _presenter;
+
+        /// <summary>
         /// 生成した HUD は親が DDOL でも戦闘側で破棄します。
         /// [KO] 생성한 HUD는 부모가 DDOL이어도 전투 측에서 해제합니다.
         /// [EN] Generated HUD is battle-owned even under a DDOL parent.
@@ -146,8 +162,14 @@ namespace UnityCombatLab.Bootstrap
                 Hud.BindLayout(_battleCamera, _unitViews);
                 _battleCamera.backgroundColor = _colors.GetColor(Define.PaletteColor.Background);
                 // 先に R3 の HP 通知を接続して初期値を表示し、その後に攻撃・被弾・死亡イベントを接続する。
-                _hudPresenter = new BattleHudPresenter(Runner.ReadModel, Hud, _colors);
-                _presenter = new BattlePresenter(Runner, _runId, _wave, _unitViews, Hud);
+                Presentation = new BattlePresentationReadModel(Runner.ReadModel.Units.Select(unit => unit.Input));
+                foreach (var unit in _unitViews)
+                {
+                    unit.ApplyPalette(_colors);
+                }
+
+                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors);
+                _presenter = new BattlePresenter(Runner, _runId, _wave, _unitViews, Hud, Presentation);
                 // 接続途中に Tick が来ても進まないよう、すべて成功した後で開始済みにする。
                 _isStarted = true;
             }
@@ -174,6 +196,8 @@ namespace UnityCombatLab.Bootstrap
             {
                 // Unity の timeScale で縮めていない実経過秒を使う。0.05 秒が戦闘の 1 tick に相当する。
                 Runner.Advance(Time.unscaledDeltaTime);
+                // Domain が終了しても、既に確定した最後の命中・死亡・結果表示は毎フレーム進める。
+                _presenter.Advance(Time.deltaTime);
             }
             catch
             {
@@ -199,6 +223,7 @@ namespace UnityCombatLab.Bootstrap
             // 表示先への呼び出しを先に外す。HP の通知元を先に破棄すると、まだ接続中の表示側に終了通知が届く。
             _presenter?.Dispose();
             _hudPresenter?.Dispose();
+            Presentation?.Dispose();
             Runner.Dispose();
             if (Hud != null)
             {

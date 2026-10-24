@@ -47,6 +47,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityCombatLab.Presentation::UnityCombatLab.Presentation.Units.UnitView
   _animator: {fileID: 1892633070303370549}
   _model: {fileID: 6953451993542336588}
+  _attackSeconds: 0.7
+  _releaseNormalized: 0.35
+  _flightSeconds: 0.18
+  _attackClipSeconds: 1.0666667
+  _projectilePrefab: {fileID: 8328438099804655328, guid: 66c331871ee36d64aac49c261f6fd24e, type: 3}
+  _usesLeftHand: 0
+  _impactPrefab: {fileID: 1822290031681781920, guid: fec1a1bccc978ca4980a8c630199eeed, type: 3}
+  _strikePrefab: {fileID: 0}
+  _deathPrefab: {fileID: 6156465146768680735, guid: a46a44f0859ead34687745d82b52a389, type: 3}
 --- !u!1001 &2910783508661196541
 PrefabInstance:
   m_ObjectHideFlags: 0

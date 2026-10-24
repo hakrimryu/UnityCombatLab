@@ -155,13 +155,6 @@ namespace UnityCombatLab.Presentation.UI
         private GameColorPalette _colors;
 
         /// <summary>
-        /// 最新の表示だけを消す所有 Tween。
-        /// [KO] 최신 표시만 지우는 소유 Tween.
-        /// [EN] Owned tween clearing only the latest label.
-        /// </summary>
-        private Tween _damageTween;
-
-        /// <summary>
         /// 表示を消すたびに増える番号。古い番号の遅延処理が新しい被害数字を消さないために使います。
         /// [KO] 표시를 지울 때마다 증가하는 번호입니다. 이전 번호의 지연 처리가 새 피해 숫자를 지우지 못하게 합니다.
         /// [EN] Counter incremented when clearing a label so a delayed action with an old number cannot erase newer damage.
@@ -225,6 +218,62 @@ namespace UnityCombatLab.Presentation.UI
         private int _maxHealth;
 
         /// <summary>
+        /// 発射済みの損失を含む予告先と、命中基準で選んだ補間前の待機秒数。
+        /// [KO] 발사된 손실까지 포함한 예고 목표와 명중 기준으로 선택한 보간 전 대기 시간(초)입니다.
+        /// [EN] Preview target including pending hits and interpolation delay chosen for impact timing.
+        /// </summary>
+        private float _previewTarget = 1f;
+
+        /// <summary>
+        /// 命中通知ならゼロ、それ以外は従来の予告待機秒数。
+        /// [KO] 명중 알림이면 0, 그 밖에는 기존 예고 대기 시간(초)입니다.
+        /// [EN] Zero for impact notifications, otherwise the existing preview wait in seconds.
+        /// </summary>
+        private float _healthDelay;
+
+        /// <summary>
+        /// 最大三攻撃者の数字を別々に残す固定表示枠。古い callback は枠ごとの番号でも拒否します。
+        /// [KO] 최대 세 공격자의 숫자를 따로 남길 고정 표시 슬롯이며 이전 콜백은 슬롯별 번호로도 거부합니다.
+        /// [EN] Fixed slots retaining numbers from up to three attackers, with per-slot versions rejecting stale callbacks.
+        /// </summary>
+        private TMP_Text[] _damageLabels;
+
+        /// <summary>
+        /// 各被害枠で HP と別に示す防御膜吸収数字。
+        /// [KO] 피해 슬롯마다 HP와 별도로 표시할 방어막 흡수 수치입니다.
+        /// [EN] Separate shield-absorption labels for each damage slot.
+        /// </summary>
+        private TMP_Text[] _absorptionLabels;
+
+        /// <summary>
+        /// 各被害枠の防御膜吸収数字に添えるアイコン。
+        /// [KO] 피해 슬롯별 방어막 흡수 수치 옆에 붙일 아이콘입니다.
+        /// [EN] Icons accompanying each slot absorption label.
+        /// </summary>
+        private UnityEngine.UI.Image[] _absorptionIcons;
+
+        /// <summary>
+        /// 枠ごとに独立して数字を消し、解除時に全て停止する Tween。
+        /// [KO] 슬롯별로 독립적으로 숫자를 지우고 해제 때 모두 멈출 Tween입니다.
+        /// [EN] Independent label-clear tweens, all stopped on release.
+        /// </summary>
+        private Tween[] _damageTimers;
+
+        /// <summary>
+        /// 再利用した同じ枠を古い callback が消さないための番号。
+        /// [KO] 재사용한 같은 슬롯을 이전 콜백이 지우지 못하게 할 번호입니다.
+        /// [EN] Per-slot versions preventing old callbacks from clearing a reused slot.
+        /// </summary>
+        private readonly int[] _damageVersions = new int[Define.SlotsPerTeam];
+
+        /// <summary>
+        /// 0→1→2→0 の順で再利用する次の数字枠。
+        /// [KO] 0→1→2→0 순서로 재사용할 다음 숫자 슬롯입니다.
+        /// [EN] Next label slot reused in the order 0, 1, 2, then 0.
+        /// </summary>
+        private int _nextDamageSlot;
+
+        /// <summary>
         /// 検証可能な表示 HP。
         /// [KO] 검증 가능한 표시 HP.
         /// [EN] Displayed health available for validation.
@@ -262,7 +311,9 @@ namespace UnityCombatLab.Presentation.UI
             }
 
             ClearTransient();
+            EnsureDamageSlots();
             _hasHealth = false;
+            _previewTarget = 1f;
             _name.text = displayName;
             _teamColor = _colors.GetTeamColor(team);
             _fill.color = _teamColor;
@@ -286,14 +337,22 @@ namespace UnityCombatLab.Presentation.UI
 
             _damage.fontSharedMaterial = damageMaterial;
             _shieldDamage.fontSharedMaterial = damageMaterial;
+            if (_damageLabels != null)
+            {
+                for (var index = 0; index < _damageLabels.Length; index++)
+                {
+                    _damageLabels[index].fontSharedMaterial = damageMaterial;
+                    _absorptionLabels[index].fontSharedMaterial = damageMaterial;
+                }
+            }
         }
 
         /// <summary>
-        /// BattleHudPresenter が確定 HP を渡します。数字と死亡は即時、ゲージだけを予告・補間・遅延追従で表示します。
-        /// [KO] BattleHudPresenter가 확정 HP를 전달합니다. 숫자·사망은 즉시, 게이지만 예고·보간·지연 추적으로 표시합니다.
-        /// [EN] Receives confirmed health from BattleHudPresenter; numbers and defeat update immediately while gauges preview and interpolate.
+        /// BattleHudPresenter が命中済み HP を渡します。数字と死亡表示を変え、命中時は追加待機なしで補間します。
+        /// [KO] BattleHudPresenter가 명중한 HP를 전달합니다. 숫자·사망 표시를 바꾸고 명중 때는 추가 대기 없이 보간합니다.
+        /// [EN] Receives arrived health from BattleHudPresenter, updating numbers and defeat while starting interpolation without another impact delay.
         /// </summary>
-        public void SetHealth(int health, int maxHealth)
+        public void SetHealth(int health, int maxHealth, bool isImpact = false)
         {
             if (maxHealth <= 0 || health < 0 || health > maxHealth)
             {
@@ -330,6 +389,7 @@ namespace UnityCombatLab.Presentation.UI
             _trailingStart = Mathf.Max(_trailingHealth.rectTransform.anchorMax.x, _healthStart);
             _healthTarget = target;
             _healthElapsed = 0f;
+            _healthDelay = isImpact ? 0f : DamagePreviewSeconds;
             _isHealthAnimating = true;
             RenderHealth(_healthStart, _isHealthDecreasing ? _trailingStart : target);
         }
@@ -360,7 +420,7 @@ namespace UnityCombatLab.Presentation.UI
             }
 
             _healthElapsed += deltaSeconds;
-            var delay = _isHealthDecreasing ? DamagePreviewSeconds : 0f;
+            var delay = _isHealthDecreasing ? _healthDelay : 0f;
             var healthProgress = Mathf.Clamp01((_healthElapsed - delay) / HealthLerpSeconds);
             var trailProgress = _isHealthDecreasing
                 ? Mathf.Clamp01((_healthElapsed - TrailingDelaySeconds) / TrailingLerpSeconds)
@@ -386,9 +446,21 @@ namespace UnityCombatLab.Presentation.UI
             _trailingHealth.rectTransform.anchorMax = new Vector2(trailingRatio, 1f);
             _trailingHealth.enabled = _isHealthDecreasing && trailingRatio > healthRatio;
             // 例: 確定 60%、本体 80% なら横 60〜80% だけを予告色にし、残りの HP は隠さない。
-            _damagePreview.rectTransform.anchorMin = new Vector2(_healthTarget, 0f);
-            _damagePreview.rectTransform.anchorMax = new Vector2(Mathf.Max(_healthTarget, healthRatio), 1f);
-            _damagePreview.enabled = _isHealthDecreasing && healthRatio > _healthTarget;
+            var preview = Mathf.Min(_healthTarget, _previewTarget);
+            _damagePreview.rectTransform.anchorMin = new Vector2(preview, 0f);
+            _damagePreview.rectTransform.anchorMax = new Vector2(Mathf.Max(preview, healthRatio), 1f);
+            _damagePreview.enabled = healthRatio > preview;
+        }
+
+        /// <summary>
+        /// 命中前の確定損失範囲だけを示し、HP 数字と本体ゲージは動かしません。
+        /// [KO] 명중 전 확정 손실 구간만 보여주고 HP 숫자·본 게이지는 움직이지 않습니다.
+        /// [EN] Shows committed pending loss without changing health numbers or the main gauge.
+        /// </summary>
+        public void SetPreviewHealth(int health, int maxHealth)
+        {
+            _previewTarget = Mathf.Clamp01((float)health / maxHealth);
+            RenderHealth(_healthBar.normalizedValue, _trailingHealth.rectTransform.anchorMax.x);
         }
 
         /// <summary>
@@ -419,29 +491,83 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// BattlePresenter が被害イベントで呼びます。HP 損失と防御膜吸収を別々に表示し、短時間後に消します。
-        /// [KO] 피해 이벤트 때 BattlePresenter가 호출합니다. HP 손실과 방어막 흡수를 나눠 표시하고 잠시 후 지웁니다.
-        /// [EN] Called by BattlePresenter on damage events to briefly display health loss separately from shield absorption.
+        /// BattlePresenter が命中時に呼びます。HP 損失と防御膜吸収を別々に表示し、短時間後に消します。
+        /// [KO] 명중 때 BattlePresenter가 호출합니다. HP 손실과 방어막 흡수를 나눠 표시하고 잠시 후 지웁니다.
+        /// [EN] Called by BattlePresenter at impact to briefly display health loss separately from shield absorption.
         /// </summary>
         public void ShowDamage(int healthDamage, int shieldDamage)
         {
-            ClearDamage();
+            EnsureDamageSlots();
+            var slot = _nextDamageSlot;
+            _nextDamageSlot = (_nextDamageSlot + 1) % _damageLabels.Length;
+            _damageTimers[slot]?.Kill();
+            var version = ++_damageVersions[slot];
             // 今回の表示番号を保存する。別の被害表示に切り替わったら番号が変わるため、古いタイマーは何もしない。
             var generation = _generation;
-            _damage.text = healthDamage > 0 ? "-" + healthDamage : "";
-            _shieldDamage.text = shieldDamage > 0 ? "-" + shieldDamage : "";
-            _shieldDamageIcon.gameObject.SetActive(shieldDamage > 0);
+            _damageLabels[slot].text = healthDamage > 0 ? "-" + healthDamage : "";
+            _absorptionLabels[slot].text = shieldDamage > 0 ? "-" + shieldDamage : "";
+            _absorptionIcons[slot].gameObject.SetActive(shieldDamage > 0);
 
-            _damageTween = DOVirtual.DelayedCall(DamageLabelSeconds, () =>
+            _damageTimers[slot] = DOVirtual.DelayedCall(DamageLabelSeconds, () =>
             {
-                if (this != null && generation == _generation)
+                if (this != null && generation == _generation && version == _damageVersions[slot])
                 {
-                    _damage.text = "";
-                    _shieldDamage.text = "";
-                    _shieldDamageIcon.gameObject.SetActive(false);
-                    _damageTween = null;
+                    _damageLabels[slot].text = "";
+                    _absorptionLabels[slot].text = "";
+                    _absorptionIcons[slot].gameObject.SetActive(false);
+                    _damageTimers[slot] = null;
                 }
             }, false);
+        }
+
+        /// <summary>
+        /// HUD 開始時に既存の文字を二組だけ複製し、三人分を少しずらして再利用します。
+        /// [KO] HUD 시작 시 기존 글자를 두 묶음만 복제하고 세 명분을 조금씩 띄워 재사용합니다.
+        /// [EN] Clones two sets of existing labels at HUD startup and reuses three slightly offset sets.
+        /// </summary>
+        private void EnsureDamageSlots()
+        {
+            if (_damageLabels != null)
+            {
+                return;
+            }
+
+            _damageLabels = new TMP_Text[Define.SlotsPerTeam];
+            _absorptionLabels = new TMP_Text[Define.SlotsPerTeam];
+            _absorptionIcons = new UnityEngine.UI.Image[Define.SlotsPerTeam];
+            _damageTimers = new Tween[Define.SlotsPerTeam];
+            _damageLabels[0] = _damage;
+            _absorptionLabels[0] = _shieldDamage;
+            _absorptionIcons[0] = _shieldDamageIcon;
+            for (var index = 1; index < Define.SlotsPerTeam; index++)
+            {
+                var offset = new Vector2(index * 18f, index * 32f);
+                var existingDamage = transform.Find("UI_Damage" + index);
+                _damageLabels[index] = existingDamage != null
+                    ? existingDamage.GetComponent<TMP_Text>()
+                    : Instantiate(_damage, _damage.transform.parent);
+                _damageLabels[index].name = "UI_Damage" + index;
+                _damageLabels[index].rectTransform.anchoredPosition = _damage.rectTransform.anchoredPosition + offset;
+                _damageLabels[index].fontSharedMaterial = _damage.fontSharedMaterial;
+                _damageLabels[index].text = "";
+                var existingShield = transform.Find("UI_ShieldDamage" + index);
+                _absorptionLabels[index] = existingShield != null
+                    ? existingShield.GetComponent<TMP_Text>()
+                    : Instantiate(_shieldDamage, _shieldDamage.transform.parent);
+                _absorptionLabels[index].name = "UI_ShieldDamage" + index;
+                _absorptionLabels[index].rectTransform.anchoredPosition =
+                    _shieldDamage.rectTransform.anchoredPosition + offset;
+                _absorptionLabels[index].fontSharedMaterial = _shieldDamage.fontSharedMaterial;
+                _absorptionLabels[index].text = "";
+                var existingIcon = transform.Find("UI_ShieldDamageIcon" + index);
+                _absorptionIcons[index] = existingIcon != null
+                    ? existingIcon.GetComponent<UnityEngine.UI.Image>()
+                    : Instantiate(_shieldDamageIcon, _shieldDamageIcon.transform.parent);
+                _absorptionIcons[index].name = "UI_ShieldDamageIcon" + index;
+                _absorptionIcons[index].rectTransform.anchoredPosition =
+                    _shieldDamageIcon.rectTransform.anchoredPosition + offset;
+                _absorptionIcons[index].gameObject.SetActive(false);
+            }
         }
 
         /// <summary>
@@ -452,6 +578,7 @@ namespace UnityCombatLab.Presentation.UI
         public void ClearTransient()
         {
             ClearDamage();
+            _previewTarget = _healthTarget;
             SnapHealth();
         }
 
@@ -463,8 +590,19 @@ namespace UnityCombatLab.Presentation.UI
         private void ClearDamage()
         {
             _generation++;
-            _damageTween?.Kill();
-            _damageTween = null;
+            _nextDamageSlot = 0;
+            if (_damageTimers != null)
+            {
+                for (var index = 0; index < _damageTimers.Length; index++)
+                {
+                    _damageTimers[index]?.Kill();
+                    _damageTimers[index] = null;
+                    _damageLabels[index].text = "";
+                    _absorptionLabels[index].text = "";
+                    _absorptionIcons[index].gameObject.SetActive(false);
+                }
+            }
+
             if (_damage != null)
             {
                 _damage.text = "";

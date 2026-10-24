@@ -1,6 +1,6 @@
 using System;
 using R3;
-using UnityCombatLab.Application.ReadModels;
+using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Styling;
 
@@ -39,7 +39,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] BattleEntryPoint.Start가 호출합니다. 초기 HP를 즉시 표시하고 이후에는 값이 바뀔 때 같은 HUD를 갱신합니다.
         /// [EN] Called by BattleEntryPoint.Start to display initial health immediately and then update the HUD on changes.
         /// </summary>
-        public BattleHudPresenter(BattleReadModel model, BattleHudView view, GameColorPalette colors)
+        public BattleHudPresenter(BattlePresentationReadModel model, BattleHudView view, GameColorPalette colors)
         {
             _view = view != null ? view : throw new ArgumentNullException(nameof(view));
             if (model == null)
@@ -59,13 +59,21 @@ namespace UnityCombatLab.Presentation.UI
                     var status = view.Units[index];
                     status.Initialize(RoleName(unit.Input.Role), unit.Input.Team);
                     // Subscribe した時に現在 HP が一度届き、以後は HP が変わるたびに value に新しい HP が届く。
-                    // 例: 600 → 590 なら SetHealth(590, 600) を呼ぶ。毎フレーム HUD を書き直す処理ではない。
+                    // 例: 命中で 600 → 590 なら SetHealth(590, 600, true) を呼び、追加の予告待機を入れない。
                     // AddTo はこの接続を解除用リストへ入れる。Presenter.Dispose でまとめて通知を止める。
                     unit.Health.Subscribe(value =>
                     {
                         if (!_isDisposed && status != null)
                         {
-                            status.SetHealth(value, unit.Input.MaxHealth);
+                            status.SetHealth(value, unit.Input.MaxHealth, true);
+                        }
+                    }).AddTo(_subscriptions);
+                    // 予約被害は数字を変えず予告範囲だけに伝える。命中した値は上の Health 接続から届く。
+                    unit.PreviewHealth.Subscribe(value =>
+                    {
+                        if (!_isDisposed && status != null)
+                        {
+                            status.SetPreviewHealth(value, unit.Input.MaxHealth);
                         }
                     }).AddTo(_subscriptions);
                     // 防御膜も別に接続する。防御膜だけが減った時は HP の表示を更新する必要がない。
@@ -78,7 +86,7 @@ namespace UnityCombatLab.Presentation.UI
                     }).AddTo(_subscriptions);
                 }
 
-                // 最初は「戦闘中」、終了イベントで結果が変わると「勝利」などの文字に切り替える。
+                // 最初は「戦闘中」、最後の命中と死亡表示が終わった通知で「勝利」などへ切り替える。
                 model.Result.Subscribe(HandleResultChanged).AddTo(_subscriptions);
             }
             catch
