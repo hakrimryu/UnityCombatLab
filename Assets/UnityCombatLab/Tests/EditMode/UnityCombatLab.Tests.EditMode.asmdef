@@ -1,0 +1,8 @@
+{
+    "name": "UnityCombatLab.Tests.EditMode",
+    "rootNamespace": "UnityCombatLab.Tests.EditMode",
+    "references": ["UnityCombatLab.Domain"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

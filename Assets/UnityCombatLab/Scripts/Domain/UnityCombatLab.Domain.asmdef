@@ -1,0 +1,8 @@
+{
+    "name": "UnityCombatLab.Domain",
+    "rootNamespace": "UnityCombatLab.Domain",
+    "references": [],
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "noEngineReferences": true
+}

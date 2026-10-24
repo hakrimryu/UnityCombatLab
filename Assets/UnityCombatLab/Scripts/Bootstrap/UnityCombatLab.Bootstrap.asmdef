@@ -1,0 +1,5 @@
+{
+    "name": "UnityCombatLab.Bootstrap",
+    "rootNamespace": "UnityCombatLab.Bootstrap",
+    "references": ["VContainer", "UnityEngine.UI"]
+}
