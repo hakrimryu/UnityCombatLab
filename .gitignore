@@ -117,3 +117,8 @@ Thumbs.db
 
 # NuGetForUnity restores these generated dependencies from Assets/packages.config.
 /Assets/Packages/
+
+# Official DOTween distribution is restored locally; keep its readme and license notices intact.
+/Assets/Plugins/Demigiant/
+/Assets/Plugins/Demigiant.meta
+/Assets/Resources/DOTweenSettings.asset*
