@@ -1,0 +1,88 @@
+root = true
+
+[*.cs]
+charset = utf-8
+indent_style = space
+indent_size = 4
+tab_width = 4
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+csharp_new_line_before_open_brace = all
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+dotnet_sort_system_directives_first = true
+
+# Project-owned code only; imported source retains its original conventions.
+[Assets/UnityCombatLab/**.cs]
+resharper_inconsistent_naming_highlighting = warning
+
+dotnet_naming_style.pascal.capitalization = pascal_case
+dotnet_naming_style.camel.capitalization = camel_case
+dotnet_naming_style.private_field.capitalization = camel_case
+dotnet_naming_style.private_field.required_prefix = _
+dotnet_naming_style.interface.capitalization = pascal_case
+dotnet_naming_style.interface.required_prefix = I
+dotnet_naming_style.async.capitalization = pascal_case
+dotnet_naming_style.async.required_suffix = Async
+
+dotnet_naming_symbols.types.applicable_kinds = namespace, class, struct, enum, delegate
+dotnet_naming_rule.types.symbols = types
+dotnet_naming_rule.types.style = pascal
+dotnet_naming_rule.types.severity = warning
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_rule.interfaces.symbols = interfaces
+dotnet_naming_rule.interfaces.style = interface
+dotnet_naming_rule.interfaces.severity = warning
+
+dotnet_naming_symbols.members.applicable_kinds = method, property, event
+dotnet_naming_rule.members.symbols = members
+dotnet_naming_rule.members.style = pascal
+dotnet_naming_rule.members.severity = warning
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_rule.private_fields.symbols = private_fields
+dotnet_naming_rule.private_fields.style = private_field
+dotnet_naming_rule.private_fields.severity = warning
+
+dotnet_naming_symbols.constants.applicable_kinds = field, local
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_rule.constants.symbols = constants
+dotnet_naming_rule.constants.style = pascal
+dotnet_naming_rule.constants.severity = warning
+
+dotnet_naming_symbols.parameters_and_locals.applicable_kinds = parameter, local
+dotnet_naming_rule.parameters_and_locals.symbols = parameters_and_locals
+dotnet_naming_rule.parameters_and_locals.style = camel
+dotnet_naming_rule.parameters_and_locals.severity = warning
+
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_rule.async_methods.symbols = async_methods
+dotnet_naming_rule.async_methods.style = async
+dotnet_naming_rule.async_methods.severity = warning
+
+# Rider-specific kinds extend the standard .NET naming rules.
+dotnet_naming_symbols.serialized_fields.applicable_kinds =
+dotnet_naming_symbols.serialized_fields.applicable_accessibilities = *
+dotnet_naming_symbols.serialized_fields.resharper_applicable_kinds = unity_serialised_field
+dotnet_naming_rule.serialized_fields.symbols = serialized_fields
+dotnet_naming_rule.serialized_fields.style = private_field
+dotnet_naming_rule.serialized_fields.severity = warning
+dotnet_naming_rule.serialized_fields.resharper_style = _+aaBb
+dotnet_naming_rule.serialized_fields.import_to_resharper = true
+# Rider's existing Unity serialized-field rule identifier (not an asset GUID).
+dotnet_naming_rule.serialized_fields.resharper_guid = 5f0fdb63-c892-4d2c-9324-15c80b22a7ef
+
+resharper_csharp_naming_rule.private_instance_fields = _+aaBb
+resharper_csharp_naming_rule.private_static_readonly = _+aaBb
+resharper_csharp_naming_rule.private_constants = AaBb
+resharper_csharp_naming_rule.local_constants = AaBb
+resharper_csharp_naming_rule.enum_member = AaBb
+
+# Semantic contracts require review: boolean intent, event handlers/raisers,
+# UniTask-returning non-async methods, resource ownership, Domain dependencies,
+# Japanese/[KO]/[EN] XML documentation and Japanese inline explanations.
+# Unity messages (OnEnable etc.) and framework overrides retain API names.
