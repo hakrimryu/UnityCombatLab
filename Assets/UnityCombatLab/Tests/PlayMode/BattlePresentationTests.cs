@@ -115,7 +115,7 @@ namespace UnityCombatLab.Tests.PlayMode
                     var healthBar = status.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
                     Assert.That(healthLabel.text, Is.EqualTo(snapshot.Health + " / " + model.Input.MaxHealth));
                     Assert.That(healthBar.normalizedValue,
-                        Is.EqualTo((float)snapshot.Health / model.Input.MaxHealth).Within(0.001f));
+                        Is.InRange((float)snapshot.Health / model.Input.MaxHealth, 1f));
                     Assert.That(status.transform.Find("UI_Defeated").gameObject.activeSelf,
                         Is.EqualTo(snapshot.Health == 0));
                 }
@@ -130,6 +130,156 @@ namespace UnityCombatLab.Tests.PlayMode
             runner.Advance(100);
             Assert.That(runner.CurrentTick, Is.EqualTo(tick));
             Assert.That(lastEventCount, Is.EqualTo(1));
+            // 数字と死亡は上で即時確認し、最後の損失・残像が終わってからゲージの到着値を確認する。
+            yield return new WaitForSeconds(0.8f);
+            for (var index = 0; index < runner.ReadModel.Units.Count; index++)
+            {
+                var model = runner.ReadModel.Units[index];
+                var status = entry.Hud.Units[index];
+                var bar = status.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
+                Assert.That(bar.normalizedValue,
+                    Is.EqualTo((float)model.Health.CurrentValue / model.Input.MaxHealth).Within(0.001f));
+                Assert.That(status.transform.Find("HealthBar/FillArea/UI_DamagePreview")
+                    .GetComponent<UnityEngine.UI.Image>().enabled, Is.False);
+                Assert.That(status.transform.Find("HealthBar/FillArea/UI_TrailingHealth")
+                    .GetComponent<UnityEngine.UI.Image>().enabled, Is.False);
+            }
+
+            yield return null;
+        }
+
+        /// <summary>
+        /// 確定値・損失予告・等速補間・残像を別々に検証し、連続被害でも現在位置から続くことを確認します。
+        /// [KO] 확정값·손실 예고·선형 보간·잔상을 각각 검증하고 연속 피해도 현재 위치에서 이어지는지 확인합니다.
+        /// [EN] Verifies confirmed values, loss preview, linear movement and trailing health, including continuous repeated hits.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator HealthGaugePreviewsLerpsAndTrailsConsecutiveDamage()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var hud = Object.Instantiate(entry.Hud);
+            try
+            {
+                var colors = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<GameColorPalette>();
+                hud.ApplyPalette(colors);
+                var view = hud.Units[0];
+                view.Initialize("騎士", Define.BattleTeam.Ally);
+                var bar = view.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
+                var preview = view.transform.Find("HealthBar/FillArea/UI_DamagePreview")
+                    .GetComponent<UnityEngine.UI.Image>();
+                var trail = view.transform.Find("HealthBar/FillArea/UI_TrailingHealth")
+                    .GetComponent<UnityEngine.UI.Image>();
+                var advance = typeof(UnitStatusView).GetMethod("AdvanceHealthAnimation",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                view.SetHealth(100, 100);
+                view.SetHealth(60, 100);
+                view.ShowDamage(40, 0);
+                Assert.That(view.DisplayedHealth, Is.EqualTo(60));
+                Assert.That(bar.normalizedValue, Is.EqualTo(1f));
+                Assert.That(preview.enabled, Is.True);
+                Assert.That(preview.rectTransform.anchorMin.x, Is.EqualTo(0.6f).Within(0.001f));
+                Assert.That(preview.rectTransform.anchorMax.x, Is.EqualTo(1f));
+                Assert.That(preview.color, Is.EqualTo(colors.GetColor(Define.PaletteColor.DamagePreview)));
+                Assert.That(trail.color, Is.EqualTo(colors.GetColor(Define.PaletteColor.TrailingHealth)));
+                advance.Invoke(view, new object[] { 0.12f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(1f));
+                advance.Invoke(view, new object[] { 0.12f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.8f).Within(0.001f));
+                advance.Invoke(view, new object[] { 0.12f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.6f).Within(0.001f));
+                Assert.That(preview.enabled, Is.False);
+                Assert.That(trail.enabled, Is.True);
+                Assert.That(trail.rectTransform.anchorMax.x, Is.EqualTo(1f));
+                advance.Invoke(view, new object[] { 0.215f });
+                Assert.That(trail.rectTransform.anchorMax.x, Is.EqualTo(0.8f).Within(0.001f));
+                view.SetHealth(40, 100);
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.6f).Within(0.001f));
+                Assert.That(trail.rectTransform.anchorMax.x, Is.EqualTo(0.8f).Within(0.001f));
+                advance.Invoke(view, new object[] { 1f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.4f).Within(0.001f));
+                Assert.That(trail.enabled, Is.False);
+                Assert.That(preview.enabled, Is.False);
+
+                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.SetHealth(100, 100);
+                view.SetHealth(60, 100);
+                // 0.24 秒を 4 フレームに分けても、上の 2 フレームと同じ 80% に到着する。
+                for (var frame = 0; frame < 4; frame++)
+                {
+                    advance.Invoke(view, new object[] { 0.06f });
+                }
+
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.8f).Within(0.001f));
+            }
+            finally
+            {
+                Object.Destroy(hud.gameObject);
+            }
+
+            yield return null;
+        }
+
+        /// <summary>
+        /// 回復・致死被害・非表示・再初期化で古い HP 演出が新しい値を上書きしないことを確認します。
+        /// [KO] 회복·치명 피해·비활성화·재초기화 때 이전 HP 연출이 새 값을 덮어쓰지 않는지 확인합니다.
+        /// [EN] Checks that healing, lethal damage, hiding and reinitialization cannot revive stale gauge transitions.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator HealthGaugeResetsForHealingDeathDisableAndRebind()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var hud = Object.Instantiate(entry.Hud);
+            try
+            {
+                var colors = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<GameColorPalette>();
+                hud.ApplyPalette(colors);
+                var view = hud.Units[0];
+                var bar = view.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
+                var preview = view.transform.Find("HealthBar/FillArea/UI_DamagePreview")
+                    .GetComponent<UnityEngine.UI.Image>();
+                var trail = view.transform.Find("HealthBar/FillArea/UI_TrailingHealth")
+                    .GetComponent<UnityEngine.UI.Image>();
+                var advance = typeof(UnitStatusView).GetMethod("AdvanceHealthAnimation",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.SetHealth(40, 100);
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.4f).Within(0.001f));
+                view.SetShield(20);
+                view.ShowDamage(0, 10);
+                Assert.That(preview.enabled, Is.False);
+                view.SetHealth(80, 100);
+                Assert.That(preview.enabled, Is.False);
+                Assert.That(trail.enabled, Is.False);
+                advance.Invoke(view, new object[] { 0.12f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.6f).Within(0.001f));
+                view.SetHealth(0, 100);
+                Assert.That(view.DisplayedHealth, Is.Zero);
+                Assert.That(view.transform.Find("UI_Defeated").gameObject.activeSelf, Is.True);
+                advance.Invoke(view, new object[] { 1f });
+                Assert.That(bar.normalizedValue, Is.Zero);
+                Assert.That(preview.enabled || trail.enabled, Is.False);
+                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.SetHealth(100, 100);
+                view.SetHealth(30, 100);
+                view.gameObject.SetActive(false);
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.3f).Within(0.001f));
+                Assert.That(preview.enabled || trail.enabled, Is.False);
+                view.gameObject.SetActive(true);
+                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.SetHealth(75, 100);
+                advance.Invoke(view, new object[] { 2f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.75f).Within(0.001f));
+                view.SetHealth(50, 100);
+                view.ClearTransient();
+                advance.Invoke(view, new object[] { 2f });
+                Assert.That(bar.normalizedValue, Is.EqualTo(0.5f).Within(0.001f));
+                Assert.That(preview.enabled || trail.enabled, Is.False);
+            }
+            finally
+            {
+                Object.Destroy(hud.gameObject);
+            }
+
             yield return null;
         }
 

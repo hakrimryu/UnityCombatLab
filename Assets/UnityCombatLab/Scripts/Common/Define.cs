@@ -119,7 +119,21 @@ namespace UnityCombatLab.Common
             /// [KO] HP 손실과 흡수 숫자의 외곽선 색입니다.
             /// [EN] Outlines around health-loss and absorption numbers.
             /// </summary>
-            DamageOutline = 14
+            DamageOutline = 14,
+
+            /// <summary>
+            /// 本体ゲージが減る前に示す HP 損失範囲。
+            /// [KO] 본 게이지가 줄기 전에 보여주는 HP 손실 구간입니다.
+            /// [EN] Health-loss region shown before the main fill shrinks.
+            /// </summary>
+            DamagePreview = 15,
+
+            /// <summary>
+            /// 遅れて減る直前 HP。
+            /// [KO] 늦게 줄어드는 직전 HP입니다.
+            /// [EN] Old health that shrinks after a delay.
+            /// </summary>
+            TrailingHealth = 16
         }
 
         #endregion

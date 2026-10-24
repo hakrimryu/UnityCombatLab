@@ -118,6 +118,20 @@ namespace UnityCombatLab.Presentation.Styling
         [SerializeField] private Color _damageOutline;
 
         /// <summary>
+        /// 本体ゲージが減る前に損失範囲を示す色。
+        /// [KO] 본 게이지가 줄기 전에 손실 구간을 보여주는 색입니다.
+        /// [EN] Color highlighting the loss region before the main gauge shrinks.
+        /// </summary>
+        [SerializeField] private Color _damagePreview;
+
+        /// <summary>
+        /// 減少後に短時間残す直前 HP の色。
+        /// [KO] 감소 후 잠시 남기는 직전 HP 색입니다.
+        /// [EN] Color of old health briefly retained after damage.
+        /// </summary>
+        [SerializeField] private Color _trailingHealth;
+
+        /// <summary>
         /// View が要求した役割の色を返します。色の実値は Inspector のアセットだけで編集します。
         /// [KO] View가 요청한 역할의 색을 반환합니다. 실제 색상 값은 Inspector의 에셋에서만 편집합니다.
         /// [EN] Returns the color for a view role; actual values are edited only in the asset Inspector.
@@ -141,6 +155,8 @@ namespace UnityCombatLab.Presentation.Styling
                 Define.PaletteColor.Shadow => _shadow,
                 Define.PaletteColor.Background => _background,
                 Define.PaletteColor.DamageOutline => _damageOutline,
+                Define.PaletteColor.DamagePreview => _damagePreview,
+                Define.PaletteColor.TrailingHealth => _trailingHealth,
                 _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown palette role.")
             };
         }

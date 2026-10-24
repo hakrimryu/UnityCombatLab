@@ -22,6 +22,34 @@ namespace UnityCombatLab.Presentation.UI
         private const float DamageLabelSeconds = 0.55f;
 
         /// <summary>
+        /// HP が減り始める前に、失う範囲を示す秒数。
+        /// [KO] HP가 줄기 전에 잃을 구간을 보여주는 시간(초)입니다.
+        /// [EN] Seconds showing the loss region before the health fill starts moving.
+        /// </summary>
+        private const float DamagePreviewSeconds = 0.12f;
+
+        /// <summary>
+        /// 現在の表示位置から確定 HP まで等速で動かす秒数。
+        /// [KO] 현재 표시 위치에서 확정 HP까지 일정 속도로 움직이는 시간(초)입니다.
+        /// [EN] Seconds for linear movement from the current fill to confirmed health.
+        /// </summary>
+        private const float HealthLerpSeconds = 0.24f;
+
+        /// <summary>
+        /// 被害通知から直前 HP の追従を始めるまでの秒数。
+        /// [KO] 피해 알림부터 직전 HP의 추적을 시작할 때까지의 시간(초)입니다.
+        /// [EN] Seconds after a damage notification before the old-health trail starts moving.
+        /// </summary>
+        private const float TrailingDelaySeconds = 0.4f;
+
+        /// <summary>
+        /// 残した直前 HP を確定 HP まで縮める秒数。
+        /// [KO] 남겨 둔 직전 HP를 확정 HP까지 줄이는 시간(초)입니다.
+        /// [EN] Seconds for the retained old-health trail to reach confirmed health.
+        /// </summary>
+        private const float TrailingLerpSeconds = 0.35f;
+
+        /// <summary>
         /// 役割名の表示先。
         /// [KO] 역할 이름 표시 대상.
         /// [EN] Role label.
@@ -55,6 +83,20 @@ namespace UnityCombatLab.Presentation.UI
         /// [EN] Display-only slider from the purchased prefab; SetHealth supplies the HP ratio to resize its fill without distorting the border.
         /// </summary>
         [SerializeField] private UnityEngine.UI.Slider _healthBar;
+
+        /// <summary>
+        /// 確定 HP から現在の塗り位置まで、これから減る範囲を重ねる画像。
+        /// [KO] 확정 HP에서 현재 채움 위치까지 곧 줄어들 구간을 덮어 표시하는 이미지입니다.
+        /// [EN] Overlay highlighting the upcoming visual loss between confirmed health and the current fill.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Image _damagePreview;
+
+        /// <summary>
+        /// 本体の背面に直前 HP を残し、遅れて縮む画像。
+        /// [KO] 본 체력바 뒤에 직전 HP를 남기고 늦게 줄어드는 이미지입니다.
+        /// [EN] Image behind the main fill that retains old health before shrinking later.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Image _trailingHealth;
 
         /// <summary>
         /// HP 損失と盾吸収を区別する短い表示。
@@ -127,6 +169,62 @@ namespace UnityCombatLab.Presentation.UI
         private int _generation;
 
         /// <summary>
+        /// 最初の HP 通知を受けたか。Initialize は解除し、初期値を補間せず表示します。
+        /// [KO] 첫 HP 알림 수신 여부입니다. Initialize가 해제하여 초기값을 보간 없이 표시합니다.
+        /// [EN] Whether initial health arrived; Initialize clears this so initial values appear without interpolation.
+        /// </summary>
+        private bool _hasHealth;
+
+        /// <summary>
+        /// Update がこの View のゲージを動かしている間だけ true。
+        /// [KO] Update가 이 View의 게이지를 움직이는 동안만 true입니다.
+        /// [EN] True only while Update is animating this view's gauges.
+        /// </summary>
+        private bool _isHealthAnimating;
+
+        /// <summary>
+        /// 最新通知が HP 損失か。回復時には予告と残像を表示しません。
+        /// [KO] 최신 알림이 HP 손실인지 여부입니다. 회복 시 예고와 잔상을 표시하지 않습니다.
+        /// [EN] Whether the latest notification lost health; healing shows neither preview nor trail.
+        /// </summary>
+        private bool _isHealthDecreasing;
+
+        /// <summary>
+        /// 最新通知からの経過秒。毎回の補間は固定した開始値から計算します。
+        /// [KO] 최신 알림부터의 경과 시간(초)입니다. 보간은 고정한 시작값에서 계산합니다.
+        /// [EN] Seconds since the latest notification; interpolation always uses a fixed starting value.
+        /// </summary>
+        private float _healthElapsed;
+
+        /// <summary>
+        /// 新通知時点の本体ゲージ比率。連続被害でも表示を巻き戻しません。
+        /// [KO] 새 알림 시점 본 게이지 비율입니다. 연속 피해에도 표시를 되돌리지 않습니다.
+        /// [EN] Main-fill ratio when a notification arrives, preserving continuity through repeated hits.
+        /// </summary>
+        private float _healthStart;
+
+        /// <summary>
+        /// ReadModel の確定 HP 比率。表示の遅れを戦闘状態へ戻しません。
+        /// [KO] ReadModel의 확정 HP 비율입니다. 표시 지연을 전투 상태로 되돌리지 않습니다.
+        /// [EN] Confirmed ReadModel health ratio; presentation delay never feeds back into combat state.
+        /// </summary>
+        private float _healthTarget;
+
+        /// <summary>
+        /// 最新通知時点の残像比率。連続被害では既に残っている範囲を維持します。
+        /// [KO] 최신 알림 시점 잔상 비율입니다. 연속 피해에는 이미 남아 있는 구간을 유지합니다.
+        /// [EN] Trail ratio at the latest notification, preserving an existing trail through consecutive damage.
+        /// </summary>
+        private float _trailingStart;
+
+        /// <summary>
+        /// 前回の最大 HP。別の最大値へ切り替わる時は古い比率を引き継ぎません。
+        /// [KO] 이전 최대 HP입니다. 최대값이 바뀌면 이전 비율을 이어받지 않습니다.
+        /// [EN] Previous maximum health; a changed maximum resets old ratios.
+        /// </summary>
+        private int _maxHealth;
+
+        /// <summary>
         /// 検証可能な表示 HP。
         /// [KO] 검증 가능한 표시 HP.
         /// [EN] Displayed health available for validation.
@@ -157,16 +255,20 @@ namespace UnityCombatLab.Presentation.UI
             if (_name == null || _health == null || _shield == null || _fill == null || _healthBar == null ||
                 _damage == null ||
                 _shieldDamage == null || _shieldDamageIcon == null || _shieldIcon == null ||
-                _badge == null || _defeated == null || _colors == null)
+                _badge == null || _defeated == null || _colors == null ||
+                _damagePreview == null || _trailingHealth == null)
             {
                 throw new InvalidOperationException("Unit status references must be assigned.");
             }
 
             ClearTransient();
+            _hasHealth = false;
             _name.text = displayName;
             _teamColor = _colors.GetTeamColor(team);
             _fill.color = _teamColor;
             _badge.color = _teamColor;
+            _damagePreview.color = _colors.GetColor(Define.PaletteColor.DamagePreview);
+            _trailingHealth.color = _colors.GetColor(Define.PaletteColor.TrailingHealth);
         }
 
         /// <summary>
@@ -187,12 +289,18 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// BattleHudPresenter が HP 変更時に呼び、数字とバーをすぐ更新します。HP 0 なら戦闘不能と表示します。
-        /// [KO] HP 변경 시 BattleHudPresenter가 호출해 숫자와 바를 즉시 갱신합니다. HP가 0이면 전투 불능으로 표시합니다.
-        /// [EN] Called by BattleHudPresenter on health changes to update the number and bar immediately, including defeat at zero.
+        /// BattleHudPresenter が確定 HP を渡します。数字と死亡は即時、ゲージだけを予告・補間・遅延追従で表示します。
+        /// [KO] BattleHudPresenter가 확정 HP를 전달합니다. 숫자·사망은 즉시, 게이지만 예고·보간·지연 추적으로 표시합니다.
+        /// [EN] Receives confirmed health from BattleHudPresenter; numbers and defeat update immediately while gauges preview and interpolate.
         /// </summary>
         public void SetHealth(int health, int maxHealth)
         {
+            if (maxHealth <= 0 || health < 0 || health > maxHealth)
+            {
+                throw new ArgumentOutOfRangeException(nameof(health), "Health must fit a positive maximum.");
+            }
+
+            var previousHealth = DisplayedHealth;
             DisplayedHealth = health;
             HealthRenderCount++;
             _health.text = health + " / " + maxHealth;
@@ -201,10 +309,101 @@ namespace UnityCombatLab.Presentation.UI
             _shieldIcon.gameObject.SetActive(health > 0);
             _badge.color = health == 0 ? _colors.GetColor(Define.PaletteColor.MutedText) : _teamColor;
             _name.color = _colors.GetColor(health == 0 ? Define.PaletteColor.MutedText : Define.PaletteColor.Text);
-            // Slider の範囲は 0〜1。例: HP 75/100 は 0.75 で塗り幅を 75% にする。
-            // float に変換しない整数除算では 75/100 が 0 になり、残 HP があってもバーが空になる。
-            // 表示専用なので値変更イベントは送らず、ReadModel への逆向きの入力を作らない。
-            _healthBar.SetValueWithoutNotify((float)health / maxHealth);
+            // HP 75/100 → 0.75。数字と死亡は確定値、以下の比率は表示専用で戦闘計算へ返さない。
+            var target = (float)health / maxHealth;
+            if (!_hasHealth || _maxHealth != maxHealth || !isActiveAndEnabled)
+            {
+                _hasHealth = true;
+                _maxHealth = maxHealth;
+                _healthTarget = target;
+                SnapHealth();
+                return;
+            }
+
+            if (health == previousHealth)
+            {
+                return;
+            }
+
+            _isHealthDecreasing = health < previousHealth;
+            _healthStart = _healthBar.normalizedValue;
+            _trailingStart = Mathf.Max(_trailingHealth.rectTransform.anchorMax.x, _healthStart);
+            _healthTarget = target;
+            _healthElapsed = 0f;
+            _isHealthAnimating = true;
+            RenderHealth(_healthStart, _isHealthDecreasing ? _trailingStart : target);
+        }
+
+        /// <summary>
+        /// 表示中のゲージだけを進めます。通知がない間は UI に値を書き込みません。
+        /// [KO] 움직이는 게이지만 진행합니다. 진행 중 연출이 없으면 UI 값을 쓰지 않습니다.
+        /// [EN] Advances active gauge transitions without writing UI values while idle.
+        /// </summary>
+        private void Update()
+        {
+            if (_isHealthAnimating)
+            {
+                AdvanceHealthAnimation(Time.deltaTime);
+            }
+        }
+
+        /// <summary>
+        /// 経過秒から三つの表示比率を決めます。遅いフレームでも同じ経過時間なら同じ位置になります。
+        /// [KO] 경과 시간으로 세 표시 비율을 결정합니다. 느린 프레임도 같은 경과 시간이면 같은 위치가 됩니다.
+        /// [EN] Computes gauge ratios from elapsed seconds so equal elapsed time gives equal positions across frame rates.
+        /// </summary>
+        private void AdvanceHealthAnimation(float deltaSeconds)
+        {
+            if (!_isHealthAnimating)
+            {
+                return;
+            }
+
+            _healthElapsed += deltaSeconds;
+            var delay = _isHealthDecreasing ? DamagePreviewSeconds : 0f;
+            var healthProgress = Mathf.Clamp01((_healthElapsed - delay) / HealthLerpSeconds);
+            var trailProgress = _isHealthDecreasing
+                ? Mathf.Clamp01((_healthElapsed - TrailingDelaySeconds) / TrailingLerpSeconds)
+                : 1f;
+            // 毎フレームの現在値から Lerp すると到着が遅れ続けるため、通知時の開始値を固定する。
+            // HP 100→60 の本体は補間の半分で 80、終端で必ず 60。残像は別の待機時間で追従する。
+            RenderHealth(Mathf.Lerp(_healthStart, _healthTarget, healthProgress),
+                Mathf.Lerp(_trailingStart, _healthTarget, trailProgress));
+            if (healthProgress >= 1f && trailProgress >= 1f)
+            {
+                SnapHealth();
+            }
+        }
+
+        /// <summary>
+        /// 同じ FillArea 内で本体・背面の残像・前面の損失範囲を描きます。
+        /// [KO] 같은 FillArea 안에 본체·뒤쪽 잔상·앞쪽 손실 구간을 그립니다.
+        /// [EN] Renders the main fill, rear trail and front loss region inside the same FillArea.
+        /// </summary>
+        private void RenderHealth(float healthRatio, float trailingRatio)
+        {
+            _healthBar.SetValueWithoutNotify(healthRatio);
+            _trailingHealth.rectTransform.anchorMax = new Vector2(trailingRatio, 1f);
+            _trailingHealth.enabled = _isHealthDecreasing && trailingRatio > healthRatio;
+            // 例: 確定 60%、本体 80% なら横 60〜80% だけを予告色にし、残りの HP は隠さない。
+            _damagePreview.rectTransform.anchorMin = new Vector2(_healthTarget, 0f);
+            _damagePreview.rectTransform.anchorMax = new Vector2(Mathf.Max(_healthTarget, healthRatio), 1f);
+            _damagePreview.enabled = _isHealthDecreasing && healthRatio > _healthTarget;
+        }
+
+        /// <summary>
+        /// 初期化・非表示・Presenter 解放で呼び、補間を止めて確定値へ揃えます。
+        /// [KO] 초기화·비활성화·Presenter 해제 시 호출해 보간을 멈추고 확정값으로 맞춥니다.
+        /// [EN] Stops interpolation and aligns gauges with confirmed health during initialization, hiding or presenter disposal.
+        /// </summary>
+        private void SnapHealth()
+        {
+            _isHealthAnimating = false;
+            _isHealthDecreasing = false;
+            if (_healthBar != null && _trailingHealth != null && _damagePreview != null)
+            {
+                RenderHealth(_healthTarget, _healthTarget);
+            }
         }
 
         /// <summary>
@@ -226,7 +425,7 @@ namespace UnityCombatLab.Presentation.UI
         /// </summary>
         public void ShowDamage(int healthDamage, int shieldDamage)
         {
-            ClearTransient();
+            ClearDamage();
             // 今回の表示番号を保存する。別の被害表示に切り替わったら番号が変わるため、古いタイマーは何もしない。
             var generation = _generation;
             _damage.text = healthDamage > 0 ? "-" + healthDamage : "";
@@ -251,6 +450,17 @@ namespace UnityCombatLab.Presentation.UI
         /// [EN] Clears only the transient presentation owned here.
         /// </summary>
         public void ClearTransient()
+        {
+            ClearDamage();
+            SnapHealth();
+        }
+
+        /// <summary>
+        /// 次の被害数字に切り替える時、ゲージの進行を止めずに数字の Tween だけを解除します。
+        /// [KO] 다음 피해 숫자로 바꿀 때 게이지 진행을 멈추지 않고 숫자 Tween만 해제합니다.
+        /// [EN] Clears damage-label tweens for the next hit without interrupting gauge movement.
+        /// </summary>
+        private void ClearDamage()
         {
             _generation++;
             _damageTween?.Kill();
