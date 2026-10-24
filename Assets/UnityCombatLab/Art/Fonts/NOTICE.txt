@@ -1,0 +1,7 @@
+Noto Sans CJK JP Regular
+Copyright © 2014-2021 Adobe (http://www.adobe.com/).
+Version 2.004;hotconv 1.0.118;makeotfexe 2.5.65603
+Source: https://github.com/notofonts/noto-cjk/tree/main/Sans/OTF/Japanese
+License: SIL Open Font License 1.1 (OFL.txt in this directory).
+The original font is unmodified. UI_BattleFont is a generated TMP atlas using this font and remains subject to the same font license.
+The original copyright and version metadata remain embedded in NotoSansCJKjp-Regular.otf.

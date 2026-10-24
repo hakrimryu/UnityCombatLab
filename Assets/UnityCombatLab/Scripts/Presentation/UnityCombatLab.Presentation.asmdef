@@ -1,0 +1,12 @@
+{
+    "name": "UnityCombatLab.Presentation",
+    "rootNamespace": "UnityCombatLab.Presentation",
+    "references": [
+        "UnityCombatLab.Common",
+        "UnityCombatLab.Domain",
+        "UnityCombatLab.Application",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "noEngineReferences": false
+}

@@ -6,6 +6,9 @@
         "UnityEngine.UI",
         "UniTask",
         "UnityCombatLab.Common",
-        "UnityCombatLab.Infrastructure"
+        "UnityCombatLab.Infrastructure",
+        "UnityCombatLab.Domain",
+        "UnityCombatLab.Application",
+        "UnityCombatLab.Presentation"
     ]
 }

@@ -130,3 +130,8 @@ Thumbs.db
 /Assets/Plugins/Demigiant/
 /Assets/Plugins/Demigiant.meta
 /Assets/Resources/DOTweenSettings.asset*
+
+# Restore official TMP Essential Resources from the installed uGUI package.
+# Keep bundled third-party sample resources out of the public repository.
+/Assets/TextMesh Pro/
+/Assets/TextMesh Pro.meta

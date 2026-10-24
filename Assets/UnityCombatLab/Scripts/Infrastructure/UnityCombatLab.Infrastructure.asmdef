@@ -3,6 +3,7 @@
     "rootNamespace": "UnityCombatLab.Infrastructure",
     "references": [
         "UnityCombatLab.Common",
-        "UniTask"
+        "UniTask",
+        "UnityCombatLab.Domain"
     ]
 }
