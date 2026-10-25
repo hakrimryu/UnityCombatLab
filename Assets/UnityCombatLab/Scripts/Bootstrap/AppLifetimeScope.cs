@@ -46,6 +46,13 @@ namespace UnityCombatLab.Bootstrap
         [SerializeField] private UiAssetCatalog _uiAssets;
 
         /// <summary>
+        /// 編成と戦闘が共有するローカルユニット参照カタログ。
+        /// [KO] 편성과 전투에서 공유하는 로컬 유닛 참조 카탈로그입니다.
+        /// [EN] Local unit reference catalog shared by formation and battle.
+        /// </summary>
+        [SerializeField] private UnitAssetCatalog _unitAssets;
+
+        /// <summary>
         /// 共通ルートだけをシーンの寿命から分離してから DI を起動します。
         /// [KO] 공통 루트만 씬 수명에서 분리한 뒤 DI를 시작합니다.
         /// [EN] Detaches only the common root from scene lifetime before starting DI.
@@ -114,10 +121,11 @@ namespace UnityCombatLab.Bootstrap
             // Boot で指定した色アセットを App Scope と子の Dungeon Scope で共有する。
             builder.RegisterInstance(_colors);
             builder.Register<SceneTransitionManager>(Lifetime.Singleton);
-            if (_loadingPrefab == null || _uiAssets == null)
-                throw new System.InvalidOperationException("Boot requires the shared loading prefab and UI asset catalog.");
+            if (_loadingPrefab == null || _uiAssets == null || _unitAssets == null)
+                throw new System.InvalidOperationException("Boot requires the shared loading prefab and UI/unit asset catalogs.");
 
             builder.RegisterInstance(_uiAssets);
+            builder.RegisterInstance(_unitAssets);
             builder.Register<AddressableAssetManager>(Lifetime.Singleton);
 
             // 共通調整役だけを App に置き、画面とユニットは各シーンに残す。
@@ -127,7 +135,7 @@ namespace UnityCombatLab.Bootstrap
             builder.Register(resolver => new RunFlowCoordinator
             (resolver.Resolve<SceneTransitionManager>(),
                 loading,
-                () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets),
+                () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets),
                 () => UniTask.NextFrame(),
                 Debug.LogException,
                 value => AudioListener.volume = value), Lifetime.Singleton);

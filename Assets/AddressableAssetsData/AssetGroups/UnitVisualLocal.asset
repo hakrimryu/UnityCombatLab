@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: UnitVisualLocal
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: UnitVisualLocal
+  m_GUID: 377faa37b17034145878fe99c05d7abd
+  m_SerializeEntries:
+  - m_GUID: 850a1d5585a92c34c9814d44cea49c60
+    m_Address: UnityCombatLab/Unit/Prefab/SkeletonMelee
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9929c4636fd6afa4a84782b87948177b
+    m_Address: UnityCombatLab/Unit/Prefab/SkeletonRanged
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: baab80d82f96cc44996030fe4d98aaaf
+    m_Address: UnityCombatLab/Unit/Prefab/Mage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bda8ea29347d0d746a799bceae570a2a
+    m_Address: UnityCombatLab/Unit/Prefab/Knight
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bfdbb21b0bb91af4cbbf2d9f36398dd4
+    m_Address: UnityCombatLab/Unit/Prefab/SkeletonCaptain
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c8d649a896215574fb555105cb81872e
+    m_Address: UnityCombatLab/Unit/Prefab/Ranger
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 24f19ee2c8e3c1d4dab4b11d9a3350aa, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 8f9d9dfbd4f6c5d4f8d3ec7008784c52, type: 2}
+    - {fileID: 11400000, guid: a4f4cf7c7fbe6844c8d83212ed62b3da, type: 2}

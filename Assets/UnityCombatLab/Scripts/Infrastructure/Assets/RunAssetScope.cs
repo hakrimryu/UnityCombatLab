@@ -9,9 +9,9 @@ using UnityEngine;
 namespace UnityCombatLab.Infrastructure.Assets
 {
     /// <summary>
-    /// 一回のRunが使うHUDを共通ローダーで準備し、表示破棄後に解放します。
-    /// [KO] 한 번의 Run이 사용할 HUD를 공통 로더로 준비하고 표시 파괴 후 해제합니다.
-    /// [EN] Prepares one run's HUD through the shared loader and releases it after view destruction.
+    /// 一回のRunが使うHUD・能力設定・キャラクターを準備し、表示破棄後に解放します。
+    /// [KO] 한 번의 Run이 사용할 HUD·능력 설정·캐릭터를 준비하고 표시 파괴 후 해제합니다.
+    /// [EN] Prepares one run's HUD, stats and characters and releases them after view destruction.
     /// </summary>
     public sealed class RunAssetScope : IRunResources
     {
@@ -27,6 +27,20 @@ namespace UnityCombatLab.Infrastructure.Assets
         /// [EN] Source of typed HUD and role-image references.
         /// </summary>
         private readonly UiAssetCatalog _catalog;
+
+        /// <summary>
+        /// 編成画面と共有する職業別の能力設定・表示参照。
+        /// [KO] 편성 화면과 공유하는 직업별 능력 설정·표시 참조입니다.
+        /// [EN] Role-specific stat and visual references shared with formation.
+        /// </summary>
+        private readonly UnitAssetCatalog _unitCatalog;
+
+        /// <summary>
+        /// このRunが保持し、Dungeonの生成処理へ貸すロード済み資産。
+        /// [KO] 이번 Run에서 유지하고 Dungeon 생성 처리에 빌려줄 로드된 자산입니다.
+        /// [EN] Loaded assets retained by this run and lent to Dungeon creation.
+        /// </summary>
+        private readonly Dictionary<Define.UnitRole, LoadedUnitAsset> _units = new();
 
         /// <summary>
         /// 職業からHUD画像を選ぶ読込結果。Run終了時に参照を消します。
@@ -67,16 +81,17 @@ namespace UnityCombatLab.Infrastructure.Assets
         /// [KO] App Scope의 공통 서비스에서 이번 Run만의 소유 범위를 만듭니다.
         /// [EN] Creates this run's ownership scope from the app's shared service.
         /// </summary>
-        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog)
+        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog, UnitAssetCatalog unitCatalog)
         {
             _scope = (assets ?? throw new ArgumentNullException(nameof(assets))).CreateScope();
             _catalog = catalog;
+            _unitCatalog = unitCatalog;
         }
 
         /// <summary>
-        /// カタログのHUDを一度読み込みます。失敗時は取得済み資産も解放します。
-        /// [KO] 카탈로그의 HUD를 한 번 로드하며 실패 시 취득한 자산도 해제합니다.
-        /// [EN] Loads the catalog's HUD once and releases acquired assets on failure.
+        /// Dungeonへ移る前に必要な資産を読み込み、失敗時は取得済み資産も解放します。
+        /// [KO] Dungeon으로 이동하기 전에 필요한 자산을 로드하며 실패 시 취득한 자산도 해제합니다.
+        /// [EN] Loads required assets before entering Dungeon and releases acquired assets on failure.
         /// </summary>
         public async UniTask PrepareAsync(CancellationToken cancellationToken)
         {
@@ -92,9 +107,22 @@ namespace UnityCombatLab.Infrastructure.Assets
                 if (_catalog == null)
                     throw new InvalidOperationException("Run requires a UI asset catalog.");
 
+                if (_unitCatalog == null)
+                    throw new InvalidOperationException("Run requires a unit asset catalog.");
+
                 var hud = await _scope.LoadAsync(_catalog.BattleHud, cancellationToken);
                 foreach (Define.UnitRole role in Enum.GetValues(typeof(Define.UnitRole)))
+                {
                     _icons.Add(role, await _scope.LoadAsync(_catalog.GetBattleIcon(role), cancellationToken));
+                    var reference = _unitCatalog.Get(role);
+                    var definition = await _scope.LoadAsync(reference.Definition, cancellationToken);
+                    if (definition.Role != role)
+                        throw new InvalidOperationException($"Unit definition does not match catalog role {role}.");
+
+                    // prefabの依存先にある効果とモデルも、このハンドルが解放されるまで保持される。
+                    var prefab = await _scope.LoadAsync(reference.Prefab, cancellationToken);
+                    _units.Add(role, new LoadedUnitAsset(definition, prefab));
+                }
 
                 HudPrefab = hud;
             }
@@ -106,9 +134,25 @@ namespace UnityCombatLab.Infrastructure.Assets
         }
 
         /// <summary>
-        /// Run調整役がHUD破棄後に呼び、Runの資産だけを解放します。
-        /// [KO] Run 조정자가 HUD 파괴 후 호출하여 Run 자산만 해제합니다.
-        /// [EN] Called by run coordination after HUD destruction to release only this run's assets.
+        /// 準備済みの職業資産を返します。終了後の生成要求は拒否します。
+        /// [KO] 준비된 직업 자산을 반환하며 종료 후 생성 요청은 거부합니다.
+        /// [EN] Returns prepared role assets and rejects creation requests after disposal.
+        /// </summary>
+        public LoadedUnitAsset GetUnit(Define.UnitRole role)
+        {
+            if (_isDisposed)
+                throw new ObjectDisposedException(nameof(RunAssetScope));
+
+            if (HudPrefab == null || !_units.TryGetValue(role, out var unit))
+                throw new InvalidOperationException($"Run assets for {role} are not ready.");
+
+            return unit;
+        }
+
+        /// <summary>
+        /// Run調整役がHUD・ユニット・効果の破棄後に呼び、Runの資産を解放します。
+        /// [KO] Run 조정자가 HUD·유닛·효과 파괴 후 호출하여 Run 자산을 해제합니다.
+        /// [EN] Called by run coordination after HUD, unit and effect destruction to release run assets.
         /// </summary>
         public void Dispose()
         {
@@ -118,6 +162,7 @@ namespace UnityCombatLab.Infrastructure.Assets
             _isDisposed = true;
             HudPrefab = null;
             _icons.Clear();
+            _units.Clear();
             _scope.Dispose();
         }
     }

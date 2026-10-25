@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: UnitDataLocal
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: UnitDataLocal
+  m_GUID: 9bbadae3a80e7b74088fffbf0de8d1a4
+  m_SerializeEntries:
+  - m_GUID: 036d71faf8a20f240a94dfc8e86b1bf1
+    m_Address: UnityCombatLab/Unit/Definition/SkeletonRanged
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2a103851c9745ac48951230227a87515
+    m_Address: UnityCombatLab/Unit/Definition/SkeletonCaptain
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 61cd9a3b91036174385a6852db17b724
+    m_Address: UnityCombatLab/Unit/Definition/Ranger
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6fa1e57260065974ab69091bbaf8e16c
+    m_Address: UnityCombatLab/Unit/Definition/SkeletonMelee
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d123bacf1c8ca14caa8a38430990e59
+    m_Address: UnityCombatLab/Unit/Definition/Mage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ee57f12de86554c459b041c866b667fd
+    m_Address: UnityCombatLab/Unit/Definition/Knight
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 24f19ee2c8e3c1d4dab4b11d9a3350aa, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 20ff9c53f8c55744aafa934b69667430, type: 2}
+    - {fileID: 11400000, guid: d9367a6baba38a8489f5fc100d87421b, type: 2}

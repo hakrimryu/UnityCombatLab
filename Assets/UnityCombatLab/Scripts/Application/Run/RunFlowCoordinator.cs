@@ -366,7 +366,7 @@ namespace UnityCombatLab.Application.Run
                 session.Cancel();
                 ShowTransitionSafely(Define.RunTransitionPhase.CleaningUp);
                 session.Battle?.Dispose();
-                // Destroy はフレーム末尾に完了する。HUD の材質と子プールが消えてから原型を解放する。
+                // Destroyはフレーム末尾に完了する。HUD・キャラクター・子の効果プールが消えてから資産を解放する。
                 await _nextFrame();
                 if (_isDisposed)
                     return;
@@ -472,7 +472,7 @@ namespace UnityCombatLab.Application.Run
             ActiveSession = null;
             session?.Cancel();
             session?.Battle?.Dispose();
-            // HUD を破棄するフレームと原型の解放を分ける。
+            // HUD・キャラクターを破棄するフレームと資産の解放を分ける。
             DisposeSessionAsync(session).Forget();
             Changed = null;
         }

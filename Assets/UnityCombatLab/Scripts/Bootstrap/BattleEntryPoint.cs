@@ -50,11 +50,18 @@ namespace UnityCombatLab.Bootstrap
         private readonly IReadOnlyDictionary<Define.UnitRole, Sprite> _icons;
 
         /// <summary>
-        /// Dungeon に配置された、今回の戦闘に使うユニットの View。
-        /// [KO] Dungeon에 배치된 이번 전투의 유닛 View입니다.
-        /// [EN] Unit views placed in Dungeon for this battle.
+        /// この戦闘が生成し、効果と一緒に終了時に破棄するユニットのView。
+        /// [KO] 이번 전투에서 생성하고 효과와 함께 종료 시 파괴할 유닛 View입니다.
+        /// [EN] Unit views created by this battle and destroyed with their effects on exit.
         /// </summary>
-        private readonly UnitView[] _unitViews;
+        private UnitView[] _unitViews;
+
+        /// <summary>
+        /// 開始許可後にだけ、確定した職業と配置先からViewを生成します。
+        /// [KO] 시작 허용 후에만 확정 직업과 배치 지점으로 View를 생성합니다.
+        /// [EN] Creates views from finalized roles and spawn points only after startup is allowed.
+        /// </summary>
+        private readonly Func<UnitView[]> _createUnits;
 
         /// <summary>
         /// 背景色の設定と HUD の座標変換に使う Dungeon カメラ。
@@ -141,18 +148,18 @@ namespace UnityCombatLab.Bootstrap
         public bool IsDisposed { get; private set; }
 
         /// <summary>
-        /// BattleLifetimeScope が用意した Runner・戦闘識別子・View・設定を保持し、Start の接続に使います。
-        /// [KO] BattleLifetimeScope가 준비한 Runner·전투 식별자·View·설정을 보관해 Start에서 연결합니다.
-        /// [EN] Stores the runner, battle identifiers, views and settings supplied by BattleLifetimeScope for connection in Start.
+        /// BattleLifetimeScopeが用意したRunner・View生成処理・設定を保持し、開始許可後に接続します。
+        /// [KO] BattleLifetimeScope가 준비한 Runner·View 생성 처리·설정을 보관하고 시작 허용 후 연결합니다.
+        /// [EN] Retains the runner, view factory and settings supplied by BattleLifetimeScope for connection after startup is allowed.
         /// </summary>
-        public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, UnitView[] unitViews,
+        public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, Func<UnitView[]> createUnits,
             BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors,
             IReadOnlyDictionary<Define.UnitRole, Sprite> icons, RunSession session = null)
         {
             Runner = runner;
             _runId = runId;
             _wave = wave;
-            _unitViews = unitViews;
+            _createUnits = createUnits ?? throw new ArgumentNullException(nameof(createUnits));
             _hudPrefab = hudPrefab;
             _icons = icons ?? throw new ArgumentNullException(nameof(icons));
             _hudParent = hudParent;
@@ -175,6 +182,7 @@ namespace UnityCombatLab.Bootstrap
 
             try
             {
+                _unitViews = _createUnits();
                 Hud = UnityEngine.Object.Instantiate(_hudPrefab, _hudParent);
                 Hud.name = "UI_BattleHud";
                 // スロット位置だけを記録するので、攻撃中のモデルの踏み込みにパネルは追従しない。
@@ -237,9 +245,9 @@ namespace UnityCombatLab.Bootstrap
         }
 
         /// <summary>
-        /// Dungeon のコンテナ破棄または開始/進行失敗で呼びます。通知を止めてからデータと生成した HUD を解放します。
-        /// [KO] Dungeon 컨테이너 해제 또는 시작·진행 실패 시 호출합니다. 알림을 끊은 뒤 데이터와 생성한 HUD를 해제합니다.
-        /// [EN] Called on Dungeon container disposal or startup/tick failure; detaches notifications before releasing data and HUD.
+        /// Dungeonの終了または開始・進行失敗で呼び、通知を止めてからデータ・HUD・キャラクターを解放します。
+        /// [KO] Dungeon 종료 또는 시작·진행 실패 시 호출하여 알림을 끊은 뒤 데이터·HUD·캐릭터를 해제합니다.
+        /// [EN] Called on Dungeon exit or startup/tick failure to detach notifications before releasing data, HUD and characters.
         /// </summary>
         public void Dispose()
         {
@@ -255,6 +263,22 @@ namespace UnityCombatLab.Bootstrap
             _hudPresenter?.Dispose();
             Presentation?.Dispose();
             Runner.Dispose();
+            if (_unitViews != null)
+            {
+                // 調整役は次フレームまで待ってから資産を解放する。先に子の効果を含む全Viewを破棄する。
+                foreach (var view in _unitViews)
+                {
+                    if (view == null)
+                        continue;
+
+                    view.Release();
+                    view.gameObject.SetActive(false);
+                    UnityEngine.Object.Destroy(view.gameObject);
+                }
+
+                _unitViews = null;
+            }
+
             if (Hud != null)
             {
                 Hud.gameObject.SetActive(false);

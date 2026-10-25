@@ -4,7 +4,6 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityCombatLab.Common;
 using UnityCombatLab.Domain.Run;
-using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Infrastructure.Assets;
 using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
@@ -53,6 +52,13 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Typed references for cards, slots and role images.
         /// </summary>
         private readonly UiAssetCatalog _catalog;
+
+        /// <summary>
+        /// 戦闘と同じ能力設定を非同期で取得する職業カタログ。
+        /// [KO] 전투와 같은 능력 설정을 비동기로 가져올 직업 카탈로그입니다.
+        /// [EN] Role catalog used to load the same stats as battle asynchronously.
+        /// </summary>
+        private readonly UnitAssetCatalog _unitCatalog;
         /// <summary>
         /// このFrontendが生成した表示の破棄後に解放する素材。
         /// [KO] 이 Frontend에서 생성한 표시를 파괴한 후 해제할 소재입니다.
@@ -88,12 +94,12 @@ namespace UnityCombatLab.Bootstrap
         private bool _isStarted;
 
         /// <summary>
-        /// 実データの英雄説明を作り、非同期のUI準備に使う依存関係を保持します。
-        /// [KO] 실제 데이터 영웅 설명을 만들고 비동기 UI 준비에 사용할 의존성을 보관합니다.
-        /// [EN] Builds actual hero descriptions and retains dependencies for async UI preparation.
+        /// 非同期のUI・能力設定の準備に使う依存関係を保持します。
+        /// [KO] 비동기 UI·능력 설정 준비에 사용할 의존성을 보관합니다.
+        /// [EN] Retains dependencies for asynchronous UI and stat preparation.
         /// </summary>
-        public FrontendEntryPoint(RunFlowCoordinator flow, FrontendView view, UnitDefinition[] heroes,
-            GameColorPalette colors, AddressableAssetManager assets, UiAssetCatalog catalog)
+        public FrontendEntryPoint(RunFlowCoordinator flow, FrontendView view,
+            GameColorPalette colors, AddressableAssetManager assets, UiAssetCatalog catalog, UnitAssetCatalog unitCatalog)
         {
             _flow = flow ?? throw new ArgumentNullException(nameof(flow));
             if (view == null)
@@ -102,24 +108,11 @@ namespace UnityCombatLab.Bootstrap
             if (colors == null)
                 throw new ArgumentNullException(nameof(colors));
 
-            if (heroes == null || heroes.Length != Define.SlotsPerTeam)
-                throw new ArgumentException("Frontend requires three hero definitions.", nameof(heroes));
-
             _view = view;
             _colors = colors;
             _catalog = catalog != null ? catalog : throw new ArgumentNullException(nameof(catalog));
+            _unitCatalog = unitCatalog != null ? unitCatalog : throw new ArgumentNullException(nameof(unitCatalog));
             _descriptions = new string[Define.SlotsPerTeam];
-            for (var index = 0; index < heroes.Length; index++)
-            {
-                if (heroes[index] == null)
-                    throw new ArgumentException($"Frontend hero definition {index} is missing.", nameof(heroes));
-
-                var input = heroes[index].CreateInput(index + 1, Define.BattleTeam.Ally, (Define.BattleSlot)index);
-                if ((int)input.Role != index)
-                    throw new InvalidOperationException("Hero definitions must be knight, ranger and mage.");
-
-                _descriptions[index] = GameText.HeroDescription(input);
-            }
 
             _assets = (assets ?? throw new ArgumentNullException(nameof(assets))).CreateScope();
         }
@@ -173,6 +166,12 @@ namespace UnityCombatLab.Bootstrap
                 for (var index = 0; index < heroes.Length; index++)
                 {
                     var role = (Define.UnitRole)index;
+                    var definition = await _assets.LoadAsync(_unitCatalog.Get(role).Definition, token);
+                    var input = definition.CreateInput(index + 1, Define.BattleTeam.Ally, (Define.BattleSlot)index);
+                    if (input.Role != role)
+                        throw new InvalidOperationException($"Hero definition does not match catalog role {role}.");
+
+                    _descriptions[index] = GameText.HeroDescription(input);
                     var visual = _catalog.GetHero(role);
                     var icon = await _assets.LoadAsync(visual.Icon, token);
                     heroes[index] = new HeroCardData(role, _descriptions[index], icon, visual.Tint);

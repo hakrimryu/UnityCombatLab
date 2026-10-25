@@ -763,6 +763,7 @@ namespace UnityCombatLab.Tests.PlayMode
             var app = Object.FindFirstObjectByType<AppLifetimeScope>();
             var previous = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
             var oldHud = previous.Hud;
+            var oldUnits = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
             var flow = app.Container.Resolve<RunFlowCoordinator>();
             while (previous.Runner.Result == Define.BattleResult.Ongoing) previous.Runner.Advance(0.4);
             previous.Presenter.Advance(100);
@@ -778,6 +779,7 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(previous.IsDisposed, Is.True);
             Assert.That(flow.Controller.Current.Id, Is.Not.EqualTo(previousId));
             Assert.That(oldHud == null, Is.True);
+            Assert.That(oldUnits.All(unit => unit == null), Is.True);
             var tick = previous.Runner.CurrentTick;
             previous.Runner.Advance(1);
             Assert.That(previous.Runner.CurrentTick, Is.EqualTo(tick));
@@ -813,8 +815,13 @@ namespace UnityCombatLab.Tests.PlayMode
             var app = Object.FindFirstObjectByType<AppLifetimeScope>();
             var flow = app.Container.Resolve<RunFlowCoordinator>();
             var scope = Object.FindFirstObjectByType<BattleLifetimeScope>();
-            var definitions = (UnitDefinition[])typeof(BattleLifetimeScope)
-                .GetField("_definitions", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(scope);
+            // Run終了後も一時変更する能力設定を保持し、復元前にアンロードされないようにする。
+            using var assets = app.Container.Resolve<AddressableAssetManager>().CreateScope();
+            var catalog = app.Container.Resolve<UnitAssetCatalog>();
+            var definitions = new UnitDefinition[Define.MaxBattleUnitCount];
+            foreach (Define.UnitRole role in System.Enum.GetValues(typeof(Define.UnitRole)))
+                yield return assets.LoadAsync(catalog.Get(role).Definition).ToCoroutine(resultHandler: value => definitions[(int)role] = value);
+
             var unique = definitions.Distinct().ToArray();
             var snapshots = unique.Select(JsonUtility.ToJson).ToArray();
             var previous = scope.Container.Resolve<BattleEntryPoint>();

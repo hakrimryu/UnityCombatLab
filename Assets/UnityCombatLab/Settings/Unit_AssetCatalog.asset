@@ -1,0 +1,93 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 622db35a011833747836a0f4c819efa6, type: 3}
+  m_Name: Unit_AssetCatalog
+  m_EditorClassIdentifier: UnityCombatLab.Infrastructure::UnityCombatLab.Infrastructure.Assets.UnitAssetCatalog
+  _units:
+  - _role: 0
+    _definition:
+      m_AssetGUID: ee57f12de86554c459b041c866b667fd
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    _prefab:
+      m_AssetGUID: bda8ea29347d0d746a799bceae570a2a
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - _role: 1
+    _definition:
+      m_AssetGUID: 61cd9a3b91036174385a6852db17b724
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    _prefab:
+      m_AssetGUID: c8d649a896215574fb555105cb81872e
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - _role: 2
+    _definition:
+      m_AssetGUID: 7d123bacf1c8ca14caa8a38430990e59
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    _prefab:
+      m_AssetGUID: baab80d82f96cc44996030fe4d98aaaf
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - _role: 3
+    _definition:
+      m_AssetGUID: 6fa1e57260065974ab69091bbaf8e16c
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    _prefab:
+      m_AssetGUID: 850a1d5585a92c34c9814d44cea49c60
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - _role: 4
+    _definition:
+      m_AssetGUID: 036d71faf8a20f240a94dfc8e86b1bf1
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    _prefab:
+      m_AssetGUID: 9929c4636fd6afa4a84782b87948177b
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+  - _role: 5
+    _definition:
+      m_AssetGUID: 2a103851c9745ac48951230227a87515
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0
+    _prefab:
+      m_AssetGUID: bfdbb21b0bb91af4cbbf2d9f36398dd4
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 0

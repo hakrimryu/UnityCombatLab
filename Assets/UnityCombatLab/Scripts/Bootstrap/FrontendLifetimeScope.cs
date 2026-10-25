@@ -1,9 +1,6 @@
 using UnityCombatLab.Application.Run;
 using System;
-using System.Linq;
-using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Infrastructure.Assets;
-using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.UI;
 using UnityEngine;
@@ -27,13 +24,6 @@ namespace UnityCombatLab.Bootstrap
         [SerializeField] private FrontendView _view;
 
         /// <summary>
-        /// 騎士・弓使い・魔法使いの実際の開始能力。
-        /// [KO] 기사·궁수·마법사의 실제 시작 능력입니다.
-        /// [EN] Actual starting definitions for knight, ranger and mage.
-        /// </summary>
-        [SerializeField] private UnitDefinition[] _heroes;
-
-        /// <summary>
         /// 共通サービスの DI 親を Boot の AppRoot から取得します。
         /// [KO] 공통 서비스의 DI 부모를 Boot의 AppRoot에서 가져옵니다.
         /// [EN] Finds the common-services DI parent created by Boot.
@@ -48,19 +38,18 @@ namespace UnityCombatLab.Bootstrap
         /// </summary>
         protected override void Configure(IContainerBuilder builder)
         {
-            if (Parent == null || _view == null || _view.gameObject.scene != gameObject.scene ||
-                _heroes == null || _heroes.Length != Define.SlotsPerTeam || _heroes.Any(hero => hero == null))
+            if (Parent == null || _view == null || _view.gameObject.scene != gameObject.scene)
             {
-                throw new InvalidOperationException("Frontend requires AppRoot, a scene-owned view and three hero definitions.");
+                throw new InvalidOperationException("Frontend requires AppRoot and a scene-owned view.");
             }
 
             builder.RegisterEntryPoint(resolver => new FrontendEntryPoint
             (resolver.Resolve<RunFlowCoordinator>(),
                 _view,
-                _heroes,
                 resolver.Resolve<GameColorPalette>(),
                 resolver.Resolve<AddressableAssetManager>(),
-                resolver.Resolve<UiAssetCatalog>()), Lifetime.Scoped).AsSelf();
+                resolver.Resolve<UiAssetCatalog>(),
+                resolver.Resolve<UnitAssetCatalog>()), Lifetime.Scoped).AsSelf();
         }
     }
 }

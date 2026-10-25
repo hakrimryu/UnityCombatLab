@@ -1162,6 +1162,7 @@ MonoBehaviour:
   _colors: {fileID: 11400000, guid: 37ff58f362dcfd04884c039410255d53, type: 2}
   _loadingPrefab: {fileID: 5153247213275023624, guid: 70fe3e35ec847694b969306934c7e92f, type: 3}
   _uiAssets: {fileID: 11400000, guid: 82a527a661b317447a21287d2db980ad, type: 2}
+  _unitAssets: {fileID: 11400000, guid: 4e229114a59b1184bb2d01e009c150a3, type: 2}
 --- !u!4 &2124495723
 Transform:
   m_ObjectHideFlags: 0

@@ -255,10 +255,6 @@ MonoBehaviour:
   autoRun: 1
   autoInjectGameObjects: []
   _view: {fileID: 8691458670388075943}
-  _heroes:
-  - {fileID: 11400000, guid: ee57f12de86554c459b041c866b667fd, type: 2}
-  - {fileID: 11400000, guid: 61cd9a3b91036174385a6852db17b724, type: 2}
-  - {fileID: 11400000, guid: 7d123bacf1c8ca14caa8a38430990e59, type: 2}
 --- !u!4 &1232147386
 Transform:
   m_ObjectHideFlags: 0

@@ -5,10 +5,8 @@ using System.Linq;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Common;
 using UnityCombatLab.Domain.Run;
-using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.Styling;
-using UnityCombatLab.Presentation.Units;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -23,18 +21,18 @@ namespace UnityCombatLab.Bootstrap
     public sealed class BattleLifetimeScope : LifetimeScope
     {
         /// <summary>
-        /// 前列の味方/敵、後列上の味方/敵、後列下の味方/敵の順に Inspector で割り当てる能力設定。
-        /// [KO] Inspector에서 아군/적 전열, 아군/적 위쪽 후열, 아군/적 아래쪽 후열 순으로 연결하는 능력치 설정.
-        /// [EN] Stat assets assigned as ally/enemy front, ally/enemy upper-back, then ally/enemy lower-back.
+        /// 前列の味方/敵、後列上の味方/敵、後列下の味方/敵の順に割り当てる配置先。
+        /// [KO] 아군/적 전열, 아군/적 위쪽 후열, 아군/적 아래쪽 후열 순으로 연결하는 배치 지점입니다.
+        /// [EN] Spawn points assigned as ally/enemy front, upper-back, then lower-back.
         /// </summary>
-        [SerializeField] private UnitDefinition[] _definitions;
+        [SerializeField] private Transform[] _spawnPoints;
 
         /// <summary>
-        /// _definitions と同じ順序のキャラクター。例えば両配列の先頭は同じ騎士を指します。
-        /// [KO] _definitions와 같은 순서의 캐릭터입니다. 예를 들어 두 배열의 첫 항목은 같은 기사를 가리킵니다.
-        /// [EN] Characters in the same order as _definitions; the first item in both arrays refers to the knight.
+        /// このDungeonが所有し、生成したキャラクターをまとめる親。
+        /// [KO] 이 Dungeon이 소유하며 생성한 캐릭터를 모아둘 부모입니다.
+        /// [EN] Dungeon-owned parent for spawned characters.
         /// </summary>
-        [SerializeField] private UnitView[] _unitViews;
+        [SerializeField] private Transform _unitsRoot;
 
         /// <summary>
         /// この Dungeon シーンが所有し、BattleEntryPoint が HUD を生成する Canvas。
@@ -67,14 +65,14 @@ namespace UnityCombatLab.Bootstrap
         /// </summary>
         protected override void Configure(IContainerBuilder builder)
         {
-            if (_definitions == null || _definitions.Length != Define.MaxBattleUnitCount ||
-                _definitions.Any(definition => definition == null) || _unitViews == null ||
-                _unitViews.Length != _definitions.Length || _unitViews.Any(view => view == null) ||
-                _unitViews.Distinct().Count() != _unitViews.Length ||
-                _battleCamera == null || Parent == null)
+            if (_spawnPoints == null || _spawnPoints.Length != Define.MaxBattleUnitCount ||
+                _spawnPoints.Any(point => point == null || point.gameObject.scene != gameObject.scene) ||
+                _spawnPoints.Distinct().Count() != _spawnPoints.Length ||
+                _unitsRoot == null || _unitsRoot.gameObject.scene != gameObject.scene ||
+                _battleCamera == null || _battleCamera.gameObject.scene != gameObject.scene || Parent == null)
             {
                 throw new InvalidOperationException(
-                    "Battle requires six distinct views, definitions, HUD, camera and AppRoot.");
+                    "Battle requires six distinct spawn points, a unit parent, camera and AppRoot in the correct scene.");
             }
 
             if (_hudCanvas == null || _hudCanvas.gameObject.scene != gameObject.scene ||
@@ -97,11 +95,13 @@ namespace UnityCombatLab.Bootstrap
             if (hudPrefab == null)
                 throw new InvalidOperationException("Run HUD must finish loading before Dungeon.");
 
-            var originals = _definitions.Select((definition, index) => definition.CreateInput(index + 1,
+            // 既存の戦闘契約に合わせ、0/1は味方/敵の前列、2/3は後列上、4/5は後列下の原型を渡す。
+            var roles = new[] { Define.UnitRole.Knight, Define.UnitRole.SkeletonMelee,
+                Define.UnitRole.Ranger, Define.UnitRole.SkeletonRanged, Define.UnitRole.Mage, Define.UnitRole.SkeletonCaptain };
+            var originals = roles.Select((role, index) => resources.GetUnit(role).Definition.CreateInput(index + 1,
                 (Define.BattleTeam)(index % Define.BattleTeamCount),
                 (Define.BattleSlot)(index / Define.BattleTeamCount))).ToArray();
             var setup = new RunBattleSetup(session.InitialState.Configuration, originals);
-            var views = ArrangeViews(setup);
 
             var runId = session.InitialState.Id;
             // 全接続ができても、読込側が許可するまでは EntryPoint.Start/Tick を進めない。
@@ -111,7 +111,7 @@ namespace UnityCombatLab.Bootstrap
                 (new BattleRunner(runId, Define.InitialWave, setup.Units),
                     runId,
                     Define.InitialWave,
-                    views,
+                    () => BattleUnitFactory.Create(setup.Units, resources, _spawnPoints, _unitsRoot),
                     hudPrefab,
                     _hudCanvas.transform,
                     _battleCamera,
@@ -121,28 +121,6 @@ namespace UnityCombatLab.Bootstrap
                 session.AttachBattle(battle);
                 return battle;
             }, Lifetime.Scoped).AsSelf();
-        }
-
-        /// <summary>
-        /// 全配置先を先に保存してから、能力データと同じ原型のViewを移動します。
-        /// [KO] 모든 배치 위치를 먼저 저장한 뒤 능력 데이터와 같은 원형의 View를 옮깁니다.
-        /// [EN] Caches every destination before moving the views selected by the same source mapping as the stats.
-        /// </summary>
-        private UnitView[] ArrangeViews(RunBattleSetup setup)
-        {
-            var allyPositions = new Vector3[Define.SlotsPerTeam];
-            for (var slot = 0; slot < allyPositions.Length; slot++)
-                allyPositions[slot] = _unitViews[slot * Define.BattleTeamCount].transform.position;
-            var views = new UnitView[setup.Units.Count];
-            for (var index = 0; index < views.Length; index++)
-            {
-                views[index] = _unitViews[setup.GetSourceIndex(index)];
-                var input = setup.Units[index];
-                if (input.Team == Define.BattleTeam.Ally)
-                    views[index].transform.position = allyPositions[(int)input.Slot];
-            }
-
-            return views;
         }
     }
 }
