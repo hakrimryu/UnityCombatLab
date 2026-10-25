@@ -89,7 +89,6 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(root.GetComponentsInChildren<AudioListener>(true).Length, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<EventSystem>(true).Length, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<Canvas>(true), Is.Empty);
-            Assert.That(root.GetComponentsInChildren<BootStatusView>(true), Is.Empty);
             Assert.That(Object.FindFirstObjectByType<BattleHudView>().gameObject.scene,
                 Is.EqualTo(SceneManager.GetActiveScene()));
             Assert.That(Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
@@ -120,9 +119,9 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
-        /// Boot のインデックスでも共通ルートを重複せずロードできることを検証します。
-        /// [KO] Boot 인덱스로도 공통 루트를 중복하지 않고 로드하는지 검증합니다.
-        /// [EN] Verifies loading the Boot index without duplicating the shared app root.
+        /// Boot を再読込しても共通ルートが重複せず、Boot 専用 Canvas が作られないことを検証します。
+        /// [KO] Boot를 다시 로드해도 공통 루트가 중복되지 않고 Boot 전용 Canvas가 생성되지 않는지 검증합니다.
+        /// [EN] Verifies reloading Boot neither duplicates the shared root nor creates a Boot-only canvas.
         /// </summary>
         [UnityTest]
         public IEnumerator BootIndexLoadsWithoutDuplicatingAppRoot()
@@ -136,6 +135,10 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(Object.FindObjectsByType<AppLifetimeScope>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
             Assert.That(Object.FindFirstObjectByType<AppLifetimeScope>(), Is.SameAs(scope));
             Assert.That(transition.IsLoading, Is.False);
+            foreach (var bootRoot in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                Assert.That(bootRoot.GetComponentsInChildren<Canvas>(true), Is.Empty);
+            }
         }
 
         /// <summary>
