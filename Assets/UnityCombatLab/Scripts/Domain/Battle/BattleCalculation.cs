@@ -85,9 +85,9 @@ namespace UnityCombatLab.Domain.Battle
         }
 
         /// <summary>
-        /// 固定規則の百分率をbasis pointへ変換します。
-        /// [KO] 고정 규칙의 백분율을 basis point로 변환합니다.
-        /// [EN] Converts fixed-rule percentages to basis points.
+        /// 百分率を1万分率へ変換します。20%は2000となり、被害計算は10000で割って元の単位へ戻します。
+        /// [KO] 백분율을 1만분율로 변환합니다. 20%는 2000이며 피해 계산은 10000으로 나눠 원래 단위로 되돌립니다.
+        /// [EN] Converts percentages to ten-thousandths: 20% becomes 2000, and damage calculations divide by 10000 to restore the original unit.
         /// </summary>
         private static int ToBasisPoints(int percent) => percent * Define.BasisPoints / Define.PercentScale;
     }

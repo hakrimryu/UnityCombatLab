@@ -269,6 +269,7 @@ namespace UnityCombatLab.Domain.Battle
         /// </summary>
         private static int GetOpponentIndex(int actor, int slot)
         {
+            // 偶数0/2/4は味方、奇数1/3/5は敵。味方の前列actor=0が敵の後列上slot=1を狙うなら結果は3。
             var actorTeam = (Define.BattleTeam)(actor % Define.BattleTeamCount);
             var opponentTeam = actorTeam == Define.BattleTeam.Ally
                 ? Define.BattleTeam.Enemy

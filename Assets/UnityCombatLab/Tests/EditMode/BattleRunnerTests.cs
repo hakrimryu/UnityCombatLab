@@ -103,9 +103,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 値コピーは再利用バッファの次 tick でも変わりません。
-        /// [KO] 값 복사본은 재사용 버퍼의 다음 tick에도 바뀌지 않습니다.
-        /// [EN] Copied values remain unchanged when the buffer is reused.
+        /// 同じ経過時間を異なるフレーム幅で渡しても、全イベントと最後の状態が一致します。
+        /// [KO] 같은 경과 시간을 다른 프레임 폭으로 전달해도 모든 이벤트와 마지막 상태가 일치하는지 확인합니다.
+        /// [EN] Checks identical events and final state when equal elapsed time is split into different frame sizes.
         /// </summary>
         [Test]
         public void FramePartitionsProduceIdenticalEventsAndSnapshots()
