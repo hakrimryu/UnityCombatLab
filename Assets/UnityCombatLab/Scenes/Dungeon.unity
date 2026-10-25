@@ -1746,7 +1746,6 @@ MonoBehaviour:
   - {fileID: 275428213}
   - {fileID: 1573482512}
   - {fileID: 1652352376}
-  _hudPrefab: {fileID: 8108488504045292738, guid: 1c2ba7418accf8f4a9c9534724fd4338, type: 3}
   _hudCanvas: {fileID: 161293926}
   _battleCamera: {fileID: 571661034}
 --- !u!1660057539 &9223372036854775807

@@ -35,13 +35,21 @@ namespace UnityCombatLab.Presentation.UI
         private bool _isDisposed;
 
         /// <summary>
+        /// この HUD が勝敗表示も所有する場合だけ true。Run は Frontend で結果を表示します。
+        /// [KO] 이 HUD가 승패 표시도 소유할 때만 true이며 Run은 Frontend에서 결과를 표시합니다.
+        /// [EN] True when this HUD owns outcome display; a run displays its result in Frontend.
+        /// </summary>
+        private readonly bool _showResult;
+
+        /// <summary>
         /// BattleEntryPoint.Start が呼びます。初期 HP をすぐ表示し、その後は値が変わった時だけ同じ HUD を更新します。
         /// [KO] BattleEntryPoint.Start가 호출합니다. 초기 HP를 즉시 표시하고 이후에는 값이 바뀔 때 같은 HUD를 갱신합니다.
         /// [EN] Called by BattleEntryPoint.Start to display initial health immediately and then update the HUD on changes.
         /// </summary>
-        public BattleHudPresenter(BattlePresentationReadModel model, BattleHudView view, GameColorPalette colors)
+        public BattleHudPresenter(BattlePresentationReadModel model, BattleHudView view, GameColorPalette colors, bool showResult = true)
         {
             _view = view != null ? view : throw new ArgumentNullException(nameof(view));
+            _showResult = showResult;
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -100,7 +108,7 @@ namespace UnityCombatLab.Presentation.UI
         /// </summary>
         private void HandleResultChanged(Define.BattleResult result)
         {
-            if (_isDisposed || _view == null)
+            if (_isDisposed || _view == null || (!_showResult && result != Define.BattleResult.Ongoing))
             {
                 return;
             }

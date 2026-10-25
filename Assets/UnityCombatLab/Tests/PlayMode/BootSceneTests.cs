@@ -1,3 +1,6 @@
+using UnityCombatLab.Application.Ports;
+using UnityCombatLab.Infrastructure.Assets;
+using UnityCombatLab.Application.Run;
 using UnityCombatLab.Common;
 using UnityCombatLab.Infrastructure.Scenes;
 using System;
@@ -84,12 +87,14 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(root.scene.GetRootGameObjects(), Does.Contain(root));
             Assert.That(root.transform.parent, Is.Null);
             Assert.That(SceneManager.GetSceneByBuildIndex((int)Define.SceneType.Boot).isLoaded, Is.False);
-            Assert.That(SceneManager.GetActiveScene().buildIndex, Is.EqualTo((int)Define.SceneType.Dungeon));
+            Assert.That(SceneManager.GetActiveScene().buildIndex, Is.EqualTo((int)Define.SceneType.Frontend));
             Assert.That(SceneManager.sceneCount, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<AudioListener>(true).Length, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<EventSystem>(true).Length, Is.EqualTo(1));
-            Assert.That(root.GetComponentsInChildren<Canvas>(true), Is.Empty);
-            Assert.That(Object.FindFirstObjectByType<BattleHudView>().gameObject.scene,
+            Assert.That(root.GetComponentsInChildren<LoadingView>(true).Length, Is.EqualTo(1));
+            Assert.That(root.GetComponentsInChildren<FrontendView>(true), Is.Empty);
+            Assert.That(root.GetComponentsInChildren<BattleHudView>(true), Is.Empty);
+            Assert.That(Object.FindFirstObjectByType<FrontendView>().gameObject.scene,
                 Is.EqualTo(SceneManager.GetActiveScene()));
             Assert.That(Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<EventSystem>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
@@ -99,20 +104,20 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
-        /// 再読込で舞台だけが置き換わり、同じ App Scope が残ることを検証します。
-        /// [KO] 재로드 시 무대만 교체되고 같은 App Scope가 유지되는지 검증합니다.
-        /// [EN] Verifies stage replacement while retaining the same app scope.
+        /// 再読込で画面だけが置き換わり、同じ App Scope が残ることを検証します。
+        /// [KO] 재로드 시 화면만 교체되고 같은 App Scope가 유지되는지 검증합니다.
+        /// [EN] Verifies page replacement while retaining the same app scope.
         /// </summary>
         [UnityTest]
-        public IEnumerator DungeonReloadPreservesAppAndReplacesStage()
+        public IEnumerator FrontendReloadPreservesAppAndReplacesView()
         {
             var scope = Object.FindFirstObjectByType<AppLifetimeScope>();
-            var knight = GameObject.Find("Unit_Knight");
-            Assert.That(knight, Is.Not.Null);
+            var previousView = Object.FindFirstObjectByType<FrontendView>();
+            Assert.That(previousView, Is.Not.Null);
             var transition = scope.Container.Resolve<SceneTransitionManager>();
-            yield return transition.LoadSceneAsync(Define.SceneType.Dungeon).ToCoroutine();
-            Assert.That(knight == null, Is.True);
-            Assert.That(GameObject.Find("Unit_Knight"), Is.Not.Null);
+            yield return transition.LoadSceneAsync(Define.SceneType.Frontend).ToCoroutine();
+            Assert.That(previousView == null, Is.True);
+            Assert.That(Object.FindFirstObjectByType<FrontendView>(), Is.Not.Null);
             Assert.That(Object.FindFirstObjectByType<AppLifetimeScope>(), Is.SameAs(scope));
             Assert.That(transition.IsLoading, Is.False);
             Assert.That(SceneManager.sceneCount, Is.EqualTo(1));
@@ -169,6 +174,8 @@ namespace UnityCombatLab.Tests.PlayMode
             var original = Object.FindFirstObjectByType<AppLifetimeScope>();
             original.gameObject.SetActive(false);
             var replacement = Object.Instantiate(original.gameObject);
+            foreach (var loading in replacement.GetComponentsInChildren<LoadingView>(true))
+                Object.DestroyImmediate(loading.gameObject);
             GameObject failedRoot = null;
             try
             {
@@ -208,15 +215,17 @@ namespace UnityCombatLab.Tests.PlayMode
             }
             finally
             {
-                if (failedRoot != null) Object.Destroy(failedRoot);
-                if (replacement != null) Object.Destroy(replacement);
+                if (failedRoot != null)
+                    Object.Destroy(failedRoot);
+                if (replacement != null)
+                    Object.Destroy(replacement);
             }
         }
 
         /// <summary>
-        /// 取消済みの起動要求が現在の戦闘 HUD とシーンを変更しないことを検証します。
-        /// [KO] 이미 취소된 시작 요청이 현재 전투 HUD와 씬을 변경하지 않는지 검증합니다.
-        /// [EN] Verifies pre-cancelled startup preserves the current battle HUD and scene.
+        /// 取消済みの起動要求が現在の Frontend とシーンを変更しないことを検証します。
+        /// [KO] 이미 취소된 시작 요청이 현재 Frontend와 씬을 변경하지 않는지 검증합니다.
+        /// [EN] Verifies pre-cancelled startup preserves the current Frontend and scene.
         /// </summary>
         [UnityTest]
         public IEnumerator CancelledStartupPreservesUiAndScene()
@@ -225,13 +234,12 @@ namespace UnityCombatLab.Tests.PlayMode
             {
                 var scope = Object.FindFirstObjectByType<AppLifetimeScope>();
                 var manager = scope.Container.Resolve<SceneTransitionManager>();
-                var hud = Object.FindFirstObjectByType<BattleHudView>();
-                var resultText = hud.ResultText;
-                var wasActive = hud.gameObject.activeSelf;
-                var knight = GameObject.Find("Unit_Knight");
+                var view = Object.FindFirstObjectByType<FrontendView>();
+                var wasActive = view.gameObject.activeSelf;
+                var activeScene = SceneManager.GetActiveScene();
                 using var cancellation = new CancellationTokenSource();
                 cancellation.Cancel();
-                var entry = new AppEntryPoint(manager);
+                var entry = new AppEntryPoint(scope.Container.Resolve<RunFlowCoordinator>());
                 var isCancelled = false;
                 try
                 {
@@ -243,12 +251,11 @@ namespace UnityCombatLab.Tests.PlayMode
                 }
 
                 Assert.That(isCancelled, Is.True);
-                Assert.That(Object.FindFirstObjectByType<BattleHudView>(), Is.SameAs(hud));
-                Assert.That(hud.ResultText, Is.EqualTo(resultText));
-                Assert.That(hud.gameObject.activeSelf, Is.EqualTo(wasActive));
+                Assert.That(Object.FindFirstObjectByType<FrontendView>(), Is.SameAs(view));
+                Assert.That(view.gameObject.activeSelf, Is.EqualTo(wasActive));
                 Assert.That(entry.IsStarted, Is.False);
                 Assert.That(manager.IsLoading, Is.False);
-                Assert.That(GameObject.Find("Unit_Knight"), Is.SameAs(knight));
+                Assert.That(SceneManager.GetActiveScene(), Is.EqualTo(activeScene));
             });
         }
 
@@ -264,7 +271,7 @@ namespace UnityCombatLab.Tests.PlayMode
             {
                 var transition = Object.FindFirstObjectByType<AppLifetimeScope>().Container
                     .Resolve<SceneTransitionManager>();
-                var knight = GameObject.Find("Unit_Knight");
+                var view = Object.FindFirstObjectByType<FrontendView>();
                 var isRejected = false;
                 try
                 {
@@ -290,8 +297,106 @@ namespace UnityCombatLab.Tests.PlayMode
 
                 Assert.That(isCancelled, Is.True);
                 Assert.That(transition.IsLoading, Is.False);
-                Assert.That(GameObject.Find("Unit_Knight"), Is.SameAs(knight));
+                Assert.That(Object.FindFirstObjectByType<FrontendView>(), Is.SameAs(view));
             });
+        }
+
+        /// <summary>
+        /// 読込中の内部取消後に Run と HUD を解放し、二重出発を受け付けません。
+        /// [KO] 로딩 중 내부 취소 후 Run과 HUD를 해제하고 중복 출발을 받지 않습니다.
+        /// [EN] Releases the run and HUD after internal loading cancellation and rejects duplicate departure.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator InternallyCancelledRunReleasesResourcesAndRejectsDuplicateDeparture()
+        {
+            var app = Object.FindFirstObjectByType<AppLifetimeScope>();
+            var flow = app.Container.Resolve<RunFlowCoordinator>();
+            var loading = flow.StartRunAsync(flow.Controller.LastConfiguration);
+            var session = flow.ActiveSession;
+            Assert.That(session, Is.Not.Null);
+            yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
+            Assert.That(flow.ActiveSession, Is.SameAs(session));
+            var view = app.GetComponentInChildren<LoadingView>(true);
+            Assert.That(view.GetComponentsInChildren<UnityEngine.UI.Button>(true), Is.Empty);
+            session.Cancel();
+            yield return loading.ToCoroutine();
+            Assert.That(flow.ActiveSession, Is.Null);
+            Assert.That(flow.Controller.Current, Is.Null);
+            Assert.That(flow.Controller.Result, Is.Null);
+            Assert.That(flow.IsBusy, Is.False);
+            Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Formation));
+            Assert.That(view.gameObject.activeSelf, Is.False);
+            Assert.That(Object.FindObjectsByType<BattleHudView>(FindObjectsSortMode.None), Is.Empty);
+            Assert.That(Object.FindObjectsByType<BattleLifetimeScope>(FindObjectsSortMode.None), Is.Empty);
+            Assert.That(SceneManager.GetActiveScene().buildIndex, Is.EqualTo((int)Define.SceneType.Frontend));
+        }
+
+        /// <summary>
+        /// 共通表示は操作ボタンを持たず、復帰失敗では回転を止めて再起動を案内します。
+        /// [KO] 공통 표시에는 버튼이 없으며 복귀 실패 시 회전을 멈추고 재시작을 안내하는지 확인합니다.
+        /// [EN] Checks that the shared display has no buttons and stops its spinner with restart guidance on failure.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator LoadingDisplayHasNoButtonsAndStopsSpinnerOnFailure()
+        {
+            var view = Object.FindFirstObjectByType<AppLifetimeScope>().GetComponentInChildren<LoadingView>(true);
+            var spinner = view.transform.Find("UI_Loading/Loading_01");
+            var message = view.transform.Find("UI_LoadingMessage").GetComponent<TMPro.TMP_Text>();
+            Assert.That(view.GetComponentsInChildren<UnityEngine.UI.Button>(true), Is.Empty);
+            view.Show(Define.RunTransitionPhase.LoadingDungeon);
+            var initialRotation = spinner.localRotation;
+            yield return new WaitForSeconds(0.1f);
+            Assert.That(Quaternion.Angle(initialRotation, spinner.localRotation), Is.GreaterThan(0f));
+            view.Show(Define.RunTransitionPhase.RecoveryFailed);
+            Assert.That(spinner.gameObject.activeSelf, Is.False);
+            Assert.That(message.text, Is.EqualTo(GameText.FrontendFailed));
+            var stoppedRotation = spinner.localRotation;
+            yield return new WaitForSeconds(0.1f);
+            Assert.That(spinner.localRotation, Is.EqualTo(stoppedRotation));
+            view.Hide();
+            Assert.That(view.gameObject.activeSelf, Is.False);
+        }
+
+        /// <summary>
+        /// HUD 読込の失敗を通知し、同じ編成の再試行で新しい Run を開始します。
+        /// [KO] HUD 로딩 실패를 알리고 같은 편성 재시도에서 새 Run을 시작합니다.
+        /// [EN] Reports a HUD loading failure and starts a fresh run when retrying the same formation.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator StartupFailureShowsErrorAndRetryStartsFreshRun()
+        {
+            var app = Object.FindFirstObjectByType<AppLifetimeScope>();
+            var flow = app.Container.Resolve<RunFlowCoordinator>();
+            var address = typeof(RunFlowCoordinator).GetField("_resourcesFactory",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var original = address.GetValue(flow);
+            try
+            {
+                // このRunの資産生成だけを置き換え、実際の読込失敗から復帰する経路を通す。
+                address.SetValue(flow, (Func<IRunResources>)(() => new RunAssetScope("")));
+                LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("HUD address is required"));
+                yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
+                Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Error));
+                Assert.That(flow.CanRetry, Is.True);
+                Assert.That(flow.IsBusy, Is.False);
+                Assert.That(flow.ActiveSession, Is.Null);
+                Assert.That(flow.Controller.Result, Is.Null);
+                address.SetValue(flow, original);
+                var frontend = Object.FindFirstObjectByType<FrontendView>();
+                var retry = frontend.transform.Find("SafeArea/UI_RunError/UI_ErrorPanel/UI_Retry").GetComponent<UnityEngine.UI.Button>();
+                Assert.That(retry.gameObject.activeInHierarchy, Is.True);
+                retry.onClick.Invoke();
+                var deadline = Time.realtimeSinceStartup + 10f;
+                while (flow.Controller.Current?.Phase != Define.RunPhase.Battle && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                Assert.That(flow.Controller.Current?.Phase, Is.EqualTo(Define.RunPhase.Battle));
+                Assert.That(flow.ActiveSession, Is.Not.Null);
+                Assert.That(Object.FindObjectsByType<BattleHudView>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
+            }
+            finally
+            {
+                address.SetValue(flow, original);
+            }
         }
 
         /// <summary>
@@ -307,13 +412,13 @@ namespace UnityCombatLab.Tests.PlayMode
                 var scope = Object.FindFirstObjectByType<AppLifetimeScope>();
                 var transition = scope.Container.Resolve<SceneTransitionManager>();
                 using var cancellation = new CancellationTokenSource();
-                var loading = transition.LoadSceneAsync(Define.SceneType.Dungeon, cancellation.Token);
+                var loading = transition.LoadSceneAsync(Define.SceneType.Frontend, cancellation.Token);
                 Assert.That(transition.IsLoading, Is.True);
                 cancellation.Cancel();
                 var isRejected = false;
                 try
                 {
-                    await transition.LoadSceneAsync(Define.SceneType.Dungeon, CancellationToken.None);
+                    await transition.LoadSceneAsync(Define.SceneType.Frontend, CancellationToken.None);
                 }
                 catch (InvalidOperationException)
                 {
@@ -333,7 +438,7 @@ namespace UnityCombatLab.Tests.PlayMode
 
                 Assert.That(isCancelled, Is.True);
                 Assert.That(transition.IsLoading, Is.False);
-                Assert.That(SceneManager.GetActiveScene().buildIndex, Is.EqualTo((int)Define.SceneType.Dungeon));
+                Assert.That(SceneManager.GetActiveScene().buildIndex, Is.EqualTo((int)Define.SceneType.Frontend));
                 Assert.That(Object.FindFirstObjectByType<AppLifetimeScope>(), Is.SameAs(scope));
             });
         }

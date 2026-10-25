@@ -1,5 +1,9 @@
+using Cysharp.Threading.Tasks;
+using UnityCombatLab.Infrastructure.Assets;
+using UnityCombatLab.Application.Run;
 using UnityCombatLab.Infrastructure.Scenes;
 using UnityCombatLab.Presentation.Styling;
+using UnityCombatLab.Presentation.UI;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -26,6 +30,20 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] The shared color asset also resolved by the child Dungeon scope.
         /// </summary>
         [SerializeField] private GameColorPalette _colors;
+
+        /// <summary>
+        /// シーンをまたぐ読込・片付け・復帰失敗を案内する共通表示。
+        /// [KO] 씬을 넘나드는 로딩·정리·복귀 실패를 안내하는 공통 표시입니다.
+        /// [EN] Shared display for loading, cleanup and scene-return failures.
+        /// </summary>
+        [SerializeField] private LoadingView _loadingPrefab;
+
+        /// <summary>
+        /// ローカルグループへ登録した戦闘 HUD のアドレス。
+        /// [KO] 로컬 그룹에 등록한 전투 HUD 주소입니다.
+        /// [EN] Battle HUD address registered in a local group.
+        /// </summary>
+        [SerializeField] private string _hudAddress = "UnityCombatLab/BattleHud";
 
         /// <summary>
         /// 共通ルートだけをシーンの寿命から分離してから DI を起動します。
@@ -96,6 +114,20 @@ namespace UnityCombatLab.Bootstrap
             // Boot で指定した色アセットを App Scope と子の Dungeon Scope で共有する。
             builder.RegisterInstance(_colors);
             builder.Register<SceneTransitionManager>(Lifetime.Singleton);
+            if (_loadingPrefab == null || string.IsNullOrWhiteSpace(_hudAddress))
+                throw new System.InvalidOperationException("Boot requires the shared loading prefab and HUD address.");
+
+            // 共通調整役だけを App に置き、画面とユニットは各シーンに残す。
+            var loading = Instantiate(_loadingPrefab, transform);
+            loading.name = "UI_LoadingCanvas";
+            loading.Validate();
+            builder.Register(resolver => new RunFlowCoordinator
+            (resolver.Resolve<SceneTransitionManager>(),
+                loading,
+                () => new RunAssetScope(_hudAddress),
+                () => UniTask.NextFrame(),
+                Debug.LogException,
+                value => AudioListener.volume = value), Lifetime.Singleton);
             builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
         }
     }

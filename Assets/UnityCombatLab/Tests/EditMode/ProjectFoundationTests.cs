@@ -78,10 +78,12 @@ namespace UnityCombatLab.Tests.EditMode
         {
             Assert.That((int)Define.SceneType.Boot, Is.EqualTo(0));
             Assert.That((int)Define.SceneType.Dungeon, Is.EqualTo(1));
+            Assert.That((int)Define.SceneType.Frontend, Is.EqualTo(2));
             var expectedPaths = new[]
             {
                 "Assets/UnityCombatLab/Scenes/Boot.unity",
-                "Assets/UnityCombatLab/Scenes/Dungeon.unity"
+                "Assets/UnityCombatLab/Scenes/Dungeon.unity",
+                "Assets/UnityCombatLab/Scenes/Frontend.unity"
             };
             var scenes = EditorBuildSettings.scenes.Where(scene => scene.enabled).ToArray();
             Assert.That(scenes.Length, Is.GreaterThanOrEqualTo(expectedPaths.Length));

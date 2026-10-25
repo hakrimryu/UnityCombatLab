@@ -1,4 +1,6 @@
+using UnityCombatLab.Application.Run;
 using System;
+using UnityCombatLab.Application.Ports;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.Styling;
@@ -16,7 +18,7 @@ namespace UnityCombatLab.Bootstrap
     /// [KO] 전투 시작·매 프레임 진행·종료 시 정리를 담당합니다.
     /// [EN] Handles battle startup, per-frame advancement and cleanup.
     /// </summary>
-    public sealed class BattleEntryPoint : IStartable, ITickable, IDisposable
+    public sealed class BattleEntryPoint : IStartable, ITickable, IRunBattle
     {
         /// <summary>
         /// この戦闘の計算とイベント通知を進める Runner。
@@ -117,6 +119,13 @@ namespace UnityCombatLab.Bootstrap
         private bool _isStarted;
 
         /// <summary>
+        /// 出発からこの戦闘を所有するセッション。単独表示の呼出元では未指定です。
+        /// [KO] 출발부터 이 전투를 소유하는 세션이며 독립 표시 호출에서는 미지정입니다.
+        /// [EN] Session owning this battle from departure, omitted by standalone presentation callers.
+        /// </summary>
+        private readonly RunSession _session;
+
+        /// <summary>
         /// 重複破棄を拒否します。
         /// [KO] 중복 해제를 거부합니다.
         /// [EN] Prevents repeated disposal.
@@ -129,7 +138,7 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Stores the runner, battle identifiers, views and settings supplied by BattleLifetimeScope for connection in Start.
         /// </summary>
         public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, UnitView[] unitViews,
-            BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors)
+            BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors, RunSession session = null)
         {
             Runner = runner;
             _runId = runId;
@@ -139,16 +148,17 @@ namespace UnityCombatLab.Bootstrap
             _hudParent = hudParent;
             _battleCamera = battleCamera;
             _colors = colors;
+            _session = session;
         }
 
         /// <summary>
-        /// VContainer が一度呼びます。HUD を作り、HP 通知とキャラクター演出を接続してから進行を許可します。
-        /// [KO] VContainer가 한 번 호출합니다. HUD를 만들고 HP 알림·캐릭터 연출을 연결한 후 전투 진행을 허용합니다.
-        /// [EN] Called once by VContainer to create the HUD and connect HP notifications and character effects before ticking.
+        /// Run調整役が読込後に開始を許可します。HUDと通知・演出を接続し、VContainerからの重複開始は無視します。
+        /// [KO] Run 조정자가 로드 후 시작을 허용합니다. HUD와 알림·연출을 연결하며 VContainer의 중복 시작은 무시합니다.
+        /// [EN] Started by run coordination after loading; connects the HUD, notifications and effects while ignoring duplicate VContainer startup.
         /// </summary>
         public void Start()
         {
-            if (_isStarted || IsDisposed)
+            if (_isStarted || IsDisposed || (_session != null && !_session.IsBattleAllowed))
             {
                 return;
             }
@@ -169,7 +179,7 @@ namespace UnityCombatLab.Bootstrap
                     unit.PrepareEffects();
                 }
 
-                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors);
+                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors, _session == null);
                 _presenter = new BattlePresenter(Runner, _runId, _wave, _unitViews, Hud, Presentation);
                 // 接続途中に Tick が来ても進まないよう、すべて成功した後で開始済みにする。
                 _isStarted = true;
@@ -201,10 +211,17 @@ namespace UnityCombatLab.Bootstrap
                 // 命中予約・View.Update・Normal Tween は scaled 秒を使う。Domain 終了後も最後の表示を進める。
                 var presentationDeltaSeconds = Time.deltaTime;
                 _presenter.Advance(presentationDeltaSeconds);
+                if (_session != null && _presenter.IsComplete)
+                    _session.QueueResult(Runner.Result, Runner.CurrentTick);
             }
-            catch
+            catch (Exception exception)
             {
                 Dispose();
+                if (_session != null)
+                {
+                    _session.QueueFailure(exception);
+                    return;
+                }
                 throw;
             }
         }

@@ -1,3 +1,4 @@
+using UnityCombatLab.Application.Run;
 using System;
 using System.Collections;
 using System.Linq;
@@ -7,7 +8,7 @@ using NUnit.Framework;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Bootstrap;
 using UnityCombatLab.Common;
-using UnityCombatLab.Infrastructure.Scenes;
+using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
@@ -43,6 +44,16 @@ namespace UnityCombatLab.Tests.PlayMode
 
             yield return null;
             yield return SceneManager.LoadSceneAsync((int)Define.SceneType.Boot, LoadSceneMode.Single);
+            var bootDeadline = Time.realtimeSinceStartup + 10f;
+            while (Time.realtimeSinceStartup < bootDeadline)
+            {
+                var app = Object.FindFirstObjectByType<AppLifetimeScope>();
+                if (app != null && app.Container != null && app.Container.Resolve<AppEntryPoint>().IsStarted)
+                    break;
+                yield return null;
+            }
+            var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
+            yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
             var deadline = Time.realtimeSinceStartup + 10f;
             while (Time.realtimeSinceStartup < deadline)
             {
@@ -133,7 +144,8 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(entry.Hud.ResultText, Is.EqualTo("戦闘中"));
             entry.Presenter.Advance(100);
             entry.Presenter.Advance(1);
-            Assert.That(entry.Hud.ResultText, Is.EqualTo("勝利"));
+            Assert.That(entry.Presentation.Result.CurrentValue, Is.EqualTo(Define.BattleResult.Victory));
+            Assert.That(entry.Hud.ResultText, Is.EqualTo("戦闘中"));
             Assert.That(lastEventCount, Is.EqualTo(1));
             Assert.That(views.Count(view => view.IsDead), Is.EqualTo(3));
             Assert.That(views.Where(view => view.IsDead).All(view => view.CurrentAnimation == "Death"), Is.True);
@@ -142,7 +154,8 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(runner.CurrentTick, Is.EqualTo(tick));
             Assert.That(lastEventCount, Is.EqualTo(1));
             // HP ゲージの補間と残像が終わってから、最終の表示比率を確認する。
-            yield return new WaitForSeconds(0.8f);
+            foreach (var status in entry.Hud.Units)
+                status.Advance(0.8f);
             for (var index = 0; index < runner.ReadModel.Units.Count; index++)
             {
                 var model = runner.ReadModel.Units[index];
@@ -650,7 +663,8 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(secondRoot.Find("UI_ShieldDamage1").GetComponent<TMPro.TMP_Text>().text, Is.Empty);
             Assert.That(secondRoot.Find("UI_ShieldDamageIcon1").gameObject.activeSelf, Is.False);
             status.gameObject.SetActive(false);
-            foreach (var slot in slots) Assert.That(animationField.GetValue(slot), Is.Null);
+            foreach (var slot in slots)
+                Assert.That(animationField.GetValue(slot), Is.Null);
             foreach (var group in status.GetComponentsInChildren<CanvasGroup>(true))
             {
                 Assert.That(group.gameObject.activeSelf, Is.False);
@@ -723,20 +737,30 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
-        /// Single 再読込で旧 HUD と購読を破棄し AppRoot は一つです。
-        /// [KO] Single 재로드 시 이전 HUD와 구독을 해제하며 AppRoot는 하나입니다.
-        /// [EN] Single reload disposes old HUD and subscriptions while preserving one AppRoot.
+        /// 結果から再出発すると旧 HUD と購読を破棄し AppRoot は一つです。
+        /// [KO] 결과에서 재출발하면 이전 HUD와 구독을 해제하며 AppRoot는 하나입니다.
+        /// [EN] Departing again from results disposes old HUD and subscriptions while preserving one AppRoot.
         /// </summary>
         [UnityTest]
-        public IEnumerator DungeonReloadDisposesOldBattleLifetime()
+        public IEnumerator RestartDisposesOldBattleLifetime()
         {
             var app = Object.FindFirstObjectByType<AppLifetimeScope>();
             var previous = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
             var oldHud = previous.Hud;
-            yield return app.Container.Resolve<SceneTransitionManager>().LoadSceneAsync(Define.SceneType.Dungeon)
-                .ToCoroutine();
+            var flow = app.Container.Resolve<RunFlowCoordinator>();
+            while (previous.Runner.Result == Define.BattleResult.Ongoing) previous.Runner.Advance(0.4);
+            previous.Presenter.Advance(100);
+            previous.Presenter.Advance(2);
+            previous.Tick();
+            var deadline = Time.realtimeSinceStartup + 10f;
+            while (flow.IsBusy && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(flow.IsBusy, Is.False);
+            Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Results));
+            var previousId = flow.Controller.Result.RunId;
+            yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
             yield return null;
             Assert.That(previous.IsDisposed, Is.True);
+            Assert.That(flow.Controller.Current.Id, Is.Not.EqualTo(previousId));
             Assert.That(oldHud == null, Is.True);
             var tick = previous.Runner.CurrentTick;
             previous.Runner.Advance(1);
@@ -744,6 +768,96 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(Object.FindFirstObjectByType<AppLifetimeScope>(), Is.SameAs(app));
             Assert.That(Object.FindObjectsByType<BattleHudView>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None).Length, Is.EqualTo(6));
+        }
+        /// <summary>
+        /// 実際の戦闘が敗北を確定し、最後の演出後にFrontendの敗北画面へ戻ることを確認します。
+        /// [KO] 실제 전투가 패배를 확정하고 마지막 연출 후 Frontend 패배 화면으로 돌아가는지 확인합니다.
+        /// [EN] Checks real combat resolves defeat and returns to the Frontend defeat page after final presentation.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator DefeatUsesActualBattleCompletionPath()
+            => VerifyActualOutcome(Define.BattleResult.Defeat);
+
+        /// <summary>
+        /// 1800tickの実際の時間切れから、Frontendへ戻って時間切れ理由を表示することを確認します。
+        /// [KO] 실제 1800tick 시간 초과로 Frontend에 돌아와 시간 초과 이유를 표시하는지 확인합니다.
+        /// [EN] Checks a real 1800-tick timeout returns to Frontend and displays the timeout reason.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TimeoutUsesActualBattleCompletionPath()
+            => VerifyActualOutcome(Define.BattleResult.Timeout);
+
+        /// <summary>
+        /// 能力値をメモリ内だけで一時変更し、出発時のコピー後に必ず戻して終了経路を検証します。
+        /// [KO] 능력치를 메모리 안에서만 잠시 바꾸고 출발 시 복사 후 반드시 복원하여 종료 경로를 검증합니다.
+        /// [EN] Temporarily changes in-memory stats, restores them after departure copies them, and verifies the resulting completion path.
+        /// </summary>
+        private static IEnumerator VerifyActualOutcome(Define.BattleResult expected)
+        {
+            var app = Object.FindFirstObjectByType<AppLifetimeScope>();
+            var flow = app.Container.Resolve<RunFlowCoordinator>();
+            var scope = Object.FindFirstObjectByType<BattleLifetimeScope>();
+            var definitions = (UnitDefinition[])typeof(BattleLifetimeScope)
+                .GetField("_definitions", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(scope);
+            var unique = definitions.Distinct().ToArray();
+            var snapshots = unique.Select(JsonUtility.ToJson).ToArray();
+            var previous = scope.Container.Resolve<BattleEntryPoint>();
+            while (previous.Runner.Result == Define.BattleResult.Ongoing) previous.Runner.Advance(0.4);
+            previous.Presenter.Advance(100);
+            previous.Presenter.Advance(2);
+            previous.Tick();
+            var deadline = Time.realtimeSinceStartup + 10;
+            while (flow.IsBusy && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(flow.IsBusy, Is.False);
+            try
+            {
+                foreach (var definition in unique)
+                {
+                    var role = (Define.UnitRole)typeof(UnitDefinition).GetField("_role", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(definition);
+                    var isAlly = role <= Define.UnitRole.Mage;
+                    var health = expected == Define.BattleResult.Timeout ? 1000000 : isAlly ? 1 : 10000;
+                    var attack = expected == Define.BattleResult.Timeout || isAlly ? 1 : 100;
+                    // ScriptableObjectの保存APIを呼ばず、戦闘入力がコピーする値だけを一時的に置き換える。
+                    JsonUtility.FromJsonOverwrite("{\"_maxHealth\":" + health + ",\"_attack\":" + attack + "}", definition);
+                }
+                yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
+            }
+            finally
+            {
+                for (var index = 0; index < unique.Length; index++)
+                    JsonUtility.FromJsonOverwrite(snapshots[index], unique[index]);
+            }
+            var battle = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var originalTimeScale = Time.timeScale;
+            try
+            {
+                // テストの待機だけを短縮する。各0.4秒分の表示を進めてから次の攻撃を計算し、数字を一フレームに蓄積しない。
+                Time.timeScale = 20;
+                var presentationFrame = new WaitForSeconds(0.4f);
+                while (battle.Runner.Result == Define.BattleResult.Ongoing)
+                {
+                    battle.Runner.Advance(0.4);
+                    battle.Presenter.Advance(0.4);
+                    yield return presentationFrame;
+                }
+            }
+            finally { Time.timeScale = originalTimeScale; }
+            Assert.That(battle.Runner.Result, Is.EqualTo(expected));
+            if (expected == Define.BattleResult.Timeout)
+                Assert.That(battle.Runner.CurrentTick, Is.EqualTo(1800));
+            battle.Presenter.Advance(100);
+            battle.Presenter.Advance(2);
+            battle.Tick();
+            deadline = Time.realtimeSinceStartup + 10;
+            while (flow.IsBusy && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(flow.IsBusy, Is.False);
+            Assert.That(flow.Controller.Result.Outcome, Is.EqualTo(expected));
+            Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Results));
+            Assert.That(battle.IsDisposed, Is.True);
+            Assert.That(Object.FindObjectsByType<BattleHudView>(FindObjectsSortMode.None), Is.Empty);
+            var frontend = Object.FindFirstObjectByType<FrontendView>();
+            var reason = frontend.GetComponentsInChildren<TMPro.TMP_Text>(false);
+            Assert.That(reason.Any(text => text.text.Contains(GameText.Outcome(expected))), Is.True);
         }
     }
 }

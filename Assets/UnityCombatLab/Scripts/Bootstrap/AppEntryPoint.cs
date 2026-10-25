@@ -1,5 +1,4 @@
-using UnityCombatLab.Common;
-using UnityCombatLab.Infrastructure.Scenes;
+using UnityCombatLab.Application.Run;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using VContainer.Unity;
@@ -11,36 +10,36 @@ namespace UnityCombatLab.Bootstrap
     /// [KO] 공통 서비스 초기화 후 첫 씬으로 전환을 시작합니다.
     /// [EN] Starts the initial scene transition after shared services are initialized.
     /// </summary>
-    public sealed class AppEntryPoint : IAsyncStartable
+    public sealed class AppEntryPoint : IAsyncStartable, ITickable
     {
         /// <summary>
-        /// App Scope が所有する共通シーン切替処理。
-        /// [KO] App Scope가 소유하는 공통 씬 전환 처리입니다.
-        /// [EN] The shared scene transition owned by the app scope.
+        /// 毎フレーム、保留中の戦闘結果を処理するApplicationの調整役。
+        /// [KO] 매 프레임 대기 중 전투 결과를 처리할 Application 조정자입니다.
+        /// [EN] Application coordinator that processes pending battle results each frame.
         /// </summary>
-        private readonly SceneTransitionManager _sceneTransition;
+        private readonly RunFlowCoordinator _flow;
 
         /// <summary>
-        /// 最初の Dungeon 読込が完了したかを示します。
-        /// [KO] 첫 Dungeon 로드가 완료됐는지 나타냅니다.
-        /// [EN] Whether the initial Dungeon load has completed.
+        /// 最初の Frontend が入力接続と初回描画まで完了したかを示します。
+        /// [KO] 첫 Frontend가 입력 연결과 첫 표시까지 완료했는지 나타냅니다.
+        /// [EN] Whether the initial Frontend completed input setup and its first render.
         /// </summary>
         public bool IsStarted { get; private set; }
 
         /// <summary>
-        /// App Scope が所有するシーン切替を受け取り、起動時の Dungeon 読込に使います。
-        /// [KO] App Scope 소유 씬 전환을 전달받아 시작 시 Dungeon을 로드하는 데 사용합니다.
-        /// [EN] Receives app-owned scene transitions for loading Dungeon at startup.
+        /// App Scope の調整役を受け取り、起動とフレーム更新を接続します。
+        /// [KO] App Scope의 조정자를 전달받아 시작과 프레임 갱신을 연결합니다.
+        /// [EN] Receives the app-owned coordinator and connects startup and frame updates.
         /// </summary>
-        public AppEntryPoint(SceneTransitionManager sceneTransition)
+        public AppEntryPoint(RunFlowCoordinator flow)
         {
-            _sceneTransition = sceneTransition ?? throw new System.ArgumentNullException(nameof(sceneTransition));
+            _flow = flow ?? throw new System.ArgumentNullException(nameof(flow));
         }
 
         /// <summary>
-        /// 起動要求の取消を確認して Dungeon を読み込み、完了後に IsStarted を設定します。
-        /// [KO] 시작 요청의 취소를 확인하고 Dungeon을 로드한 뒤 IsStarted를 설정합니다.
-        /// [EN] Checks startup cancellation, loads Dungeon and sets IsStarted after loading.
+        /// 起動要求の取消を確認して Frontend を読み込み、完了後に IsStarted を設定します。
+        /// [KO] 시작 요청의 취소를 확인하고 Frontend를 로드한 뒤 IsStarted를 설정합니다.
+        /// [EN] Checks startup cancellation, loads Frontend and sets IsStarted after loading.
         /// </summary>
         /// <param name="cancellation">
         /// VContainer が開始処理の寿命に合わせて取り消すトークン。
@@ -51,8 +50,16 @@ namespace UnityCombatLab.Bootstrap
         {
             cancellation.ThrowIfCancellationRequested();
 
-            await _sceneTransition.LoadSceneAsync(Define.SceneType.Dungeon, cancellation);
-            IsStarted = true;
+            // 六人分の攻撃と被害数字で既定の Sequence 50 枠を超えるため、戦闘前に容量を確保する。
+            DG.Tweening.DOTween.SetTweensCapacity(200, 125);
+            IsStarted = await _flow.StartFrontendAsync(cancellation);
         }
+        /// <summary>
+        /// VContainerのフレーム通知をApplicationのRun処理へ渡します。
+        /// [KO] VContainer의 프레임 알림을 Application Run 처리로 넘깁니다.
+        /// [EN] Forwards VContainer frame notifications to application run processing.
+        /// </summary>
+        public void Tick()
+            => _flow.Tick();
     }
 }

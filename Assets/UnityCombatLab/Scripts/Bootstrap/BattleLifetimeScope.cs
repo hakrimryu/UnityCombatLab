@@ -1,7 +1,10 @@
+using UnityCombatLab.Infrastructure.Assets;
+using UnityCombatLab.Application.Run;
 using System;
 using System.Linq;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Common;
+using UnityCombatLab.Domain.Run;
 using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.Styling;
@@ -32,13 +35,6 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Characters in the same order as _definitions; the first item in both arrays refers to the knight.
         /// </summary>
         [SerializeField] private UnitView[] _unitViews;
-
-        /// <summary>
-        /// Dungeon 専用 Canvas に生成する HUD の原型。
-        /// [KO] Dungeon 전용 Canvas에 생성할 HUD 원형입니다.
-        /// [EN] HUD prefab instantiated under the Dungeon-owned canvas.
-        /// </summary>
-        [SerializeField] private BattleHudView _hudPrefab;
 
         /// <summary>
         /// この Dungeon シーンが所有し、BattleEntryPoint が HUD を生成する Canvas。
@@ -74,7 +70,7 @@ namespace UnityCombatLab.Bootstrap
             if (_definitions == null || _definitions.Length != Define.MaxBattleUnitCount ||
                 _definitions.Any(definition => definition == null) || _unitViews == null ||
                 _unitViews.Length != _definitions.Length || _unitViews.Any(view => view == null) ||
-                _unitViews.Distinct().Count() != _unitViews.Length || _hudPrefab == null ||
+                _unitViews.Distinct().Count() != _unitViews.Length ||
                 _battleCamera == null || Parent == null)
             {
                 throw new InvalidOperationException(
@@ -87,21 +83,64 @@ namespace UnityCombatLab.Bootstrap
                 throw new InvalidOperationException("Battle requires an Overlay canvas owned by its Dungeon scene.");
             }
 
-            // Inspector の並びから ID・陣営・配置枠を決める。両配列は同じ並びであることが前提。
-            // index 0/1 → 味方/敵の前列、2/3 → 味方/敵の後列上、4/5 → 味方/敵の後列下。
-            // index + 1 は ID 1〜6。ID 0 は「単一対象なし」のイベント用なのでユニットには使わない。
-            var inputs = _definitions.Select((definition, index) => definition.CreateInput(index + 1,
+            var session = Parent.Container.Resolve<RunFlowCoordinator>().ActiveSession;
+            if (session == null)
+                throw new InvalidOperationException("Dungeon requires a run started from formation.");
+
+            // Unity のロードは取消できない。取消後に届いた Dungeon は、戦闘を登録せず復帰を待つ。
+            if (session.Token.IsCancellationRequested)
+                return;
+
+            var hudObject = (session.Resources as RunAssetScope)?.HudPrefab;
+            var hudPrefab = hudObject != null ? hudObject.GetComponent<BattleHudView>() : null;
+            if (hudPrefab == null)
+                throw new InvalidOperationException("Run HUD must finish loading before Dungeon.");
+
+            var originals = _definitions.Select((definition, index) => definition.CreateInput(index + 1,
                 (Define.BattleTeam)(index % Define.BattleTeamCount),
                 (Define.BattleSlot)(index / Define.BattleTeamCount))).ToArray();
-            // 再読込前のイベントと区別するため、新しい戦闘 ID を一度だけ作る。
-            var runId = Guid.NewGuid();
-            // 単一戦闘の開始ウェーブは 1。
-            const int InitialWave = 1;
-            // 同じ runId/wave の Runner と EntryPoint を作り、シーンの View と共通パレットを渡す。
-            builder.RegisterEntryPoint(resolver => new BattleEntryPoint(
-                new BattleRunner(runId, InitialWave, inputs), runId, InitialWave,
-                _unitViews, _hudPrefab, _hudCanvas.transform, _battleCamera,
-                resolver.Resolve<GameColorPalette>()), Lifetime.Scoped).AsSelf();
+            var setup = new RunBattleSetup(session.InitialState.Configuration, originals);
+            var views = ArrangeViews(setup);
+
+            var runId = session.InitialState.Id;
+            // 全接続ができても、読込側が許可するまでは EntryPoint.Start/Tick を進めない。
+            builder.RegisterEntryPoint(resolver =>
+            {
+                var battle = new BattleEntryPoint
+                (new BattleRunner(runId, Define.InitialWave, setup.Units),
+                    runId,
+                    Define.InitialWave,
+                    views,
+                    hudPrefab,
+                    _hudCanvas.transform,
+                    _battleCamera,
+                    resolver.Resolve<GameColorPalette>(),
+                    session);
+                session.AttachBattle(battle);
+                return battle;
+            }, Lifetime.Scoped).AsSelf();
+        }
+
+        /// <summary>
+        /// 全配置先を先に保存してから、能力データと同じ原型のViewを移動します。
+        /// [KO] 모든 배치 위치를 먼저 저장한 뒤 능력 데이터와 같은 원형의 View를 옮깁니다.
+        /// [EN] Caches every destination before moving the views selected by the same source mapping as the stats.
+        /// </summary>
+        private UnitView[] ArrangeViews(RunBattleSetup setup)
+        {
+            var allyPositions = new Vector3[Define.SlotsPerTeam];
+            for (var slot = 0; slot < allyPositions.Length; slot++)
+                allyPositions[slot] = _unitViews[slot * Define.BattleTeamCount].transform.position;
+            var views = new UnitView[setup.Units.Count];
+            for (var index = 0; index < views.Length; index++)
+            {
+                views[index] = _unitViews[setup.GetSourceIndex(index)];
+                var input = setup.Units[index];
+                if (input.Team == Define.BattleTeam.Ally)
+                    views[index].transform.position = allyPositions[(int)input.Slot];
+            }
+
+            return views;
         }
     }
 }
