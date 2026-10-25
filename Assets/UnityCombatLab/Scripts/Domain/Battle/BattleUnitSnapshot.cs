@@ -1,16 +1,16 @@
 namespace UnityCombatLab.Domain.Battle
 {
     /// <summary>
-    /// 状態を所有しない値コピー。
-    /// [KO] 상태 소유권 없는 값 복사본.
-    /// [EN] Value copy without mutable state ownership.
+    /// ある時点のユニットの HP・盾・攻撃回数をまとめた値。
+    /// [KO] 특정 시점의 유닛 HP·방어막·공격 횟수를 담은 값입니다.
+    /// [EN] Value containing a unit's health, shields and attack count at a point in time.
     /// </summary>
     public readonly struct BattleUnitSnapshot
     {
         /// <summary>
-        /// 元の不変入力。
-        /// [KO] 원본 불변 입력.
-        /// [EN] Original immutable input.
+        /// このユニットの ID・配置・開始時の能力値。
+        /// [KO] 이 유닛의 ID·배치·시작 능력치입니다.
+        /// [EN] This unit's ID, position and starting stats.
         /// </summary>
         public BattleUnitInput Input { get; }
 

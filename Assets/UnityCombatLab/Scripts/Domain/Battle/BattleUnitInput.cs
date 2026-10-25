@@ -4,9 +4,9 @@ using UnityCombatLab.Common;
 namespace UnityCombatLab.Domain.Battle
 {
     /// <summary>
-    /// 外部データから確定した不変の戦闘入力。
-    /// [KO] 외부 데이터로 확정한 불변 전투 입력.
-    /// [EN] Immutable resolved combat input.
+    /// ユニットの ID・配置と、戦闘開始時の能力値を保持します。
+    /// [KO] 유닛의 ID·배치와 전투 시작 능력치를 보관합니다.
+    /// [EN] Stores a unit's ID, position and starting combat stats.
     /// </summary>
     public sealed class BattleUnitInput
     {
@@ -46,23 +46,23 @@ namespace UnityCombatLab.Domain.Battle
         public int MaxHealth { get; }
 
         /// <summary>
-        /// 開始 HP。0 は境界検証用。
-        /// [KO] 시작 HP, 0은 경계 검증용.
-        /// [EN] Initial health; zero supports boundary validation.
+        /// 戦闘開始時の HP。
+        /// [KO] 전투 시작 시 HP입니다.
+        /// [EN] Health at battle startup.
         /// </summary>
         public int Health { get; }
 
         /// <summary>
-        /// 解決済み攻撃力。
-        /// [KO] 확정 공격력.
-        /// [EN] Resolved attack power.
+        /// 攻撃の被害計算に使う攻撃力。
+        /// [KO] 공격 피해 계산에 사용할 공격력입니다.
+        /// [EN] Attack power used to calculate damage.
         /// </summary>
         public int Attack { get; }
 
         /// <summary>
-        /// 整数の攻撃間隔。
-        /// [KO] 정수 공격 간격.
-        /// [EN] Integer attack interval.
+        /// 次の攻撃までの間隔。単位は tick です。
+        /// [KO] 다음 공격까지의 간격이며 단위는 tick입니다.
+        /// [EN] Interval until the next attack, measured in ticks.
         /// </summary>
         public int IntervalTicks { get; }
 
@@ -74,9 +74,9 @@ namespace UnityCombatLab.Domain.Battle
         public int Shield { get; }
 
         /// <summary>
-        /// 入力の範囲を検証します。
-        /// [KO] 입력 범위를 검증합니다.
-        /// [EN] Validates input ranges.
+        /// ID・陣営・能力値の範囲を確認して、戦闘開始データを作ります。
+        /// [KO] ID·팀·능력치 범위를 확인해 전투 시작 데이터를 만듭니다.
+        /// [EN] Checks the ID, team and stat ranges and creates starting combat data.
         /// </summary>
         public BattleUnitInput(int id, Define.BattleTeam team, Define.BattleSlot slot, Define.UnitRole role,
             int maxHealth, int attack, int intervalTicks, int shield = 0, int? health = null)

@@ -6,9 +6,9 @@ using UnityCombatLab.Common;
 namespace UnityCombatLab.Domain.Battle
 {
     /// <summary>
-    /// 時刻や描画に依存しない単一ウェーブの戦闘所有者。
-    /// [KO] 시간과 렌더링에 의존하지 않는 단일 웨이브 전투 소유자.
-    /// [EN] Owns one wave of combat independently of clocks and rendering.
+    /// 一回のウェーブを 20Hz で進め、攻撃・被害・死亡と勝敗を計算します。
+    /// [KO] 한 웨이브를 20Hz로 진행하며 공격·피해·사망과 승패를 계산합니다.
+    /// [EN] Advances one wave at 20Hz and calculates attacks, damage, deaths and the outcome.
     /// </summary>
     public sealed class BattleSimulation
     {
@@ -21,16 +21,16 @@ namespace UnityCombatLab.Domain.Battle
             Define.MaxBattleUnitCount * (1 + Define.SlotsPerTeam) + Define.MaxBattleUnitCount + 1;
 
         /// <summary>
-        /// 変更権はこのインスタンスだけが所有する。
-        /// [KO] 이 인스턴스만 변경권 소유.
-        /// [EN] State mutation belongs solely to this instance.
+        /// 全ユニットの現在の HP・盾・攻撃回数を保持する配列。
+        /// [KO] 모든 유닛의 현재 HP·방어막·공격 횟수를 보관하는 배열입니다.
+        /// [EN] Array storing every unit's current health, shields and attack count.
         /// </summary>
         private readonly BattleUnitSnapshot[] _states = new BattleUnitSnapshot[Define.MaxBattleUnitCount];
 
         /// <summary>
-        /// 同期消費される一ティック分の所有バッファ。
-        /// [KO] 동기 소비하는 한 틱 분량의 소유 버퍼.
-        /// [EN] Owned single-tick buffer consumed synchronously.
+        /// 一回の Step で発生したイベントを、通知完了まで保持する配列。
+        /// [KO] 한 번의 Step에서 발생한 이벤트를 알림 완료까지 보관하는 배열입니다.
+        /// [EN] Array retaining events from one Step until delivery completes.
         /// </summary>
         private readonly BattleEvent[] _events = new BattleEvent[EventBufferCapacity];
 
@@ -77,9 +77,9 @@ namespace UnityCombatLab.Domain.Battle
         public int EventCount { get; private set; }
 
         /// <summary>
-        /// 入力を固定スロットへコピーし重複を拒否します。空陣営は初回 Step で境界判定します。
-        /// [KO] 고정 슬롯에 입력 복사 후 중복 거부, 빈 팀은 첫 Step에서 경계 판정.
-        /// [EN] Copies inputs into fixed slots and rejects duplicates; empty teams resolve on first Step.
+        /// 開始データを陣営・スロット順に並べ、重複を検査します。空陣営の勝敗は最初の Step で判定します。
+        /// [KO] 시작 데이터를 팀·슬롯 순서로 배치하고 중복을 검사하며 빈 팀의 승패는 첫 Step에서 판정합니다.
+        /// [EN] Orders starting data by team and slot and checks duplicates; the first Step resolves empty teams.
         /// </summary>
         public BattleSimulation(Guid runId, int wave, IReadOnlyList<BattleUnitInput> units)
         {
@@ -131,9 +131,9 @@ namespace UnityCombatLab.Domain.Battle
         public BattleUnitSnapshot GetUnit(Define.BattleTeam team, Define.BattleSlot slot) => _states[Index(team, slot)];
 
         /// <summary>
-        /// 未消費バッファから値をコピーします。参照は公開しません。
-        /// [KO] 미소비 버퍼에서 값 복사, 참조 비공개.
-        /// [EN] Copies a value from the pending buffer without exposing its storage.
+        /// まだ通知していないイベントを発生順の番号で取得します。
+        /// [KO] 아직 알리지 않은 이벤트를 발생 순서 번호로 조회합니다.
+        /// [EN] Gets an undelivered event by its occurrence-order index.
         /// </summary>
         public BattleEvent GetEvent(int index)
         {
@@ -141,9 +141,9 @@ namespace UnityCombatLab.Domain.Battle
         }
 
         /// <summary>
-        /// 同期消費の完了を通知します。必要な値をコピーした後だけ呼びます。
-        /// [KO] 필요한 값을 복사한 뒤 동기 소비 완료 통지.
-        /// [EN] Acknowledges synchronous consumption after required values have been copied.
+        /// Runner が全イベントを通知した後、イベント数を 0 に戻します。
+        /// [KO] Runner가 모든 이벤트를 알린 뒤 이벤트 수를 0으로 되돌립니다.
+        /// [EN] Resets the event count after the runner has delivered all events.
         /// </summary>
         public void AcknowledgeEvents() => EventCount = 0;
 
@@ -222,9 +222,9 @@ namespace UnityCombatLab.Domain.Battle
         }
 
         /// <summary>
-        /// スロットを交互順の配列添字へ変換します。
-        /// [KO] 슬롯을 교차 순서 배열 인덱스로 변환.
-        /// [EN] Converts a slot to an interleaved array index.
+        /// 陣営とスロットを配列番号に変換します。0/1 は味方/敵の前列、2/3 は後列上、4/5 は後列下です。
+        /// [KO] 팀과 슬롯을 배열 번호로 변환합니다. 0/1은 아군/적 전열, 2/3은 위쪽 후열, 4/5는 아래쪽 후열입니다.
+        /// [EN] Converts team and slot to an array index: 0/1 are ally/enemy front, 2/3 upper-back, and 4/5 lower-back.
         /// </summary>
         private static int Index(Define.BattleTeam team, Define.BattleSlot slot)
         {
@@ -242,9 +242,9 @@ namespace UnityCombatLab.Domain.Battle
         }
 
         /// <summary>
-        /// 生存対象だけを固定順に探します。
-        /// [KO] 생존 대상만 고정 순서 탐색.
-        /// [EN] Searches living targets in fixed order.
+        /// 生存している相手を探します。敵射手は後列上→後列下→前列、それ以外は前列→後列上→後列下の順です。
+        /// [KO] 살아 있는 상대를 찾습니다. 적 사수는 위쪽 후열→아래쪽 후열→전열, 나머지는 전열→위쪽 후열→아래쪽 후열 순서입니다.
+        /// [EN] Finds a living opponent: enemy ranged units search upper-back, lower-back, front; other roles search front, upper-back, lower-back.
         /// </summary>
         private int FindTarget(int actor)
         {
@@ -298,9 +298,9 @@ namespace UnityCombatLab.Domain.Battle
         }
 
         /// <summary>
-        /// 両陣営ゼロは敗北を優先します。
-        /// [KO] 양 팀 0이면 패배 우선.
-        /// [EN] Both teams empty resolves as defeat.
+        /// 全滅した陣営を確認して勝敗を確定します。両陣営とも全滅なら敗北です。
+        /// [KO] 전멸한 팀을 확인해 승패를 확정하며 양 팀이 모두 전멸했다면 패배입니다.
+        /// [EN] Checks eliminated teams and determines the outcome; both teams eliminated means defeat.
         /// </summary>
         private bool TryEnd()
         {
@@ -347,9 +347,9 @@ namespace UnityCombatLab.Domain.Battle
         }
 
         /// <summary>
-        /// 所有バッファへ正規順に追記します。
-        /// [KO] 소유 버퍼에 정규 순서로 추가.
-        /// [EN] Appends to the owned buffer in canonical order.
+        /// イベントに連番を付け、今回の Step のイベント配列へ追加します。
+        /// [KO] 이벤트에 순번을 붙여 이번 Step의 이벤트 배열에 추가합니다.
+        /// [EN] Assigns an event sequence number and appends it to the current Step's event array.
         /// </summary>
         private void Emit(Define.BattleEventKind kind, int actor, int target, int healthDamage = 0,
             int shieldDamage = 0)

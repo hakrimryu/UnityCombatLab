@@ -10,16 +10,16 @@ using UnityCombatLab.Presentation.UI;
 namespace UnityCombatLab.Presentation.Units
 {
     /// <summary>
-    /// イベント値をその場でコピーし、各攻撃の命中へ表示を届けます。Domain の進行は待たせません。
-    /// [KO] 이벤트 값을 즉시 복사해 각 공격의 명중에 표시를 전달하며 Domain 진행은 기다리게 하지 않습니다.
-    /// [EN] Copies event values immediately and presents each attack at impact without delaying Domain progression.
+    /// 戦闘イベントを受け取り、各攻撃の命中時刻に HP と演出を反映します。
+    /// [KO] 전투 이벤트를 받아 각 공격의 명중 시각에 HP와 연출을 반영합니다.
+    /// [EN] Receives battle events and applies health and effects at each attack's impact time.
     /// </summary>
     public sealed class BattlePresenter : IDisposable
     {
         /// <summary>
-        /// 表示時計と予約の判断だけを所有する純粋 C#。View と HUD への呼出しはこの Presenter が担当します。
-        /// [KO] 표시 시계와 예약 판단만 소유하는 순수 C#이며 View·HUD 호출은 이 Presenter가 담당합니다.
-        /// [EN] Pure C# owner of presentation time and cue decisions; this presenter owns view and HUD calls.
+        /// 攻撃ごとの発射・命中・終了時刻と、勝敗を公開する時刻を管理します。
+        /// [KO] 공격별 발사·명중·종료 시각과 승패를 공개할 시각을 관리합니다.
+        /// [EN] Tracks each attack's release, impact and completion timings and when the outcome can be published.
         /// </summary>
         private readonly BattlePresentationTimeline _timeline = new();
 
@@ -38,16 +38,16 @@ namespace UnityCombatLab.Presentation.Units
         private readonly BattleRunner _runner;
 
         /// <summary>
-        /// 命中を画面へ届ける状態。戦闘計算は含みません。
-        /// [KO] 명중을 화면으로 전달할 상태이며 전투 계산은 포함하지 않습니다.
-        /// [EN] Presentation state receiving impacts without combat calculation.
+        /// 命中時刻に合わせて HUD へ通知する HP・盾・勝敗。
+        /// [KO] 명중 시각에 맞춰 HUD에 알릴 HP·방어막·승패입니다.
+        /// [EN] Health, shields and outcome notified to the HUD at presentation times.
         /// </summary>
         private readonly BattlePresentationReadModel _model;
 
         /// <summary>
-        /// ID と固定表示枠の対応、および借用する View。
-        /// [KO] ID와 고정 표시 슬롯의 대응 및 빌린 View입니다.
-        /// [EN] ID-to-slot mapping and borrowed views.
+        /// ユニット ID から、View と表示状態の配列番号を引く対応表。
+        /// [KO] 유닛 ID로 View와 표시 상태의 배열 번호를 찾을 대응표입니다.
+        /// [EN] Maps unit IDs to indices in the view and presentation-state arrays.
         /// </summary>
         private readonly Dictionary<int, int> _indices;
 
@@ -87,16 +87,16 @@ namespace UnityCombatLab.Presentation.Units
         private bool _isDisposed;
 
         /// <summary>
-        /// 未完了の同時攻撃数。終了と検証で使用します。
-        /// [KO] 미완료 동시 공격 수이며 종료·검증에 사용합니다.
-        /// [EN] Number of unfinished simultaneous attacks used for completion and validation.
+        /// 命中または演出終了を待っている攻撃数。
+        /// [KO] 명중 또는 연출 종료를 기다리는 공격 수입니다.
+        /// [EN] Number of attacks awaiting impact or animation completion.
         /// </summary>
         public int PendingAttackCount => _timeline.Attacks.Count;
 
         /// <summary>
-        /// 最後の命中・死亡まで画面に届いた状態。
-        /// [KO] 마지막 명중·사망까지 화면에 도착한 상태입니다.
-        /// [EN] Whether final hits and deaths have reached the screen.
+        /// 全攻撃の命中と死亡演出を終え、勝敗を公開したかを示します。
+        /// [KO] 모든 공격의 명중과 사망 연출을 끝내고 승패를 공개했는지 나타냅니다.
+        /// [EN] Whether all impacts and death effects finished and the outcome was published.
         /// </summary>
         public bool IsComplete { get; private set; }
 
@@ -128,9 +128,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 同期消費中に必要な値をコピーし、攻撃は即開始、被害は対応する攻撃へ予約します。
-        /// [KO] 동기 소비 중 필요한 값을 복사하고 공격은 즉시 시작하며 피해는 대응 공격에 예약합니다.
-        /// [EN] Copies needed values synchronously, starts attacks immediately and reserves damage with the matching attack.
+        /// 攻撃開始を View へ伝え、被害をその攻撃の命中時刻に表示するよう登録します。
+        /// [KO] View에 공격 시작을 알리고 피해를 해당 공격의 명중 시각에 표시하도록 등록합니다.
+        /// [EN] Starts attack presentation on the view and schedules its damage for impact.
         /// </summary>
         private void HandleEventOccurred(BattleEvent item)
         {
@@ -167,17 +167,16 @@ namespace UnityCombatLab.Presentation.Units
             else if (item.Kind == Define.BattleEventKind.DamageApplied)
             {
                 var actor = _indices[item.ActorId];
-                // コピーしたイベントだけを予約し、Runner の再利用バッファを非同期表示へ渡さない。
+                // 後の命中表示に使う被害の値を、この攻撃に保存する。
                 _timeline.ReserveDamage(actor, item);
                 _model.Units[_indices[item.TargetId]].ReserveDamage(item.HealthDamage);
             }
-            // 死亡は既に確定しているが、画面では予約被害が到着して HP 0 になった時に一度だけ示す。
         }
 
         /// <summary>
-        /// EntryPoint が毎フレーム呼び、全攻撃を同時に進めます。誰かの演出待ちで戦闘 tick を止めません。
-        /// [KO] EntryPoint가 매 프레임 호출해 모든 공격을 동시에 진행하며 누군가의 연출 때문에 전투 틱을 멈추지 않습니다.
-        /// [EN] EntryPoint advances every attack concurrently each frame, never blocking combat ticks for another unit's animation.
+        /// 毎フレーム、各攻撃の進行・死亡表示・勝敗公開を順に更新します。
+        /// [KO] 매 프레임 각 공격 진행·사망 표시·승패 공개를 순서대로 갱신합니다.
+        /// [EN] Updates attacks, death presentation and outcome publication in order each frame.
         /// </summary>
         public void Advance(double scaledDeltaSeconds)
         {
@@ -239,7 +238,7 @@ namespace UnityCombatLab.Presentation.Units
             {
                 var damage = cue.Damage[hit];
                 var target = _indices[damage.TargetId];
-                // 到着順が異なっても確定損失を一度引く。古い絶対 HP は代入しない。
+                // 命中した被害だけを表示 HP と盾から引く。
                 _model.Units[target].ApplyDamage(damage.HealthDamage, damage.ShieldDamage);
                 actor.ShowImpact(_runId, hit, _views[target].ImpactPosition);
                 _views[target].ShowHit(_runId, actor.ImpactPosition);

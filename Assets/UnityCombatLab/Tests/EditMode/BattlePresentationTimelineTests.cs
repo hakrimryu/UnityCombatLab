@@ -9,16 +9,16 @@ using UnityCombatLab.Presentation.Units;
 namespace UnityCombatLab.Tests.EditMode
 {
     /// <summary>
-    /// GameObject や Unity 時計を使わず、実際に Presenter が使う予約と到着順を検証します。
-    /// [KO] GameObject나 Unity 시계 없이 실제 Presenter가 사용하는 예약과 도착 순서를 검증합니다.
-    /// [EN] Verifies the actual presenter's cue and arrival rules without GameObjects or Unity clocks.
+    /// 攻撃の発射・命中時刻と、死亡・勝敗の待機条件を確認します。
+    /// [KO] 공격 발사·명중 시각과 사망·승패 대기 조건을 확인합니다.
+    /// [EN] Checks attack release and impact timings and conditions for death and outcome waits.
     /// </summary>
     public sealed class BattlePresentationTimelineTests
     {
         /// <summary>
-        /// Domain の公開入力から指定損失のイベントを作り、内部コンストラクターや反射に依存しません。
-        /// [KO] Domain 공개 입력으로 지정 손실의 이벤트를 만들며 내부 생성자나 리플렉션에 의존하지 않습니다.
-        /// [EN] Creates an event with the requested loss through public Domain inputs, without internal constructors or reflection.
+        /// 指定した HP 損失が発生する戦闘を作り、その被害イベントを返します。
+        /// [KO] 지정한 HP 손실이 발생할 전투를 만들고 해당 피해 이벤트를 반환합니다.
+        /// [EN] Creates combat producing the specified health loss and returns its damage event.
         /// </summary>
         private static BattleEvent DamageOf(int healthDamage, int actorId = 1)
         {
@@ -31,7 +31,7 @@ namespace UnityCombatLab.Tests.EditMode
             };
             using var runner = new BattleRunner(Guid.NewGuid(), 1, inputs);
             BattleEvent damage = default;
-            // Runner の同期通知から構造体をコピーし、通知元の解除は using の Dispose が担当する。
+            // Runner が通知した被害イベントを値として取り出す。
             runner.EventOccurred += item =>
             {
                 if (item.Kind == Define.BattleEventKind.DamageApplied && item.ActorId == actorId) damage = item;

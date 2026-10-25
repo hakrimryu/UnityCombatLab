@@ -7,9 +7,9 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.Units
 {
     /// <summary>
-    /// 攻撃・接近・投射体・被弾を同時進行で描き、戦闘の損失量は決めません。
-    /// [KO] 공격·접근·투사체·피격을 동시에 그리며 전투 손실량은 결정하지 않습니다.
-    /// [EN] Presents overlapping attacks, approaches, projectiles and hits without deciding combat damage.
+    /// ユニットの攻撃・接近・投射物・被弾・死亡の演出を進めます。
+    /// [KO] 유닛의 공격·접근·투사체·피격·사망 연출을 진행합니다.
+    /// [EN] Runs a unit's attack, approach, projectile, hit and death presentation.
     /// </summary>
     public sealed class UnitView : MonoBehaviour
     {
@@ -112,16 +112,16 @@ namespace UnityCombatLab.Presentation.Units
         [SerializeField] private UnitHitReactionView _hitReaction;
 
         /// <summary>
-        /// 次の攻撃周期より短い攻撃再生秒数。
-        /// [KO] 다음 공격 주기보다 짧은 공격 재생 시간(초)입니다.
-        /// [EN] Attack duration in seconds, shorter than the attack interval.
+        /// 接近や元の姿勢への復帰を含む、攻撃モーションの秒数。
+        /// [KO] 접근과 원래 자세로의 복귀를 포함한 공격 모션 시간입니다.
+        /// [EN] Attack-motion duration including approach and return.
         /// </summary>
         [SerializeField] private float _attackSeconds = 0.64f;
 
         /// <summary>
-        /// 姿勢確認で選んだ斬撃・発射の正規化位置。
-        /// [KO] 자세를 확인해 정한 베기·발사의 정규화 위치입니다.
-        /// [EN] Normalized strike or release position selected from inspected poses.
+        /// 攻撃開始から斬撃・発射までの時間比率（0〜1）。
+        /// [KO] 공격 시작부터 검격·발사까지의 시간 비율(0~1)입니다.
+        /// [EN] Fraction of attack duration before strike or release, from 0 to 1.
         /// </summary>
         [SerializeField] private float _releaseNormalized = 0.52f;
 
@@ -175,9 +175,9 @@ namespace UnityCombatLab.Presentation.Units
         [SerializeField] private BattleEffectView _deathPrefab;
 
         /// <summary>
-        /// 旧移動完了を拒否する世代。
-        /// [KO] 이전 이동 완료를 거부하는 세대입니다.
-        /// [EN] Generation rejecting stale movement completions.
+        /// 接続や攻撃が切り替わるたびに増やし、古い Tween の完了通知を見分ける番号。
+        /// [KO] 연결이나 공격이 바뀔 때마다 증가해 이전 Tween 완료 알림을 구별할 번호입니다.
+        /// [EN] Counter advanced when bindings or attacks change to identify stale tween completions.
         /// </summary>
         private int _generation;
 
@@ -189,9 +189,9 @@ namespace UnityCombatLab.Presentation.Units
         private Guid _runId;
 
         /// <summary>
-        /// 解除後の演出要求を拒否する状態。
-        /// [KO] 해제 후 연출 요청을 거부하는 상태입니다.
-        /// [EN] State rejecting effects after release.
+        /// 戦闘に接続され、演出要求を受け付ける状態。
+        /// [KO] 전투에 연결되어 연출 요청을 받을 수 있는 상태입니다.
+        /// [EN] Whether the view is bound to a battle and can accept presentation requests.
         /// </summary>
         private bool _isBound;
 
@@ -224,9 +224,9 @@ namespace UnityCombatLab.Presentation.Units
         private Tween _motion;
 
         /// <summary>
-        /// Hit に切り替えず攻撃を保護する残り秒数。
-        /// [KO] Hit로 전환하지 않고 공격을 보호할 남은 시간(초)입니다.
-        /// [EN] Remaining protected attack seconds.
+        /// 攻撃モーションが終わるまでの残り秒数。
+        /// [KO] 공격 모션이 끝날 때까지 남은 시간입니다.
+        /// [EN] Seconds remaining in the attack motion.
         /// </summary>
         private float _attackRemaining;
 
@@ -303,16 +303,16 @@ namespace UnityCombatLab.Presentation.Units
         public bool IsBound => _isBound;
 
         /// <summary>
-        /// 他ユニットを止めずこの一人が攻撃中か。
-        /// [KO] 다른 유닛을 멈추지 않고 이 유닛만 공격 중인지 나타냅니다.
-        /// [EN] Whether this unit is attacking independently.
+        /// 攻撃モーションが続いているかを示します。
+        /// [KO] 공격 모션이 진행 중인지 나타냅니다.
+        /// [EN] Whether the attack motion is still running.
         /// </summary>
         public bool IsAttacking => _attackRemaining > 0f;
 
         /// <summary>
-        /// Presenter が予約に使う攻撃・発射・到着秒数。
-        /// [KO] Presenter가 예약에 쓸 공격·발사·도착 시간(초)입니다.
-        /// [EN] Attack, release and arrival seconds used by the presenter.
+        /// Presenter が攻撃終了の判定に使う秒数。
+        /// [KO] Presenter가 공격 종료 판정에 사용할 시간입니다.
+        /// [EN] Attack duration used by the presenter to determine completion.
         /// </summary>
         public float AttackDuration => _attackSeconds;
 
@@ -361,9 +361,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 共通色だけを被弾表示へ渡します。効果の生成は PrepareEffects が担当します。
-        /// [KO] 공통 색상만 피격 표시에 전달하며 효과 생성은 PrepareEffects가 담당합니다.
-        /// [EN] Supplies only shared colors to hit reactions; PrepareEffects owns effect creation.
+        /// 被弾の閃光に使うパレットを UnitHitReactionView へ渡します。
+        /// [KO] 피격 섬광에 사용할 팔레트를 UnitHitReactionView에 전달합니다.
+        /// [EN] Passes the hit-flash palette to UnitHitReactionView.
         /// </summary>
         public void ApplyPalette(GameColorPalette colors) => _hitReaction.ApplyPalette(colors);
 
@@ -402,9 +402,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// シーンのユニットの子へ生成し、開始直後の自動再生を残さず待機させます。
-        /// [KO] 씬 유닛의 자식으로 생성하고 시작 직후 자동 재생을 남기지 않고 대기시킵니다.
-        /// [EN] Creates an effect under the scene unit and parks it without leaving startup playback.
+        /// ユニットの子としてエフェクトを作り、再生待ちの状態にします。
+        /// [KO] 유닛 자식으로 효과를 생성해 재생 대기 상태로 만듭니다.
+        /// [EN] Creates an effect as a unit child and leaves it ready for playback.
         /// </summary>
         private BattleEffectView CreateEffect(BattleEffectView prefab, string effectName)
         {
@@ -429,9 +429,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 一人の攻撃を始め、対象へモデルだけを近づけます。他の攻撃を待ちません。
-        /// [KO] 한 명의 공격을 시작해 모델만 대상에게 접근시키며 다른 공격을 기다리지 않습니다.
-        /// [EN] Starts one attack and approaches using only the model, without waiting for other attackers.
+        /// 攻撃モーションを始め、近接攻撃ならモデルを対象へ近づけます。
+        /// [KO] 공격 모션을 시작하고 근접 공격이면 모델을 대상에게 접근시킵니다.
+        /// [EN] Starts attack motion and moves the model toward the target for melee attacks.
         /// </summary>
         public void ShowAttack(Guid runId, Vector3 targetPosition, bool isMelee, bool isSpecial,
             float approachFraction = 0.5f)
@@ -453,7 +453,7 @@ namespace UnityCombatLab.Presentation.Units
             }
 
             var generation = _generation;
-            // 現在の DOTween 既定値と同じ Normal/scaled を明示し、表示時計と時間基準を揃える。
+            // 接近と姿勢の Tween を、他の演出と同じゲーム内時間で進める。
             var sequence = DOTween.Sequence().SetUpdate(UpdateType.Normal, false);
             _motion = sequence;
             if (isMelee)
@@ -512,7 +512,7 @@ namespace UnityCombatLab.Presentation.Units
             {
                 start = _hand != null ? _hand.position : ImpactPosition;
                 _projectileStarts[slot] = start;
-                // 購入デモと同じ +Z を飛行前方にする。前回の尾は発射位置を変える前に消す。
+                // 飛行方向を +Z に向けて再生する。発射位置を変える前に前回の尾を消す。
                 projectile.Play(start, targetPosition - start);
             }
 
@@ -596,16 +596,16 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void Update()
         {
-            // 攻撃保護と反動は表示と同じ scaled 秒。20Hz の計算時間はここでは進めない。
+            // 攻撃モーションの残り時間と被弾反応を、ゲーム内の経過秒で進める。
             var presentationDeltaSeconds = Time.deltaTime;
             _attackRemaining = Mathf.Max(0, _attackRemaining - presentationDeltaSeconds);
             _hitReaction.Advance(presentationDeltaSeconds);
         }
 
         /// <summary>
-        /// 命中位置で死亡を始め、復帰移動で死体を元の位置へ飛ばしません。
-        /// [KO] 명중 위치에서 사망을 시작하며 복귀 이동으로 시체를 원래 위치로 날려 보내지 않습니다.
-        /// [EN] Starts death at impact position without snapping the corpse home.
+        /// 現在の位置で死亡モーションを開始し、反動位置を固定して魂の効果を再生します。
+        /// [KO] 현재 위치에서 사망 모션을 시작하고 반동 위치를 고정해 영혼 효과를 재생합니다.
+        /// [EN] Starts death motion at the current position, freezes recoil and plays the soul effect.
         /// </summary>
         public void ShowDeath(Guid runId)
         {
@@ -640,9 +640,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 所有する移動・投射体・色を解除し、次の戦闘へ古い表示を残しません。
-        /// [KO] 소유 이동·투사체·색을 해제해 다음 전투에 이전 표시를 남기지 않습니다.
-        /// [EN] Releases owned motion, projectiles and tint before another battle.
+        /// 移動と効果を止め、モデルの位置・姿勢・被弾表示を初期状態に戻します。
+        /// [KO] 이동과 효과를 멈추고 모델 위치·자세·피격 표시를 초기 상태로 되돌립니다.
+        /// [EN] Stops motion and effects and restores the model position, pose and hit appearance.
         /// </summary>
         public void Release()
         {

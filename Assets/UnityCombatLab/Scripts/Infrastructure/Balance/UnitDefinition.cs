@@ -5,9 +5,9 @@ using UnityEngine;
 namespace UnityCombatLab.Infrastructure.Balance
 {
     /// <summary>
-    /// Inspector で編集するユニットの開始 HP・攻撃力などを保存します。戦闘中に減った HP は保存しません。
-    /// [KO] Inspector에서 편집할 유닛의 시작 HP·공격력 등을 저장합니다. 전투 중 감소한 HP는 저장하지 않습니다.
-    /// [EN] Stores Inspector-editable starting stats. Health lost during battle is not written to this asset.
+    /// Inspector で編集する、戦闘開始時の HP・攻撃力・攻撃間隔を保存します。
+    /// [KO] Inspector에서 편집할 전투 시작 HP·공격력·공격 간격을 저장합니다.
+    /// [EN] Stores starting health, attack power and attack interval edited in the Inspector.
     /// </summary>
     [CreateAssetMenu(menuName = "UnityCombatLab/Unit Definition")]
     public sealed class UnitDefinition : ScriptableObject
@@ -52,30 +52,9 @@ namespace UnityCombatLab.Infrastructure.Balance
         /// [KO] 이 설정의 HP·공격력에 ID·팀·슬롯을 붙여, 이번 전투를 시작하는 데 사용할 데이터를 만듭니다.
         /// [EN] Combines these stats with an ID, team and slot to create the data used to start this battle.
         /// </summary>
-        /// <param name="id">
-        /// この戦闘でユニットを区別する正数。例: 騎士は 1、最初の敵は 2。
-        /// [KO] 이번 전투에서 유닛을 구별할 양수입니다. 예: 기사 1, 첫 번째 적 2.
-        /// [EN] Positive ID identifying a unit in this battle, such as knight 1 and first enemy 2.
-        /// </param>
-        /// <param name="team">
-        /// 味方か敵かを指定します。役割と異なる陣営は生成時に拒否されます。
-        /// [KO] 아군인지 적인지 지정합니다. 역할과 맞지 않는 팀은 생성 시 거부됩니다.
-        /// [EN] Selects ally or enemy; construction rejects a team that does not match the role.
-        /// </param>
-        /// <param name="slot">
-        /// 前列・後列上・後列下のどこに置くか。ワールド座標ではありません。
-        /// [KO] 전열·위쪽 후열·아래쪽 후열 중 배치할 자리입니다. 월드 좌표가 아닙니다.
-        /// [EN] Front, upper-back or lower-back battle position; this is not a world coordinate.
-        /// </param>
-        /// <returns>
-        /// 生成後は設定値を変更できない開始データ。不正な値は BattleUnitInput のコンストラクターが拒否します。
-        /// [KO] 생성 후 설정값을 바꿀 수 없는 시작 데이터입니다. 잘못된 값은 BattleUnitInput 생성자가 거부합니다.
-        /// [EN] Starting data whose properties cannot be changed after construction; its constructor rejects invalid values.
-        /// </returns>
         public BattleUnitInput CreateInput(int id, Define.BattleTeam team, Define.BattleSlot slot)
         {
-            // 開始 HP を別指定しないので、BattleUnitInput は最大 HP を開始 HP に使う。
-            // この asset 自体は変更せず、Unity の asset を参照しない C# オブジェクトを返す。
+            // 開始 HP には最大 HP を使う。
             return new BattleUnitInput(id, team, slot, _role, _maxHealth, _attack, _intervalTicks, _shield);
         }
     }

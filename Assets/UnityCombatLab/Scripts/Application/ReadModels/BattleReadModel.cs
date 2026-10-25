@@ -15,23 +15,23 @@ namespace UnityCombatLab.Application.ReadModels
     public sealed class BattleReadModel : IDisposable
     {
         /// <summary>
-        /// 確定状態のユニットを一度だけ作って保持します。内部ではこの配列を直接巡回し、外部には Units で同じ内容を公開します。
-        /// [KO] 확정 상태 유닛을 한 번만 만들어 보관합니다. 내부에서는 이 배열을 직접 순회하고 외부에는 Units로 같은 내용을 보여줍니다.
-        /// [EN] Stores committed-state units created once; internal code iterates this array while Units exposes the same contents to callers.
+        /// 各ユニットの確定 HP と盾を、開始データと同じ順に保持します。
+        /// [KO] 각 유닛의 확정 HP와 방어막을 시작 데이터와 같은 순서로 보관합니다.
+        /// [EN] Stores committed unit health and shields in starting-data order.
         /// </summary>
         private readonly UnitReadModel[] _unitReadModels;
 
         /// <summary>
-        /// 終了通知は最後のイベント消費時にだけ変更します。
-        /// [KO] 종료 알림은 마지막 이벤트 소비 시에만 변경합니다.
-        /// [EN] Changes the outcome only when consuming the final event.
+        /// 戦闘終了イベントで更新する勝敗。
+        /// [KO] 전투 종료 이벤트로 갱신할 승패입니다.
+        /// [EN] Outcome updated by the battle-ended event.
         /// </summary>
         private readonly ReactiveProperty<Define.BattleResult> _result = new(Define.BattleResult.Ongoing);
 
         /// <summary>
-        /// 確定状態の一覧。外部から項目の追加・入替はできませんが、イベントで各 HP は変わります。
-        /// [KO] 확정 상태 목록이며 외부에서 항목을 추가·교체할 수 없지만 이벤트로 각 HP는 바뀝니다.
-        /// [EN] Committed-state list; callers cannot add or replace items, while events update each health value.
+        /// 開始データと同じ順で取得する各ユニットの確定状態。
+        /// [KO] 시작 데이터와 같은 순서로 조회할 각 유닛의 확정 상태입니다.
+        /// [EN] Committed unit states in starting-data order.
         /// </summary>
         public IReadOnlyList<UnitReadModel> Units { get; }
 
@@ -50,7 +50,6 @@ namespace UnityCombatLab.Application.ReadModels
         internal BattleReadModel(IReadOnlyList<BattleUnitInput> inputs)
         {
             _unitReadModels = inputs.Select(input => new UnitReadModel(input)).ToArray();
-            // 配列やユニットを複製せず、外部から項目を入れ替えられない窓口だけを作る。
             Units = Array.AsReadOnly(_unitReadModels);
         }
 
@@ -63,8 +62,7 @@ namespace UnityCombatLab.Application.ReadModels
         {
             if (battleEvent.Kind == Define.BattleEventKind.DamageApplied)
             {
-                // イベントの対象 ID と同じユニットを探す。並び順ではなく ID で相手を一致させる。
-                // 配列を直接 foreach すると、被害のたびに巡回用の一時オブジェクトを作らずに済む。
+                // イベントの対象 ID に一致するユニットの HP と盾を更新する。
                 foreach (var unit in _unitReadModels)
                 {
                     if (unit.Input.Id == battleEvent.TargetId)
@@ -79,7 +77,6 @@ namespace UnityCombatLab.Application.ReadModels
 
             if (battleEvent.Kind == Define.BattleEventKind.BattleEnded)
             {
-                // これは即時の確定結果。画面への公開時刻は表示側が別に管理する。
                 _result.Value = battleEvent.Result;
             }
         }

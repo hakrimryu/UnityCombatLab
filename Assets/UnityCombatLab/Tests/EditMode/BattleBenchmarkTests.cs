@@ -34,9 +34,9 @@ namespace UnityCombatLab.Tests.EditMode
         private const ulong FnvPrime = 1099511628211UL;
 
         /// <summary>
-        /// 購入エセットに依存しない数値 fixture。
-        /// [KO] 구매 에셋과 무관한 수치 fixture.
-        /// [EN] Numeric fixture independent of purchased assets.
+        /// 繰り返し測定に使う 3 対 3 の開始データを作ります。
+        /// [KO] 반복 측정에 사용할 3대3 시작 데이터를 만듭니다.
+        /// [EN] Creates three-versus-three starting data for repeated measurements.
         /// </summary>
         internal static BattleUnitInput[] CreateInputs()
         {
@@ -56,9 +56,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// ウォームアップ後に構築と Step を別々に計測し証拠を保存。
-        /// [KO] 워밍업 후 생성·Step 분리 측정 및 증거 저장.
-        /// [EN] Warms up, measures construction and Step separately, and saves evidence.
+        /// ウォームアップ後に戦闘の生成と Step を別々に測り、結果を保存します。
+        /// [KO] 워밍업 후 전투 생성과 Step을 따로 측정하고 결과를 저장합니다.
+        /// [EN] Measures battle construction and Step separately after warmup and saves the results.
         /// </summary>
         [Test]
         public void HeadlessRepeatedBattlesRecordTimeAllocationAndDeterminism()
@@ -196,7 +196,7 @@ namespace UnityCombatLab.Tests.EditMode
                 for (var i = 0; i < battle.EventCount; i++)
                 {
                     var item = battle.GetEvent(i);
-                    // RunId と wave は fixture 全体で固定し、数値は little endian で正規化する。
+                    // RunId と wave は全測定で固定し、整数は下位バイトから順にハッシュへ加える。
                     hash = HashInt(hash, item.Wave);
                     hash = HashInt(hash, item.Tick);
                     hash = HashInt(hash, item.Sequence);

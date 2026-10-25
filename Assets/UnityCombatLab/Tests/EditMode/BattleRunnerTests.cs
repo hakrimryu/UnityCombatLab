@@ -10,16 +10,16 @@ using UnityCombatLab.Domain.Battle;
 namespace UnityCombatLab.Tests.EditMode
 {
     /// <summary>
-    /// 実時間・イベント消費・通知の境界を検証します。
-    /// [KO] 실시간·이벤트 소비·알림 경계를 검증합니다.
-    /// [EN] Verifies real-time, event-consumption and notification boundaries.
+    /// 経過秒による戦闘の進行と、イベント通知・終了時の処理を確認します。
+    /// [KO] 경과 시간에 따른 전투 진행과 이벤트 알림·종료 처리를 확인합니다.
+    /// [EN] Checks elapsed-time combat advancement, event delivery and shutdown.
     /// </summary>
     public sealed class BattleRunnerTests
     {
         /// <summary>
-        /// 最初の攻撃で勝つ入力を独立値で作ります。
-        /// [KO] 첫 공격으로 승리하는 입력을 독립값으로 만듭니다.
-        /// [EN] Creates independent inputs that win on the first attack.
+        /// 最初の攻撃で勝敗が決まる開始データを作ります。
+        /// [KO] 첫 공격으로 승패가 결정될 시작 데이터를 만듭니다.
+        /// [EN] Creates starting data that resolves the battle on the first attack.
         /// </summary>
         private static BattleUnitInput[] LethalInputs()
         {

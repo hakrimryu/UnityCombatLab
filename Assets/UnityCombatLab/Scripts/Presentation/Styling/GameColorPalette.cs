@@ -5,9 +5,9 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.Styling
 {
     /// <summary>
-    /// プロジェクト共通の色設定。AppLifetimeScope が一つのアセットを登録し、画面の開始時に View へ渡します。
-    /// [KO] 프로젝트 공통 색상 설정입니다. AppLifetimeScope가 에셋 하나를 등록해 화면 시작 시 View에 전달합니다.
-    /// [EN] Project-wide colors registered as one asset by AppLifetimeScope and passed to views at screen startup.
+    /// UI とカメラで共有する、用途別の色を保存します。
+    /// [KO] UI와 카메라가 공유할 용도별 색상을 저장합니다.
+    /// [EN] Stores colors by role for use by UI and cameras.
     /// </summary>
     [CreateAssetMenu(menuName = "UnityCombatLab/Game Color Palette", fileName = "UI_GameColors")]
     public sealed class GameColorPalette : ScriptableObject
@@ -162,9 +162,9 @@ namespace UnityCombatLab.Presentation.Styling
         }
 
         /// <summary>
-        /// UnitStatusView が初期化時に陣営を渡し、HP と役割印に同じ色を適用します。
-        /// [KO] UnitStatusView가 초기화 시 팀을 전달해 HP와 역할 배지에 같은 색을 적용합니다.
-        /// [EN] UnitStatusView passes its team at initialization to use one color for health and its role badge.
+        /// 指定した陣営の色を返します。
+        /// [KO] 지정한 팀의 색상을 반환합니다.
+        /// [EN] Returns the color for the specified team.
         /// </summary>
         public Color GetTeamColor(Define.BattleTeam team)
         {

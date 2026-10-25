@@ -26,30 +26,30 @@ namespace UnityCombatLab.Application.ReadModels
         private readonly ReactiveProperty<int> _shield;
 
         /// <summary>
-        /// このユニットの ID・配置・開始能力。生成後は値を変更できず、現在 HP は Health で別に扱います。
-        /// [KO] 이 유닛의 ID·배치·시작 능력치입니다. 생성 후 바꿀 수 없으며 현재 HP는 Health에서 따로 관리합니다.
-        /// [EN] ID, position and starting stats, unchanged after construction; current committed health is stored in Health.
+        /// ユニットの ID・陣営・スロットと開始時の能力値。
+        /// [KO] 유닛의 ID·팀·슬롯과 시작 능력치입니다.
+        /// [EN] Unit ID, team, slot and starting stats.
         /// </summary>
         public BattleUnitInput Input { get; }
 
         /// <summary>
-        /// 変更権を公開しない HP。
-        /// [KO] 변경권을 공개하지 않는 HP.
-        /// [EN] Health without public mutation access.
+        /// 戦闘計算で確定した HP と、その変更通知。
+        /// [KO] 전투 계산으로 확정한 HP와 변경 알림입니다.
+        /// [EN] Committed health and its change notifications.
         /// </summary>
         public ReadOnlyReactiveProperty<int> Health => _health;
 
         /// <summary>
-        /// 変更権を公開しない防御膜。
-        /// [KO] 변경권을 공개하지 않는 방어막.
-        /// [EN] Shield without public mutation access.
+        /// 戦闘計算で確定した防御膜と、その変更通知。
+        /// [KO] 전투 계산으로 확정한 방어막과 변경 알림입니다.
+        /// [EN] Committed shield value and its change notifications.
         /// </summary>
         public ReadOnlyReactiveProperty<int> Shield => _shield;
 
         /// <summary>
-        /// 初期確定値をコピーします。
-        /// [KO] 초기 확정값을 복사합니다.
-        /// [EN] Copies the initial committed values.
+        /// 開始データの HP と盾で通知用の値を初期化します。
+        /// [KO] 시작 데이터의 HP와 방어막으로 알림용 값을 초기화합니다.
+        /// [EN] Initializes observable health and shield values from starting data.
         /// </summary>
         internal UnitReadModel(BattleUnitInput input)
         {
@@ -59,14 +59,12 @@ namespace UnityCombatLab.Application.ReadModels
         }
 
         /// <summary>
-        /// コアが計算済みの HP 損失と防御膜吸収を確定値から引きます。ここで攻撃力から被害を再計算しません。
-        /// [KO] 코어가 계산한 HP 손실과 방어막 흡수를 확정값에서 뺍니다. 여기서 공격력으로 피해를 다시 계산하지 않습니다.
-        /// [EN] Subtracts core-calculated health loss and shield absorption from committed values without recalculating damage.
+        /// 被害イベントの HP 損失と盾吸収を現在値から引きます。
+        /// [KO] 피해 이벤트의 HP 손실과 방어막 흡수를 현재 값에서 뺍니다.
+        /// [EN] Subtracts the event's health loss and shield absorption from current values.
         /// </summary>
         internal void ApplyDamage(BattleEvent battleEvent)
         {
-            // 例: 盾 5、HP 100 に吸収 5・HP 損失 7 が届いたら、確定値を盾 0・HP 93 にする。
-            // Value の変更が Subscribe の処理をその場で呼ぶ。同じ値のままなら R3 は変更通知を出さない。
             _shield.Value -= battleEvent.ShieldDamage;
             _health.Value -= battleEvent.HealthDamage;
         }

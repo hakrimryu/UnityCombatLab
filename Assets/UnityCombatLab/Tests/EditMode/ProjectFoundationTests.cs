@@ -8,9 +8,9 @@ using UnityEngine.SceneManagement;
 namespace UnityCombatLab.Tests.EditMode
 {
     /// <summary>
-    /// プロジェクト基盤の境界と画面設定を検証します。
-    /// [KO] 프로젝트 기반의 계층 경계와 화면 설정을 검증합니다.
-    /// [EN] Verifies foundation boundaries and display settings.
+    /// Domain の参照先・画面設定・シーンのビルド順を確認します。
+    /// [KO] Domain 참조 대상·화면 설정·씬 빌드 순서를 확인합니다.
+    /// [EN] Checks Domain references, display settings and scene build order.
     /// </summary>
     public sealed class ProjectFoundationTests
     {

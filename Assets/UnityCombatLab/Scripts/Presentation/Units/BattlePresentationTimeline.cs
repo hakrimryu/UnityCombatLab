@@ -13,9 +13,9 @@ namespace UnityCombatLab.Presentation.Units
     public sealed class BattlePresentationTimeline
     {
         /// <summary>
-        /// 最後の死亡表示から勝敗公開まで待つ秒数。以前の表示時間を維持します。
-        /// [KO] 마지막 사망 표시부터 승패 공개까지 기다리는 초 단위 시간이며 기존 표시 시간을 유지합니다.
-        /// [EN] Seconds from the last death presentation until result publication, preserving the existing delay.
+        /// 最後の死亡表示から勝敗公開まで待つ秒数。
+        /// [KO] 마지막 사망 표시부터 승패 공개까지 기다릴 초 단위 시간입니다.
+        /// [EN] Seconds to wait between the last death presentation and outcome publication.
         /// </summary>
         private const double DeathResultDelaySeconds = 0.82;
 
@@ -27,30 +27,30 @@ namespace UnityCombatLab.Presentation.Units
         private const double ImpactToleranceSeconds = 0.00001;
 
         /// <summary>
-        /// 作成順を維持して並行処理する予約。このクラスだけが追加と除去を行います。
-        /// [KO] 생성 순서를 유지해 병렬 처리할 예약이며 이 클래스만 추가·제거합니다.
-        /// [EN] Cues processed concurrently in creation order, added and removed only by this class.
+        /// 開始順に保持し、各命中と演出終了を確認する攻撃一覧。
+        /// [KO] 시작 순서로 보관하며 각 명중과 연출 종료를 확인할 공격 목록입니다.
+        /// [EN] Attacks kept in start order for checking each impact and animation completion.
         /// </summary>
         private readonly List<AttackCue> _attacks = new();
 
         /// <summary>
-        /// 最後に死亡を表示した時刻。未表示なら待機を発生させません。
-        /// [KO] 마지막으로 사망을 표시한 시각이며 아직 표시하지 않았다면 대기를 만들지 않습니다.
-        /// [EN] Time of the last death presentation; no death means no death wait.
+        /// 最後に死亡表示を始めた時刻。結果公開までの待機時間に使います。
+        /// [KO] 마지막 사망 표시를 시작한 시각이며 결과 공개까지의 대기 시간에 사용합니다.
+        /// [EN] Time the last death presentation began, used for the outcome delay.
         /// </summary>
         private double? _lastDeathTime;
 
         /// <summary>
-        /// View を参照しない一回の攻撃。イベントは値でコピーし、時刻設定は開始時に固定します。
-        /// [KO] View를 참조하지 않는 한 번의 공격이며 이벤트는 값으로 복사하고 시간 설정은 시작 시 고정합니다.
-        /// [EN] One attack without view references, holding event value copies and timings fixed at attack start.
+        /// 一回の攻撃の発射・命中時刻と、表示する被害を保持します。
+        /// [KO] 한 번의 공격의 발사·명중 시각과 표시할 피해를 보관합니다.
+        /// [EN] Stores release and impact timings and damage for one attack.
         /// </summary>
         public sealed class AttackCue
         {
             /// <summary>
-            /// 同期消費からコピーした被害。元のイベント配列は保持しません。
-            /// [KO] 동기 소비 중 복사한 피해이며 원래 이벤트 배열은 보관하지 않습니다.
-            /// [EN] Damage copied during synchronous consumption, never the original event buffer.
+            /// この攻撃で表示する、イベントからコピーした被害。
+            /// [KO] 이번 공격에서 표시할 이벤트에서 복사한 피해입니다.
+            /// [EN] Damage copied from events for presentation by this attack.
             /// </summary>
             private readonly List<BattleEvent> _damage = new(Define.SlotsPerTeam);
 
@@ -136,16 +136,16 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// EntryPoint が渡した scaled 経過秒だけを積み上げる表示時計。Domain の時計とは別です。
-        /// [KO] EntryPoint가 전달한 scaled 경과 시간만 누적하는 표시 시계이며 Domain 시계와 별개입니다.
-        /// [EN] Presentation clock accumulating only scaled elapsed seconds supplied by EntryPoint, separate from Domain time.
+        /// EntryPoint が渡すゲーム内経過秒を積み上げた、演出の時刻。
+        /// [KO] EntryPoint가 전달한 게임 경과 시간을 누적한 연출 시각입니다.
+        /// [EN] Presentation time accumulated from game-time seconds supplied by EntryPoint.
         /// </summary>
         public double Time { get; private set; }
 
         /// <summary>
-        /// Presenter が作成順で読む予約一覧。外部から追加や除去はできません。
-        /// [KO] Presenter가 생성 순서대로 읽는 예약 목록이며 외부에서 추가·제거할 수 없습니다.
-        /// [EN] Cues read by the presenter in creation order, without external add or remove access.
+        /// Presenter が開始順に読み取る攻撃一覧。
+        /// [KO] Presenter가 시작 순서로 읽을 공격 목록입니다.
+        /// [EN] Attack list read by the presenter in start order.
         /// </summary>
         public IReadOnlyList<AttackCue> Attacks { get; }
 
@@ -172,9 +172,9 @@ namespace UnityCombatLab.Presentation.Units
         public BattlePresentationTimeline() => Attacks = _attacks.AsReadOnly();
 
         /// <summary>
-        /// Unity の時計を直接読まず、Presenter から受け取った表示秒だけを進めます。
-        /// [KO] Unity 시계를 직접 읽지 않고 Presenter에서 받은 표시 시간만 진행합니다.
-        /// [EN] Advances only presentation seconds supplied by the presenter, without reading Unity clocks.
+        /// Presenter が渡した経過秒を、演出の時刻に加算します。
+        /// [KO] Presenter가 전달한 경과 시간을 연출 시각에 더합니다.
+        /// [EN] Adds elapsed seconds supplied by the presenter to presentation time.
         /// </summary>
         public void Advance(double scaledDeltaSeconds)
         {
@@ -206,9 +206,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 同期消費中に同じ actor と tick の最後の予約へイベント値をコピーします。
-        /// [KO] 동기 소비 중 같은 actor와 tick의 마지막 예약에 이벤트 값을 복사합니다.
-        /// [EN] Copies the event value into the latest matching actor and tick cue during synchronous consumption.
+        /// 同じ攻撃者と tick で始まった攻撃へ、表示する被害を追加します。
+        /// [KO] 같은 공격자와 tick에서 시작한 공격에 표시할 피해를 추가합니다.
+        /// [EN] Adds presentation damage to the attack matching the actor and tick.
         /// </summary>
         public void ReserveDamage(int actor, BattleEvent damage)
         {
@@ -239,9 +239,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 命中時刻に到着状態を一度だけ変更し、Presenter に被害表示を許可します。
-        /// [KO] 명중 시각에 도착 상태를 한 번만 변경해 Presenter에 피해 표시를 허용합니다.
-        /// [EN] Marks arrival once at impact time, allowing the presenter to deliver damage presentation.
+        /// 命中時刻に達した攻撃を一度だけ命中済みにし、その時だけ true を返します。
+        /// [KO] 명중 시각에 도달한 공격을 한 번만 명중 상태로 바꾸고 그때만 true를 반환합니다.
+        /// [EN] Marks an attack impacted once its impact time is reached and returns true only for that change.
         /// </summary>
         public bool TryImpact(int index)
         {
@@ -265,9 +265,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 表示 HP が零で、自分の最後の命中だけを届け終えたか判断します。他人の攻撃は待ちません。
-        /// [KO] 표시 HP가 0이고 자신의 마지막 명중 전달을 끝냈는지 판단하며 다른 유닛의 공격은 기다리지 않습니다.
-        /// [EN] Checks zero displayed health and delivery of this actor's final impact, without waiting for other actors.
+        /// 表示 HP が 0 で、自身の全攻撃が命中済みなら死亡表示を許可します。
+        /// [KO] 표시 HP가 0이고 자신의 모든 공격이 명중했다면 사망 표시를 허용합니다.
+        /// [EN] Allows death presentation when displayed health is zero and all of this unit's attacks have impacted.
         /// </summary>
         public bool CanPresentDeath(int actor, int displayedHealth, bool isDead)
         {
@@ -286,16 +286,16 @@ namespace UnityCombatLab.Presentation.Units
         public void RecordDeath() => _lastDeathTime = Time;
 
         /// <summary>
-        /// Runner の確定結果を保存し、残っている表示時間は止めません。
-        /// [KO] Runner의 확정 결과를 저장하고 남은 표시 시간은 멈추지 않습니다.
-        /// [EN] Stores the runner's committed result without stopping remaining presentation time.
+        /// Runner で確定した勝敗を、演出終了後に公開するため保存します。
+        /// [KO] Runner에서 확정한 승패를 연출 종료 후 공개하도록 저장합니다.
+        /// [EN] Stores the runner's committed outcome for publication after effects finish.
         /// </summary>
         public void CommitResult(Define.BattleResult result) => Result = result;
 
         /// <summary>
-        /// Presenter の解除で全予約を捨てます。時計と確定結果は再利用用に初期化しません。
-        /// [KO] Presenter 해제 시 모든 예약을 버리며 시계와 확정 결과를 재사용용으로 초기화하지 않습니다.
-        /// [EN] Discards all cues on presenter disposal without resetting time or result for reuse.
+        /// Presenter の終了時に、残っている攻撃を全て取り除きます。
+        /// [KO] Presenter 종료 시 남은 공격을 모두 제거합니다.
+        /// [EN] Removes all remaining attacks when the presenter ends.
         /// </summary>
         public void Clear() => _attacks.Clear();
     }

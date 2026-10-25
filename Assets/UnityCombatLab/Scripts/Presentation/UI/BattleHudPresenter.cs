@@ -14,16 +14,16 @@ namespace UnityCombatLab.Presentation.UI
     public sealed class BattleHudPresenter : IDisposable
     {
         /// <summary>
-        /// HP・防御膜・結果の Subscribe が返す解除用ハンドルをまとめ、Dispose 時に全て解除します。
-        /// [KO] HP·방어막·결과의 Subscribe가 반환한 해제용 핸들을 모아 Dispose할 때 모두 해제합니다.
-        /// [EN] Collects handles returned by HP, shield and outcome subscriptions so Dispose can detach them all.
+        /// HP・盾・勝敗の通知接続をまとめ、Dispose で解除します。
+        /// [KO] HP·방어막·승패의 알림 연결을 모아 Dispose에서 해제합니다.
+        /// [EN] Groups health, shield and outcome subscriptions for disposal.
         /// </summary>
         private readonly CompositeDisposable _subscriptions = new();
 
         /// <summary>
-        /// 更新先の HUD。ここは表示を更新するだけで、HUD オブジェクトの生成・破棄は BattleEntryPoint が行います。
-        /// [KO] 갱신할 HUD입니다. 여기서는 표시만 갱신하며 HUD 오브젝트의 생성·파괴는 BattleEntryPoint가 담당합니다.
-        /// [EN] HUD to update; BattleEntryPoint creates and destroys its GameObject, while this class only updates it.
+        /// HP・盾・勝敗を表示する HUD。生成と破棄は BattleEntryPoint が担当します。
+        /// [KO] HP·방어막·승패를 표시할 HUD이며 생성·파괴는 BattleEntryPoint가 담당합니다.
+        /// [EN] HUD displaying health, shields and the outcome, created and destroyed by BattleEntryPoint.
         /// </summary>
         private readonly BattleHudView _view;
 
@@ -54,13 +54,11 @@ namespace UnityCombatLab.Presentation.UI
                 view.ApplyPalette(colors);
                 for (var index = 0; index < model.Units.Count; index++)
                 {
-                    // データと HUD は同じ配列順。例: index 0 の騎士の HP は index 0 のカードだけへ表示する。
+                    // 同じ index のユニットと状態パネルを接続する。
                     var unit = model.Units[index];
                     var status = view.Units[index];
                     status.Initialize(RoleName(unit.Input.Role), unit.Input.Team);
-                    // Subscribe した時に現在 HP が一度届き、以後は HP が変わるたびに value に新しい HP が届く。
-                    // 例: 命中で 600 → 590 なら SetHealth(590, 600) を呼び、追加の予告待機を入れない。
-                    // AddTo はこの接続を解除用リストへ入れる。Presenter.Dispose でまとめて通知を止める。
+                    // 初期 HP と命中後の HP を対応するパネルへ表示する。
                     unit.Health.Subscribe(value =>
                     {
                         if (!_isDisposed && status != null)
@@ -68,7 +66,7 @@ namespace UnityCombatLab.Presentation.UI
                             status.SetHealth(value, unit.Input.MaxHealth);
                         }
                     }).AddTo(_subscriptions);
-                    // 予約被害は数字を変えず予告範囲だけに伝える。命中した値は上の Health 接続から届く。
+                    // 命中前の被害はゲージの損失予告へ反映する。
                     unit.PreviewHealth.Subscribe(value =>
                     {
                         if (!_isDisposed && status != null)
@@ -76,7 +74,6 @@ namespace UnityCombatLab.Presentation.UI
                             status.SetPreviewHealth(value, unit.Input.MaxHealth);
                         }
                     }).AddTo(_subscriptions);
-                    // 防御膜も別に接続する。防御膜だけが減った時は HP の表示を更新する必要がない。
                     unit.Shield.Subscribe(value =>
                     {
                         if (!_isDisposed && status != null)
@@ -86,7 +83,7 @@ namespace UnityCombatLab.Presentation.UI
                     }).AddTo(_subscriptions);
                 }
 
-                // 最初は「戦闘中」、最後の命中と死亡表示が終わった通知で「勝利」などへ切り替える。
+                // 演出終了後に公開された勝敗で見出しを更新する。
                 model.Result.Subscribe(HandleResultChanged).AddTo(_subscriptions);
             }
             catch
@@ -97,9 +94,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 画面用語をゲーム規約に合わせます。
-        /// [KO] 화면 용어를 게임 규약에 맞춥니다.
-        /// [EN] Maps display terms to the game contract.
+        /// ユニットの役割を日本語の表示名へ変換します。
+        /// [KO] 유닛 역할을 일본어 표시 이름으로 변환합니다.
+        /// [EN] Converts a unit role to its Japanese display name.
         /// </summary>
         private static string RoleName(Define.UnitRole role)
         {
@@ -116,9 +113,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 単一戦闘の結果だけを表示します。
-        /// [KO] 단일 전투 결과만 표시합니다.
-        /// [EN] Displays only this battle's outcome.
+        /// 通知された勝敗に応じて、HUD の見出しを更新します。
+        /// [KO] 알림으로 받은 승패에 따라 HUD 제목을 갱신합니다.
+        /// [EN] Updates the HUD heading for the notified battle outcome.
         /// </summary>
         private void HandleResultChanged(Define.BattleResult result)
         {
@@ -138,9 +135,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 通知より先に無効化し、所有購読を全て解除します。
-        /// [KO] 먼저 무효화한 후 소유 구독을 모두 해제합니다.
-        /// [EN] Invalidates first, then disposes all owned subscriptions.
+        /// HP・盾・勝敗の通知を解除し、HUD の一時表示を消します。
+        /// [KO] HP·방어막·승패 알림을 해제하고 HUD의 일시 표시를 지웁니다.
+        /// [EN] Unsubscribes from health, shield and outcome changes and clears transient HUD displays.
         /// </summary>
         public void Dispose()
         {
@@ -150,7 +147,6 @@ namespace UnityCombatLab.Presentation.UI
             }
 
             _isDisposed = true;
-            // 以後は ReadModel の HP が変わっても、この Presenter の表示更新処理は呼ばれない。
             _subscriptions.Dispose();
             if (_view != null)
             {

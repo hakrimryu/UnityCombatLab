@@ -14,16 +14,16 @@ namespace UnityCombatLab.Application.Battle
     public sealed class BattleRunner : IDisposable
     {
         /// <summary>
-        /// 一フレームの上限。残時間は捨てず次回へ持ち越します。
-        /// [KO] 한 프레임 상한이며 남은 시간은 다음 호출로 보존합니다.
-        /// [EN] Per-frame limit; remaining time carries into the next call.
+        /// Advance 一回で処理する最大 tick 数。残り時間は次回へ繰り越します。
+        /// [KO] Advance 한 번에 처리할 최대 tick 수이며 남은 시간은 다음 호출로 넘깁니다.
+        /// [EN] Maximum ticks processed by one Advance call; remaining time carries over.
         /// </summary>
         public const int MaxTicksPerAdvance = 8;
 
         /// <summary>
-        /// 状態変更権を公開しないシミュレーション。
-        /// [KO] 상태 변경권을 공개하지 않는 시뮬레이션.
-        /// [EN] Simulation whose mutation access stays private.
+        /// この Runner が進める戦闘シミュレーション。
+        /// [KO] 이 Runner가 진행하는 전투 시뮬레이션입니다.
+        /// [EN] Battle simulation advanced by this runner.
         /// </summary>
         private readonly BattleSimulation _simulation;
 
@@ -35,9 +35,9 @@ namespace UnityCombatLab.Application.Battle
         private double _pendingTicks;
 
         /// <summary>
-        /// 再入による同一バッファの二重消費を拒否します。
-        /// [KO] 재진입으로 같은 버퍼를 중복 소비하지 않게 합니다.
-        /// [EN] Rejects reentrant consumption of the same buffer.
+        /// Advance の処理中かを記録し、通知中の呼び直しを検出します。
+        /// [KO] Advance 처리 중인지 기록해 알림 중 재호출을 감지합니다.
+        /// [EN] Tracks whether Advance is running to detect calls made during event notification.
         /// </summary>
         private bool _isAdvancing;
 
@@ -49,44 +49,44 @@ namespace UnityCombatLab.Application.Battle
         private bool _isDisposed;
 
         /// <summary>
-        /// 失敗した消費から戦闘を再開しません。
-        /// [KO] 실패한 소비 지점부터 전투를 재개하지 않습니다.
-        /// [EN] Prevents resuming combat after a failed consumer.
+        /// イベントの処理に失敗し、戦闘の進行を停止したかを示します。
+        /// [KO] 이벤트 처리 실패로 전투 진행을 중단했는지 나타냅니다.
+        /// [EN] Whether event processing failed and combat advancement stopped.
         /// </summary>
         public bool HasFaulted { get; private set; }
 
         /// <summary>
-        /// Runner が所有する表示モデル。
-        /// [KO] Runner가 소유하는 표시 모델.
-        /// [EN] Display model owned by this runner.
+        /// 戦闘計算で確定した各ユニットの HP・盾・結果。
+        /// [KO] 전투 계산으로 확정한 각 유닛의 HP·방어막·결과입니다.
+        /// [EN] Unit health, shields and result committed by combat calculations.
         /// </summary>
         public BattleReadModel ReadModel { get; }
 
         /// <summary>
-        /// 完了した論理 tick。
-        /// [KO] 완료한 논리 tick.
-        /// [EN] Completed logical ticks.
+        /// 処理を終えた戦闘 tick 数。
+        /// [KO] 처리가 끝난 전투 tick 수입니다.
+        /// [EN] Number of completed combat ticks.
         /// </summary>
         public int CurrentTick => _simulation.CurrentTick;
 
         /// <summary>
-        /// コアが確定した結果。
-        /// [KO] 코어가 확정한 결과.
-        /// [EN] Outcome committed by the core.
+        /// 戦闘計算で決まった勝敗。
+        /// [KO] 전투 계산으로 결정한 승패입니다.
+        /// [EN] Outcome determined by combat calculations.
         /// </summary>
         public Define.BattleResult Result => _simulation.Result;
 
         /// <summary>
-        /// Step 後、イベント一件ごとに BattlePresenter などをその場で呼ぶ通知。呼び出しが戻るまで次へ進みません。
-        /// [KO] Step 후 이벤트마다 BattlePresenter 등을 즉시 호출하는 알림입니다. 호출이 돌아올 때까지 다음 처리로 넘어가지 않습니다.
-        /// [EN] Calls BattlePresenter and other listeners for each event after Step, waiting for each call to return.
+        /// 計算後のイベントを BattlePresenter などへ発生順に通知します。
+        /// [KO] 계산 후 이벤트를 BattlePresenter 등에 발생 순서로 전달합니다.
+        /// [EN] Delivers calculated events to BattlePresenter and other listeners in occurrence order.
         /// </summary>
         public event Action<BattleEvent> EventOccurred;
 
         /// <summary>
-        /// コア検証後に表示モデルを生成します。
-        /// [KO] 코어 검증 후 표시 모델을 생성합니다.
-        /// [EN] Creates the display model after core validation.
+        /// 開始データで戦闘を作成し、初期 HP と盾を ReadModel に設定します。
+        /// [KO] 시작 데이터로 전투를 만들고 초기 HP와 방어막을 ReadModel에 설정합니다.
+        /// [EN] Creates combat from starting data and initializes ReadModel health and shields.
         /// </summary>
         public BattleRunner(Guid runId, int wave, IReadOnlyList<BattleUnitInput> inputs)
         {
@@ -95,9 +95,9 @@ namespace UnityCombatLab.Application.Battle
         }
 
         /// <summary>
-        /// 副作用なしの状態コピーを返します。
-        /// [KO] 부수 효과 없는 상태 복사본을 반환합니다.
-        /// [EN] Returns a side-effect-free state snapshot.
+        /// 指定した陣営・スロットの現在の戦闘状態を返します。
+        /// [KO] 지정한 팀·슬롯의 현재 전투 상태를 반환합니다.
+        /// [EN] Returns the current combat state for the specified team and slot.
         /// </summary>
         public BattleUnitSnapshot GetUnit(Define.BattleTeam team, Define.BattleSlot slot)
         {
@@ -141,9 +141,7 @@ namespace UnityCombatLab.Application.Battle
                     _simulation.Step();
                     for (var index = 0; index < _simulation.EventCount; index++)
                     {
-                        // コアの再利用配列ではなく、イベント一件の値を取り出す。
-                        // 先に計算上の確定状態を更新し、EventOccurred で表示予約へ値をコピーする。
-                        // HUD は別の表示モデルを購読するため、この更新では命中前の数字を変えない。
+                        // 計算済みの状態を ReadModel に反映してから、表示側へイベントの値を通知する。
                         var battleEvent = _simulation.GetEvent(index);
                         ReadModel.Apply(battleEvent);
                         EventOccurred?.Invoke(battleEvent);
@@ -164,7 +162,7 @@ namespace UnityCombatLab.Application.Battle
             }
             catch
             {
-                // 消費失敗を成功確認せず、この戦闘を再開不能にする。
+                // イベント処理の途中で失敗した戦闘は停止する。
                 HasFaulted = true;
                 throw;
             }

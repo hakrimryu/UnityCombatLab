@@ -6,9 +6,9 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.Units
 {
     /// <summary>
-    /// 移動軸の子で閃光と反動だけを描き、攻撃・戦闘判定・論理位置は変更しません。
-    /// [KO] 이동 축의 자식에서 섬광과 반동만 그리며 공격·전투 판정·논리 위치는 바꾸지 않습니다.
-    /// [EN] Renders only flash and recoil beneath the motion pivot without changing attacks, combat decisions or logical positions.
+    /// モデルの表示位置と色を動かし、被弾時の押し戻しと閃光を描きます。
+    /// [KO] 모델의 표시 위치와 색을 바꿔 피격 시 밀림과 섬광을 표현합니다.
+    /// [EN] Animates the model's display position and color for hit recoil and flash.
     /// </summary>
     public sealed class UnitHitReactionView : MonoBehaviour
     {
@@ -41,9 +41,9 @@ namespace UnityCombatLab.Presentation.Units
         [SerializeField] private float _flashIntensity = 3f;
 
         /// <summary>
-        /// 攻撃元の反対へ動く世界距離。親の縮尺に依存しません。
-        /// [KO] 공격 원점 반대로 움직일 월드 거리이며 부모 크기에 의존하지 않습니다.
-        /// [EN] World-space push distance, independent of parent scale.
+        /// 攻撃元から離れる距離。ワールド座標の単位で指定します。
+        /// [KO] 공격 원점에서 멀어질 거리이며 월드 좌표 단위로 지정합니다.
+        /// [EN] Distance to move away from the attacker, measured in world units.
         /// </summary>
         [SerializeField] private float _recoilDistance = 0.14f;
 
@@ -97,9 +97,9 @@ namespace UnityCombatLab.Presentation.Units
         private Color[] _originalColors;
 
         /// <summary>
-        /// 描画中に使い回す個体の設定容器。共有材質は変更しません。
-        /// [KO] 그리는 동안 재사용할 개체 설정 컨테이너이며 공유 재질은 바꾸지 않습니다.
-        /// [EN] Reused property block for this instance, leaving shared materials unchanged.
+        /// このユニットの色と発光を設定するために再利用する MaterialPropertyBlock。
+        /// [KO] 이 유닛의 색상과 발광을 설정하도록 재사용할 MaterialPropertyBlock입니다.
+        /// [EN] Reusable MaterialPropertyBlock for this unit's color and emission.
         /// </summary>
         private MaterialPropertyBlock _flashProperties;
 
@@ -160,16 +160,16 @@ namespace UnityCombatLab.Presentation.Units
         private static readonly int _emissionMap = Shader.PropertyToID("_EmissionMap");
 
         /// <summary>
-        /// 移動軸を含めず、この反動だけを示す現在の世界変位。
-        /// [KO] 이동 축을 제외하고 이 반동만 나타낼 현재 월드 변위입니다.
-        /// [EN] Current world displacement from recoil alone, excluding attack movement.
+        /// 反動で移動した距離と方向をワールド座標で返します。
+        /// [KO] 반동으로 이동한 거리와 방향을 월드 좌표로 반환합니다.
+        /// [EN] Returns recoil displacement in world coordinates.
         /// </summary>
         public Vector3 Displacement => transform.parent.TransformVector(transform.localPosition - _homePosition);
 
         /// <summary>
-        /// 自体プレハブの参照と時間を確認し、元の材質設定を一度記録します。
-        /// [KO] 자체 프리팹 참조·시간을 확인하고 원래 재질 설정을 한 번 기록합니다.
-        /// [EN] Validates authored references and timings and caches original renderer properties once.
+        /// モデルと時間設定を確認し、初期位置と Renderer の色・材質設定を保存します。
+        /// [KO] 모델과 시간 설정을 확인하고 초기 위치와 Renderer의 색상·재질 설정을 저장합니다.
+        /// [EN] Checks the model and timings and saves its initial position and renderer color and material settings.
         /// </summary>
         private void Awake()
         {
@@ -198,9 +198,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// UnitView が反応開始前に同じ共通パレットを渡します。設定アセットは借用します。
-        /// [KO] UnitView가 반응 시작 전에 같은 공통 팔레트를 전달하며 설정 에셋은 빌립니다.
-        /// [EN] UnitView supplies the borrowed shared palette before reactions begin.
+        /// UnitView から、閃光色に使う共通パレットを受け取ります。
+        /// [KO] UnitView에서 섬광 색상에 사용할 공통 팔레트를 전달받습니다.
+        /// [EN] Receives the shared flash-color palette from UnitView.
         /// </summary>
         public void ApplyPalette(GameColorPalette colors)
         {
@@ -230,9 +230,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// UnitView が毎フレーム経過秒を渡し、この反応の時計だけを進めます。
-        /// [KO] UnitView가 매 프레임 경과 초를 전달해 이 반응의 시계만 진행합니다.
-        /// [EN] UnitView supplies elapsed seconds each frame to advance only this reaction's clock.
+        /// 経過秒に応じて、閃光の明るさと反動の位置を更新します。
+        /// [KO] 경과 시간에 따라 섬광 밝기와 반동 위치를 갱신합니다.
+        /// [EN] Updates flash brightness and recoil position from elapsed seconds.
         /// </summary>
         public void Advance(float deltaSeconds)
         {
@@ -280,9 +280,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 個体の設定だけを上書きし、終了時に記録した Block を復元します。
-        /// [KO] 개체 설정만 오버라이드하고 종료 때 기록한 Block을 복원합니다.
-        /// [EN] Overrides only instance properties and restores the cached blocks on completion.
+        /// 閃光の強さに合わせて色と発光を設定し、強さ 0 で保存済みの設定に戻します。
+        /// [KO] 섬광 강도에 따라 색상과 발광을 설정하고 강도가 0이면 저장한 설정으로 되돌립니다.
+        /// [EN] Sets color and emission for flash strength and restores saved settings at zero strength.
         /// </summary>
         private void RenderFlash(float strength)
         {
@@ -304,9 +304,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 非表示でも反動と個体の材質上書きを残しません。
-        /// [KO] 비활성화 때도 반동과 개체 재질 오버라이드를 남기지 않습니다.
-        /// [EN] Clears recoil and instance material overrides when disabled.
+        /// 非表示時に反動位置と Renderer の設定を戻します。
+        /// [KO] 비활성화 시 반동 위치와 Renderer 설정을 되돌립니다.
+        /// [EN] Restores recoil position and renderer settings when disabled.
         /// </summary>
         private void OnDisable() => Clear();
     }

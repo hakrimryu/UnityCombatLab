@@ -25,9 +25,9 @@ namespace UnityCombatLab.Domain.Battle
         }.Max();
 
         /// <summary>
-        /// 最大の攻撃係数でもintを越えない入力上限。
-        /// [KO] 최대 공격 계수에서도 int를 넘지 않는 입력 상한.
-        /// [EN] Input limit that remains within int at the largest attack coefficient.
+        /// 最大の攻撃倍率を適用しても、被害が int の範囲に収まる攻撃力の上限。
+        /// [KO] 최대 공격 배율을 적용해도 피해가 int 범위에 들어오는 공격력 상한입니다.
+        /// [EN] Maximum attack power whose damage fits in an int at the largest attack multiplier.
         /// </summary>
         internal static readonly int MaxAttackPower =
             (int)((long)int.MaxValue * Define.PercentScale / _maximumDamagePercent);

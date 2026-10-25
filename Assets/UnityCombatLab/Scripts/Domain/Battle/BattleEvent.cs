@@ -4,16 +4,16 @@ using UnityCombatLab.Common;
 namespace UnityCombatLab.Domain.Battle
 {
     /// <summary>
-    /// 非同期にも渡せる不変イベント値。
-    /// [KO] 비동기에도 전달 가능한 불변 이벤트 값.
-    /// [EN] Immutable event value safe to copy for asynchronous use.
+    /// 攻撃・被害・死亡・終了の内容と発生順を記録するイベント。
+    /// [KO] 공격·피해·사망·종료의 내용과 발생 순서를 기록하는 이벤트입니다.
+    /// [EN] Event recording attacks, damage, deaths or completion and their occurrence order.
     /// </summary>
     public readonly struct BattleEvent
     {
         /// <summary>
-        /// 挑戦識別子。
-        /// [KO] 도전 식별자.
-        /// [EN] Run identifier.
+        /// このイベントが属する戦闘の ID。
+        /// [KO] 이 이벤트가 속한 전투의 ID입니다.
+        /// [EN] ID of the battle this event belongs to.
         /// </summary>
         public Guid RunId { get; }
 
@@ -32,23 +32,23 @@ namespace UnityCombatLab.Domain.Battle
         public int Tick { get; }
 
         /// <summary>
-        /// 戦闘内の単調連番。
-        /// [KO] 전투 내 단조 증가 순번.
-        /// [EN] Monotonic sequence within battle.
+        /// 戦闘内でのイベントの発生順。
+        /// [KO] 전투 안에서 이벤트가 발생한 순서입니다.
+        /// [EN] Event occurrence order within the battle.
         /// </summary>
         public int Sequence { get; }
 
         /// <summary>
-        /// 行動者。終了時は0。
-        /// [KO] 행동자, 종료 시 0.
-        /// [EN] Actor; zero for battle end.
+        /// 行動したユニットの ID。戦闘終了では 0。
+        /// [KO] 행동한 유닛의 ID이며 전투 종료에서는 0입니다.
+        /// [EN] Acting unit's ID, or 0 for battle completion.
         /// </summary>
         public int ActorId { get; }
 
         /// <summary>
-        /// 対象。全体イベントは0。
-        /// [KO] 대상, 전체 이벤트는 0.
-        /// [EN] Target; zero for aggregate events.
+        /// 対象ユニットの ID。単一対象を持たないイベントでは 0。
+        /// [KO] 대상 유닛의 ID이며 단일 대상이 없는 이벤트에서는 0입니다.
+        /// [EN] Target unit's ID, or 0 for events without a single target.
         /// </summary>
         public int TargetId { get; }
 

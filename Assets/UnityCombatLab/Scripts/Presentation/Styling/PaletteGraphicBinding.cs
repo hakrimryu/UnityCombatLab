@@ -14,16 +14,16 @@ namespace UnityCombatLab.Presentation.Styling
     public sealed class PaletteGraphicBinding
     {
         /// <summary>
-        /// 色を受け取る既存の Image または文字。購入原本ではなく HUD の部品を指定します。
-        /// [KO] 색상을 적용할 기존 Image 또는 텍스트입니다. 구매 원본 대신 HUD 안의 요소를 지정합니다.
-        /// [EN] Existing image or text in the HUD instance, rather than a purchased source asset.
+        /// パレットの色を適用する HUD 内の Image または文字。
+        /// [KO] 팔레트 색상을 적용할 HUD의 Image 또는 글자입니다.
+        /// [EN] HUD image or text that receives the palette color.
         /// </summary>
         [SerializeField] private Graphic _graphic;
 
         /// <summary>
-        /// 色の値ではなく用途だけを保存します。
-        /// [KO] 색상 값 대신 용도만 저장합니다.
-        /// [EN] Stores the color's purpose instead of its value.
+        /// この UI 部品に適用するパレット色の用途。
+        /// [KO] 이 UI 요소에 적용할 팔레트 색상의 용도입니다.
+        /// [EN] Palette role used to color this UI element.
         /// </summary>
         [SerializeField] private Define.PaletteColor _role;
 

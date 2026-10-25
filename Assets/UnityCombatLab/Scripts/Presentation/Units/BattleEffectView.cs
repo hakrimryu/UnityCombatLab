@@ -4,16 +4,16 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.Units
 {
     /// <summary>
-    /// UnitView が借りたエフェクトを再生し、古い粒子を次の攻撃へ残さず再利用します。
-    /// [KO] UnitView가 가져온 효과를 재생하고 이전 입자를 다음 공격에 남기지 않도록 재사용합니다.
-    /// [EN] Plays UnitView-owned effects and reuses them without carrying old particles into another attack.
+    /// UnitView が指定した位置でエフェクトを再生し、再利用時に残った粒子を消します。
+    /// [KO] UnitView가 지정한 위치에 효과를 재생하고 재사용 시 남은 입자를 지웁니다.
+    /// [EN] Plays effects at positions supplied by UnitView and clears remaining particles before reuse.
     /// </summary>
     public sealed class BattleEffectView : MonoBehaviour
     {
         /// <summary>
-        /// 原本の階層を保った再生元。子の放出・生存確認もこの ParticleSystem から行います。
-        /// [KO] 원본 계층을 유지한 재생 원본이며 자식 방출·생존 확인도 이 ParticleSystem에서 수행합니다.
-        /// [EN] Root particle system used to play and check its original child hierarchy.
+        /// 再生と子の粒子の生存確認に使うルート ParticleSystem。
+        /// [KO] 재생과 자식 입자의 생존 확인에 사용할 루트 ParticleSystem입니다.
+        /// [EN] Root ParticleSystem used for playback and checking whether child particles are alive.
         /// </summary>
         private ParticleSystem _root;
 
@@ -25,16 +25,16 @@ namespace UnityCombatLab.Presentation.Units
         private ParticleSystem[] _systems;
 
         /// <summary>
-        /// UnitView が同じ飛行を移動中かを判断する状態。尾の残存とは別です。
-        /// [KO] UnitView가 같은 비행을 이동 중인지 판단할 상태이며 꼬리 잔존과는 별개입니다.
-        /// [EN] State used by UnitView to continue a flight independently of fading tail particles.
+        /// 先端が飛行中かを示します。命中後に残る尾は含みません。
+        /// [KO] 선두가 비행 중인지 나타내며 명중 후 남은 꼬리는 포함하지 않습니다.
+        /// [EN] Whether the projectile head is in flight, excluding trails remaining after impact.
         /// </summary>
         public bool IsEmitting { get; private set; }
 
         /// <summary>
-        /// 自身の粒子を一度取得します。購入原本のスクリプトや物理判定には依存しません。
-        /// [KO] 자체 입자를 한 번 가져오며 구매 원본 스크립트나 물리 판정에는 의존하지 않습니다.
-        /// [EN] Caches owned particles without depending on vendor scripts or collision decisions.
+        /// 自身と子の ParticleSystem を取得します。
+        /// [KO] 자신과 자식의 ParticleSystem을 가져옵니다.
+        /// [EN] Collects this object's particle systems.
         /// </summary>
         private void Awake()
         {
@@ -63,9 +63,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 命中時に先端を消し、通過した場所の尾だけを自然に消します。被害判定は呼びません。
-        /// [KO] 명중 때 선두를 없애고 지나온 위치의 꼬리만 자연스럽게 지우며 피해 판정은 호출하지 않습니다.
-        /// [EN] Removes the head at impact and lets world-space tails fade without invoking combat decisions.
+        /// 命中した先端を消し、ワールド空間の尾は残り寿命だけ再生します。
+        /// [KO] 명중한 선두를 지우고 월드 공간의 꼬리는 남은 수명 동안 재생합니다.
+        /// [EN] Clears the impacted projectile head and lets world-space trails finish their lifetime.
         /// </summary>
         public void StopFlight()
         {
@@ -107,9 +107,9 @@ namespace UnityCombatLab.Presentation.Units
         }
 
         /// <summary>
-        /// 非表示・シーン退場のどちらでも古いワールド空間の粒子を残しません。
-        /// [KO] 비활성화·씬 퇴장 모두 이전 월드 공간 입자를 남기지 않습니다.
-        /// [EN] Clears old world-space particles on both hiding and scene exit.
+        /// 非表示時に、尾を含む全ての粒子を消します。
+        /// [KO] 비활성화 시 꼬리를 포함한 모든 입자를 지웁니다.
+        /// [EN] Clears all particles, including trails, when disabled.
         /// </summary>
         private void OnDisable()
         {

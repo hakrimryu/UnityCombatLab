@@ -8,9 +8,9 @@ using UnityCombatLab.Domain.Battle;
 namespace UnityCombatLab.Presentation.ReadModels
 {
     /// <summary>
-    /// BattleEntryPoint が所有する表示用状態。命中済みの数値と最後の演出後の結果だけを HUD へ通知します。
-    /// [KO] BattleEntryPoint가 소유하는 표시 상태이며 명중한 수치와 마지막 연출 후 결과만 HUD에 알립니다.
-    /// [EN] BattleEntryPoint-owned presentation state notifying the HUD of arrived hits and the result after final effects.
+    /// 各ユニットの表示用 HP・盾と、演出終了後に公開する勝敗を保持します。
+    /// [KO] 각 유닛의 표시용 HP·방어막과 연출 종료 후 공개할 승패를 보관합니다.
+    /// [EN] Stores displayed unit health and shields and the outcome published after effects finish.
     /// </summary>
     public sealed class BattlePresentationReadModel : IDisposable
     {
@@ -43,9 +43,9 @@ namespace UnityCombatLab.Presentation.ReadModels
         public ReadOnlyReactiveProperty<Define.BattleResult> Result => _result;
 
         /// <summary>
-        /// 検証済みの開始入力から HUD 専用の状態を一度作ります。
-        /// [KO] 검증된 시작 입력으로 HUD 전용 상태를 한 번 만듭니다.
-        /// [EN] Creates HUD-only state once from validated starting inputs.
+        /// 戦闘開始データから各ユニットの表示用 HP と盾を初期化します。
+        /// [KO] 전투 시작 데이터로 각 유닛의 표시용 HP와 방어막을 초기화합니다.
+        /// [EN] Initializes displayed unit health and shields from starting combat data.
         /// </summary>
         public BattlePresentationReadModel(IEnumerable<BattleUnitInput> inputs)
         {
@@ -59,9 +59,9 @@ namespace UnityCombatLab.Presentation.ReadModels
         }
 
         /// <summary>
-        /// Presenter が最後の演出を確認した時、既に確定していた勝敗を表示へ渡します。
-        /// [KO] Presenter가 마지막 연출을 확인하면 이미 확정된 승패를 표시로 전달합니다.
-        /// [EN] Publishes the already committed result when the presenter confirms final presentation is complete.
+        /// Presenter が演出終了を確認したら、確定した勝敗を HUD へ通知します。
+        /// [KO] Presenter가 연출 종료를 확인하면 확정한 승패를 HUD에 알립니다.
+        /// [EN] Notifies the HUD of the committed outcome once the presenter confirms effects have finished.
         /// </summary>
         public void Complete(Define.BattleResult result)
         {

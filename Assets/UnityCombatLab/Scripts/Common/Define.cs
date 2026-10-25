@@ -167,16 +167,16 @@ namespace UnityCombatLab.Common
         #region Battle
 
         /// <summary>
-        /// 戦闘の固定時間規約。
-        /// [KO] 전투 고정 시간 규약.
-        /// [EN] Fixed combat timing.
+        /// 一秒あたりの戦闘 tick 数。1 tick は 0.05 秒です。
+        /// [KO] 1초당 전투 tick 수이며 1 tick은 0.05초입니다.
+        /// [EN] Combat ticks per second; one tick is 0.05 seconds.
         /// </summary>
         public const int TicksPerSecond = 20;
 
         /// <summary>
-        /// 比率の単位。
-        /// [KO] 비율 단위.
-        /// [EN] Basis point denominator.
+        /// 倍率計算の基準値。10000 を 100% として扱います。
+        /// [KO] 배율 계산의 기준값이며 10000을 100%로 취급합니다.
+        /// [EN] Scale used for ratio calculations; 10000 represents 100%.
         /// </summary>
         public const int BasisPoints = 10000;
 

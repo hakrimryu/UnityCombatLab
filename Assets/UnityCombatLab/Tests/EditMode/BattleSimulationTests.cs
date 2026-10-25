@@ -8,9 +8,9 @@ using UnityCombatLab.Domain.Battle;
 namespace UnityCombatLab.Tests.EditMode
 {
     /// <summary>
-    /// 描画なしで戦闘契約と境界を検証します。
-    /// [KO] 렌더링 없이 전투 계약과 경계 검증.
-    /// [EN] Verifies combat contracts and boundaries without rendering.
+    /// 攻撃順・被害計算・勝敗と、不正な入力への対応を確認します。
+    /// [KO] 공격 순서·피해 계산·승패와 잘못된 입력 처리를 확인합니다.
+    /// [EN] Checks attack order, damage calculations, outcomes and invalid-input handling.
     /// </summary>
     public sealed class BattleSimulationTests
     {
@@ -22,9 +22,9 @@ namespace UnityCombatLab.Tests.EditMode
         internal static readonly Guid RunId = new Guid("c6607675-6cda-47a3-8498-295d87d59520");
 
         /// <summary>
-        /// 小さな入力を組み立てます。
-        /// [KO] 작은 입력 구성.
-        /// [EN] Builds a small input.
+        /// 指定した役割と能力値で、テスト用のユニットを作ります。
+        /// [KO] 지정한 역할과 능력치로 테스트용 유닛을 만듭니다.
+        /// [EN] Creates a test unit with the specified role and stats.
         /// </summary>
         internal static BattleUnitInput Unit(int id, Define.UnitRole role,
             Define.BattleSlot slot = Define.BattleSlot.Front,
@@ -38,9 +38,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// イベントを同期消費して指定 tick まで進めます。
-        /// [KO] 이벤트 동기 소비 후 지정 틱까지 진행.
-        /// [EN] Consumes events synchronously while advancing to a tick.
+        /// 直前のイベントを確認済みにして、指定 tick まで戦闘を進めます。
+        /// [KO] 직전 이벤트를 처리 완료로 표시하며 지정한 tick까지 전투를 진행합니다.
+        /// [EN] Acknowledges previous events and advances combat to the requested tick.
         /// </summary>
         internal static void Advance(BattleSimulation battle, int tick)
         {
@@ -195,9 +195,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 敵の撃破でも即座に敗北し後続行動を止めます。
-        /// [KO] 적 처치 시 즉시 패배 및 후속 행동 중단.
-        /// [EN] Enemy kills resolve defeat immediately and stop later actions.
+        /// 敵が最後の味方を倒した時に敗北が確定し、後続の行動が止まることを確認します。
+        /// [KO] 적이 마지막 아군을 처치하면 패배가 확정되고 후속 행동이 멈추는지 확인합니다.
+        /// [EN] Checks that an enemy killing the last ally resolves defeat and stops later actions.
         /// </summary>
         [Test]
         public void EnemyKillEndsBattleOnce()
@@ -210,9 +210,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 盾吸収、軽減、最小被害と HP clamp。
-        /// [KO] 방어막 흡수·경감·최소 피해·HP 제한.
-        /// [EN] Shield absorption, mitigation, minimum damage, and health clamp.
+        /// 盾吸収・騎士の軽減・最小被害を適用し、HP の残量以内で被害を引くことを確認します。
+        /// [KO] 방어막 흡수·기사 경감·최소 피해를 적용하고 남은 HP 범위 안에서 피해를 빼는지 확인합니다.
+        /// [EN] Checks shield absorption, knight mitigation and minimum damage, with health loss capped by remaining health.
         /// </summary>
         [TestCase(10, 5, 100, 3, 5)]
         [TestCase(1, 0, 100, 1, 0)]
@@ -315,9 +315,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 最大攻撃力でもlong中間値と残量clampを維持します。
-        /// [KO] 최대 공격력에서도 long 중간값과 잔량 제한을 유지합니다.
-        /// [EN] Preserves long arithmetic and remaining-health clamping at maximum attack power.
+        /// 最大攻撃力でも被害計算がオーバーフローせず、HP を 0 未満にしないことを確認します。
+        /// [KO] 최대 공격력에서도 피해 계산이 오버플로하지 않고 HP가 0 미만이 되지 않는지 확인합니다.
+        /// [EN] Checks maximum-power damage without overflow or health below zero.
         /// </summary>
         [Test]
         public void RangerMaximumAttackUsesLongArithmeticAndClamps()
@@ -499,9 +499,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 1800境界では攻撃の終了判定を時間超過より優先。
-        /// [KO] 1800 경계에서 공격 종료 판정이 시간 초과 우선.
-        /// [EN] At tick 1800, attack outcomes take precedence over timeout.
+        /// 制限の 1800 tick で最後の敵を倒した場合、時間切れではなく勝利になることを確認します。
+        /// [KO] 제한인 1800 tick에 마지막 적을 처치하면 시간 초과가 아닌 승리가 되는지 확인합니다.
+        /// [EN] Checks that defeating the last enemy on tick 1800 yields victory rather than timeout.
         /// </summary>
         [TestCase(1, Define.BattleResult.Victory)]
         [TestCase(3, Define.BattleResult.Timeout)]
@@ -524,9 +524,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 未消費バッファの上書き拒否とコピー寿命。
-        /// [KO] 미소비 버퍼 덮어쓰기 거부와 복사본 수명.
-        /// [EN] Prevents overwriting unread events and preserves copied values.
+        /// 未通知イベントの上書きが拒否され、取得済みのイベント値が保持されることを確認します。
+        /// [KO] 아직 알리지 않은 이벤트 덮어쓰기를 거부하고 이미 얻은 이벤트 값은 유지되는지 확인합니다.
+        /// [EN] Checks that undelivered events cannot be overwritten and previously retrieved event values remain intact.
         /// </summary>
         [Test]
         public void EventOwnershipRequiresAcknowledgement()
@@ -630,9 +630,9 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 値型の全フィールドと毎 tick の状態を比較用に保存。
-        /// [KO] 값 타입의 전체 필드와 매 틱 상태를 비교용 저장.
-        /// [EN] Captures all event fields and per-tick state for comparison.
+        /// 各 tick のユニット状態とイベントを、比較用の一覧へ保存します。
+        /// [KO] 각 tick의 유닛 상태와 이벤트를 비교용 목록에 저장합니다.
+        /// [EN] Records unit states and events at each tick for comparison.
         /// </summary>
         private static List<object> Record(BattleUnitInput[] inputs, int ticksPerFrame, out Define.BattleResult result,
             out int tick)
