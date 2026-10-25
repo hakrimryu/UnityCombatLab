@@ -151,14 +151,6 @@ namespace UnityCombatLab.Presentation.UI
                (option == Define.Difficulty.Easy ? $"\n敵HP・攻撃力\n{Define.EasyEnemyStatPercent}%" : "");
 
         /// <summary>
-        /// 英雄のカード説明に選択印を付けます。
-        /// [KO] 영웅 카드 설명에 선택 표시를 붙입니다.
-        /// [EN] Adds a selection mark to a hero card description.
-        /// </summary>
-        public static string HeroCard(string description, bool isSelected)
-            => (isSelected ? "選択中 " : "") + description;
-
-        /// <summary>
         /// 勝敗の説明を返します。進行中は HUD の見出しとして使います。
         /// [KO] 승패 설명을 반환하며 진행 중에는 HUD 제목으로 사용합니다.
         /// [EN] Returns an outcome explanation, or the HUD heading while combat is ongoing.

@@ -7,18 +7,25 @@ using UnityCombatLab.Presentation.UI;
 namespace UnityCombatLab.Presentation.ReadModels
 {
     /// <summary>
-    /// 選択済みの英雄・配置・難易度を表示文字へ変換し、Viewによるゲーム規則の解釈を不要にします。
-    /// [KO] 선택한 영웅·배치·난이도를 표시 문자열로 변환하여 View가 게임 규칙을 해석할 필요를 없앱니다.
-    /// [EN] Converts selected heroes, slots and difficulty to text so the view needs no gameplay interpretation.
+    /// 英雄の説明・選択状態・配置・難易度を表示値へ変換し、Viewによるゲーム規則の解釈を不要にします。
+    /// [KO] 영웅 설명·선택 상태·배치·난이도를 표시 값으로 변환하여 View가 게임 규칙을 해석할 필요를 없앱니다.
+    /// [EN] Converts hero descriptions, selection, slots and difficulty to display values so the view needs no gameplay interpretation.
     /// </summary>
     public sealed class FormationDisplay
     {
         /// <summary>
-        /// 騎士・弓使い・魔法使いの順の、選択印を含むカード説明。
-        /// [KO] 기사·궁수·마법사 순서의 선택 표시를 포함한 카드 설명입니다.
-        /// [EN] Hero descriptions with selection marks in knight, ranger and mage order.
+        /// 騎士・弓使い・魔法使いの順のカード説明。
+        /// [KO] 기사·궁수·마법사 순서의 카드 설명입니다.
+        /// [EN] Hero descriptions in knight, ranger and mage order.
         /// </summary>
         public IReadOnlyList<string> Heroes { get; }
+
+        /// <summary>
+        /// 騎士・弓使い・魔法使いの順に、カードの色とバッジへ反映する選択状態。
+        /// [KO] 기사·궁수·마법사 순서로 카드 색상과 배지에 반영할 선택 상태입니다.
+        /// [EN] Selection states applied to card colors and badges in knight, ranger and mage order.
+        /// </summary>
+        public IReadOnlyList<bool> HeroSelections { get; }
 
         /// <summary>
         /// 前列・後列上・後列下の順の配置名と英雄名。
@@ -35,9 +42,9 @@ namespace UnityCombatLab.Presentation.ReadModels
         public IReadOnlyList<string> Difficulties { get; }
 
         /// <summary>
-        /// Presenterの現在の選択から、変更されない一画面分の表示文字を作ります。
-        /// [KO] Presenter의 현재 선택으로 변경되지 않는 한 화면의 표시 문자열을 만듭니다.
-        /// [EN] Creates immutable text for one screen from the presenter's current selection.
+        /// Presenterの現在の選択から、変更されない一画面分の表示値を作ります。
+        /// [KO] Presenter의 현재 선택으로 변경되지 않는 한 화면의 표시 값을 만듭니다.
+        /// [EN] Creates immutable display values for one screen from the presenter's current selection.
         /// </summary>
         public FormationDisplay(RunConfiguration configuration, Define.UnitRole? selected, IReadOnlyList<string> descriptions)
         {
@@ -48,16 +55,19 @@ namespace UnityCombatLab.Presentation.ReadModels
                 throw new ArgumentException("Three hero descriptions are required.", nameof(descriptions));
 
             var heroes = new string[Define.SlotsPerTeam];
+            var heroSelections = new bool[Define.SlotsPerTeam];
             var slots = new string[Define.SlotsPerTeam];
 
             for (var index = 0; index < heroes.Length; index++)
             {
-                heroes[index] = GameText.HeroCard(descriptions[index], selected == (Define.UnitRole)index);
+                heroes[index] = descriptions[index];
+                heroSelections[index] = selected == (Define.UnitRole)index;
                 var slot = (Define.BattleSlot)index;
                 slots[index] = $"{GameText.SlotName(slot)}\n{GameText.RoleName(configuration.GetRole(slot))}";
             }
 
             Heroes = Array.AsReadOnly(heroes);
+            HeroSelections = Array.AsReadOnly(heroSelections);
             Slots = Array.AsReadOnly(slots);
             Difficulties = Array.AsReadOnly(new[]
             {

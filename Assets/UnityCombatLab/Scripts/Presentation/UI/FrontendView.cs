@@ -93,11 +93,33 @@ namespace UnityCombatLab.Presentation.UI
         /// </summary>
         [SerializeField] private Button[] _heroButtons;
         /// <summary>
-        /// 英雄の実際の能力と選択状態を示すカード文字。
-        /// [KO] 영웅의 실제 능력과 선택 상태를 보여줄 카드 글자입니다.
-        /// [EN] Card text showing actual hero stats and selection.
+        /// 英雄の名前と実際の能力を示すカード文字。
+        /// [KO] 영웅의 이름과 실제 능력을 보여줄 카드 글자입니다.
+        /// [EN] Card text showing hero names and actual stats.
         /// </summary>
         [SerializeField] private TMP_Text[] _heroTexts;
+
+        /// <summary>
+        /// 騎士・弓使い・魔法使いの順に、選択時だけ黄色へ変えるカード背景。
+        /// [KO] 기사·궁수·마법사 순서로 선택 시에만 노란색으로 바꿀 카드 배경입니다.
+        /// [EN] Card backgrounds tinted yellow only when selected, in knight, ranger and mage order.
+        /// </summary>
+        [SerializeField] private Image[] _heroBackgrounds;
+
+        /// <summary>
+        /// 選択した英雄のカードだけに表示するチェックバッジ。
+        /// [KO] 선택한 영웅 카드에만 표시할 체크 배지입니다.
+        /// [EN] Check badges shown only on the selected hero card.
+        /// </summary>
+        [SerializeField] private GameObject[] _heroSelectionBadges;
+
+        /// <summary>
+        /// 選択した英雄のカード背景色。未選択の背景には白を使います。
+        /// [KO] 선택한 영웅의 카드 배경색이며 선택하지 않은 배경에는 흰색을 사용합니다.
+        /// [EN] Selected hero background color; unselected backgrounds use white.
+        /// </summary>
+        [SerializeField] private Color _selectedHeroColor = new Color(0.98f, 0.643f, 0.11f, 1f);
+
         /// <summary>
         /// 前列・後列上・後列下の順の移動先。
         /// [KO] 전열·위쪽 후열·아래쪽 후열 순서의 이동 위치입니다.
@@ -307,6 +329,8 @@ namespace UnityCombatLab.Presentation.UI
             RequireReference(_volumeText, nameof(_volumeText));
             ValidateReferences(_heroButtons, Define.SlotsPerTeam, nameof(_heroButtons));
             ValidateReferences(_heroTexts, Define.SlotsPerTeam, nameof(_heroTexts));
+            ValidateReferences(_heroBackgrounds, Define.SlotsPerTeam, nameof(_heroBackgrounds));
+            ValidateReferences(_heroSelectionBadges, Define.SlotsPerTeam, nameof(_heroSelectionBadges));
             ValidateReferences(_slotButtons, Define.SlotsPerTeam, nameof(_slotButtons));
             ValidateReferences(_slotTexts, Define.SlotsPerTeam, nameof(_slotTexts));
             ValidateReferences(_difficultyButtons, 2, nameof(_difficultyButtons));
@@ -386,16 +410,23 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 実データのカード文字と、交換後の三つの配置を表示します。
-        /// [KO] 실제 데이터 카드 글자와 교환 후 세 배치를 표시합니다.
-        /// [EN] Displays data-backed hero cards and the three slots after swapping.
+        /// カードの説明・選択色・バッジと、交換後の三つの配置を同じ表示値から更新します。
+        /// [KO] 카드 설명·선택 색상·배지와 교환 후 세 배치를 같은 표시 값에서 갱신합니다.
+        /// [EN] Updates card descriptions, selection colors, badges and swapped slots from the same display values.
         /// </summary>
         public void ShowFormation(FormationDisplay display)
         {
             for (var index = 0; index < _heroTexts.Length; index++)
+            {
                 _heroTexts[index].text = display.Heroes[index];
+                var isSelected = display.HeroSelections[index];
+                _heroBackgrounds[index].color = isSelected ? _selectedHeroColor : Color.white;
+                _heroSelectionBadges[index].SetActive(isSelected);
+            }
+
             for (var index = 0; index < _slotTexts.Length; index++)
                 _slotTexts[index].text = display.Slots[index];
+
             for (var index = 0; index < _difficultyTexts.Length; index++)
                 _difficultyTexts[index].text = display.Difficulties[index];
         }
