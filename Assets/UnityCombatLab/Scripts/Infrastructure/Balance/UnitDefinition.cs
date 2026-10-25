@@ -20,6 +20,13 @@ namespace UnityCombatLab.Infrastructure.Balance
         [SerializeField] private Define.UnitRole _role;
 
         /// <summary>
+        /// カタログが能力設定と表示の職業を照合するために読み取ります。
+        /// [KO] 카탈로그에서 능력 설정과 표시의 직업을 대조할 때 읽습니다.
+        /// [EN] Read by catalog consumers to match the role of stats and visuals.
+        /// </summary>
+        public Define.UnitRole Role => _role;
+
+        /// <summary>
         /// 初期最大 HP。
         /// [KO] 초기 최대 HP.
         /// [EN] Initial maximum health.
