@@ -4,6 +4,10 @@
     "references": [
         "UnityCombatLab.Common",
         "UniTask",
-        "UnityCombatLab.Domain"
+        "UniTask.Addressables",
+        "UnityCombatLab.Domain",
+        "Unity.Addressables",
+        "Unity.ResourceManager",
+        "UnityCombatLab.Application"
     ]
 }

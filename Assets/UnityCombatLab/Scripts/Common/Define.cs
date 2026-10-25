@@ -159,7 +159,14 @@ namespace UnityCombatLab.Common
             /// [KO] 전투 무대이며 빌드 인덱스 1입니다.
             /// [EN] The battle stage at build index 1.
             /// </summary>
-            Dungeon = 1
+            Dungeon = 1,
+
+            /// <summary>
+            /// タイトル・編成・結果を表示するシーン。ビルドインデックス 2。
+            /// [KO] 타이틀·편성·결과를 표시하는 씬이며 빌드 인덱스 2입니다.
+            /// [EN] Scene displaying title, formation and results at build index 2.
+            /// </summary>
+            Frontend = 2
         }
 
         #endregion
@@ -201,6 +208,19 @@ namespace UnityCombatLab.Common
         {
             Standard,
             Easy
+        }
+
+        /// <summary>
+        /// Frontend シーンが切り替えて表示する画面。
+        /// [KO] Frontend 씬에서 전환해 표시할 화면입니다.
+        /// [EN] Screens switched within the Frontend scene.
+        /// </summary>
+        public enum FrontendPage
+        {
+            Title,
+            Formation,
+            Results,
+            Error
         }
 
         #endregion
@@ -399,6 +419,31 @@ namespace UnityCombatLab.Common
             Victory,
             Defeat,
             Timeout
+        }
+
+        /// <summary>
+        /// Runの失敗箇所。表示する文章はPresentationが決めます。
+        /// [KO] Run 실패 지점이며 표시 문장은 Presentation에서 결정합니다.
+        /// [EN] Run failure location; Presentation supplies its displayed wording.
+        /// </summary>
+        public enum RunFailure
+        {
+            None,
+            Startup,
+            Battle,
+            Frontend
+        }
+
+        /// <summary>
+        /// 共通切替表示が示す処理段階。
+        /// [KO] 공통 전환 표시에서 나타내는 처리 단계입니다.
+        /// [EN] Processing phase shown by the shared transition display.
+        /// </summary>
+        public enum RunTransitionPhase
+        {
+            LoadingDungeon,
+            CleaningUp,
+            RecoveryFailed
         }
 
         #endregion

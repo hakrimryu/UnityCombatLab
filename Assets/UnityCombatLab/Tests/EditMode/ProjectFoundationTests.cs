@@ -15,6 +15,22 @@ namespace UnityCombatLab.Tests.EditMode
     public sealed class ProjectFoundationTests
     {
         /// <summary>
+        /// ApplicationのRun処理がUnityの型、画面、資産実装、DIへ依存しないことを確認します。
+        /// [KO] Application Run 처리가 Unity 타입·화면·자산 구현·DI에 의존하지 않는지 확인합니다.
+        /// [EN] Verifies application run logic does not depend on Unity types, views, asset implementations or DI.
+        /// </summary>
+        [Test]
+        public void ApplicationUsesPortsWithoutReferencingOuterImplementations()
+        {
+            var names = Assembly.Load("UnityCombatLab.Application").GetReferencedAssemblies().Select(item => item.Name);
+            Assert.That(names, Has.None.StartWith("UnityEngine"));
+            Assert.That(names, Has.None.EqualTo("UnityCombatLab.Infrastructure"));
+            Assert.That(names, Has.None.EqualTo("UnityCombatLab.Presentation"));
+            Assert.That(names, Has.None.EqualTo("UnityCombatLab.Bootstrap"));
+            Assert.That(names, Has.None.StartWith("VContainer"));
+        }
+
+        /// <summary>
         /// Domain がエンジンや外部ライブラリを参照しないことを検証します。
         /// [KO] Domain이 엔진 및 외부 라이브러리를 참조하지 않는지 검증합니다.
         /// [EN] Verifies that Domain references no engine or third-party libraries.

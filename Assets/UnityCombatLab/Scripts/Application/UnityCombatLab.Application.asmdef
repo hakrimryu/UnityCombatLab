@@ -3,7 +3,8 @@
     "rootNamespace": "UnityCombatLab.Application",
     "references": [
         "UnityCombatLab.Common",
-        "UnityCombatLab.Domain"
+        "UnityCombatLab.Domain",
+        "UniTask"
     ],
     "noEngineReferences": true
 }
