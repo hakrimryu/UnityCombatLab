@@ -164,6 +164,40 @@ namespace UnityCombatLab.Common
 
         #endregion
 
+        #region Run
+
+        /// <summary>
+        /// シード未指定または0の出発に使う固定値。
+        /// [KO] 시드 미지정 또는 0인 출발에 사용할 고정값입니다.
+        /// [EN] Fixed seed used when a departure omits a seed or supplies zero.
+        /// </summary>
+        public const uint DefaultRunSeed = 20261024u;
+
+        /// <summary>
+        /// 一回の挑戦で許可する処理段階。
+        /// [KO] 한 번의 도전에서 허용할 처리 단계입니다.
+        /// [EN] Processing phases permitted during one run.
+        /// </summary>
+        public enum RunPhase
+        {
+            Loading,
+            Battle,
+            CleaningUp
+        }
+
+        /// <summary>
+        /// 出発時に固定する敵の難易度。
+        /// [KO] 출발 시 고정하는 적 난이도입니다.
+        /// [EN] Enemy difficulty fixed at departure.
+        /// </summary>
+        public enum Difficulty
+        {
+            Standard,
+            Easy
+        }
+
+        #endregion
+
         #region Battle
 
         /// <summary>
