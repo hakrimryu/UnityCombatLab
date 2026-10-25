@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityCombatLab.Common;
@@ -7,201 +8,297 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.UI
 {
     /// <summary>
-    /// 一人のユニットに届いた HP 損失と盾吸収を三枠で示し、各表示の終了と解除を管理します。
-    /// [KO] 한 유닛이 받은 HP 손실과 방어막 흡수를 세 슬롯에 표시하고 각 표시의 종료와 해제를 관리합니다.
-    /// [EN] Shows one unit's health loss and shield absorption in three slots and owns their expiry and cleanup.
+    /// 一人分の被害数字専用プール。空き枠を貸し出し、上昇とフェードの完了で返却します。
+    /// [KO] 한 유닛의 피해 숫자 전용 풀입니다. 빈 슬롯을 대여하고 상승·페이드 완료 시 반환합니다.
+    /// [EN] Owns one unit's damage-number pool, renting free slots and returning them after their rise and fade.
     /// </summary>
     public sealed class DamageNumberView : MonoBehaviour
     {
         /// <summary>
-        /// 命中から数字を消すまでの秒数。各枠は別々にこの時間を数えます。
-        /// [KO] 명중부터 숫자를 지울 때까지의 초 단위 시간이며 각 슬롯이 독립적으로 셉니다.
-        /// [EN] Seconds from impact until a number clears, counted independently for each slot.
+        /// ゲーム内時間で数える数字の表示秒数。各スロットが独立して進みます。
+        /// [KO] 게임 시간 기준 숫자 표시 시간이며 각 슬롯이 독립적으로 진행합니다.
+        /// [EN] Number display duration in game time, advanced independently for each slot.
         /// </summary>
-        private const float DisplaySeconds = 0.55f;
+        [SerializeField, Min(0.01f)] private float _displaySeconds = 0.75f;
 
         /// <summary>
-        /// プレハブで接続した三つの表示枠。数字、アイコン、タイマーを同じ枠で保持します。
-        /// [KO] 프리팹에서 연결한 세 표시 슬롯이며 숫자·아이콘·타이머를 같은 슬롯에 보관합니다.
-        /// [EN] Three prefab-authored slots, each keeping its numbers, icon and timer together.
+        /// 数字の基準点から下へずらす UI 単位。1920×1080 基準で 18px 下から始めます。
+        /// [KO] 숫자 기준점에서 아래로 옮길 UI 단위이며 1920×1080 기준 18px 아래에서 시작합니다.
+        /// [EN] UI units below the number anchor; starts 18px lower at the 1920×1080 reference resolution.
         /// </summary>
-        [SerializeField] private DamageSlot[] _slots = Array.Empty<DamageSlot>();
+        [SerializeField, Min(0f)] private float _startBelowAnchor = 18f;
 
         /// <summary>
-        /// 同時表示の上限を越えた時に 0→1→2→0 の順で再利用する枠。
-        /// [KO] 동시 표시 한도를 넘으면 0→1→2→0 순서로 재사용할 슬롯입니다.
-        /// [EN] Slot reused in the order 0, 1, 2, then 0 when concurrent hits exceed capacity.
+        /// 開始位置から上昇する UI 単位。初期値 64px は基準点より 46px 上で終わります。
+        /// [KO] 시작 위치에서 상승할 UI 단위이며 초깃값 64px는 기준점보다 46px 위에서 끝납니다.
+        /// [EN] UI units to rise from the start; the default 64px rise finishes 46px above the anchor.
         /// </summary>
-        private int _nextSlot;
+        [SerializeField, Min(0f)] private float _riseDistance = 64f;
 
         /// <summary>
-        /// 一回の被害表示に必要な参照と、古い終了処理を拒否する番号をまとめます。
-        /// [KO] 한 피해 표시에 필요한 참조와 이전 종료 처리를 거부할 번호를 함께 보관합니다.
-        /// [EN] Groups one hit's display references with the version that rejects stale completion callbacks.
+        /// プレハブの三枠から開始し、不足時だけ追加した枠も保持して再利用します。
+        /// [KO] 프리팹의 세 슬롯으로 시작하고 부족할 때만 추가한 슬롯도 보관해 재사용합니다.
+        /// [EN] Starts with three prefab slots and retains extra slots created only on exhaustion for reuse.
+        /// </summary>
+        [SerializeField] private List<DamageSlot> _slots = new();
+
+        /// <summary>
+        /// 一回の被害の数字二つ・盾アイコン・Tween と、古い callback を拒否する番号を保持します。
+        /// [KO] 한 피해의 숫자 두 개·방패 아이콘·Tween과 이전 콜백을 거부할 번호를 보관합니다.
+        /// [EN] Holds one hit's two labels, shield icon, tween and stale-callback version.
         /// </summary>
         [Serializable]
         private sealed class DamageSlot
         {
             /// <summary>
-            /// HP 損失の数字を表示する TMP。
-            /// [KO] HP 손실 수치를 표시하는 TMP입니다.
-            /// [EN] TMP label displaying health loss.
+            /// HP 数字・盾吸収数字・盾アイコンをまとめて移動・フェード・前面化する枠。
+            /// [KO] HP 숫자·방어막 흡수 숫자·방패 아이콘을 함께 이동·페이드·전면 배치할 슬롯입니다.
+            /// [EN] Group moving, fading and ordering its health label, shield-absorption label and shield icon.
+            /// </summary>
+            [SerializeField] private CanvasGroup _group;
+
+            /// <summary>
+            /// OnAccent パレット色で HP 損失を表示する数字。
+            /// [KO] OnAccent 팔레트 색상으로 HP 손실을 표시할 숫자입니다.
+            /// [EN] Health-loss label using the OnAccent palette color.
             /// </summary>
             [SerializeField] private TMP_Text _healthDamage;
 
             /// <summary>
-            /// HP 損失とは別の行で盾吸収を示す TMP。
-            /// [KO] HP 손실과 다른 줄에 방어막 흡수를 표시하는 TMP입니다.
-            /// [EN] TMP label displaying shield absorption on a separate line.
+            /// HP 損失とは別の行に表示する盾吸収数字。
+            /// [KO] HP 손실과 다른 줄에 표시할 방어막 흡수 숫자입니다.
+            /// [EN] Shield-absorption label on a separate line from health loss.
             /// </summary>
             [SerializeField] private TMP_Text _shieldDamage;
 
             /// <summary>
-            /// 盾吸収がある間だけ数字に添えるアイコン。
-            /// [KO] 방어막 흡수가 있을 때만 숫자 옆에 표시할 아이콘입니다.
-            /// [EN] Icon shown beside the number only when shield damage exists.
+            /// 盾吸収がある時だけ表示するアイコン。
+            /// [KO] 방어막 흡수가 있을 때만 표시할 아이콘입니다.
+            /// [EN] Icon displayed only when shield absorption exists.
             /// </summary>
             [SerializeField] private UnityEngine.UI.Image _shieldIcon;
 
             /// <summary>
-            /// この枠だけの表示終了を予約する Tween。再利用と解除で停止します。
-            /// [KO] 이 슬롯의 표시 종료를 예약하는 Tween이며 재사용·해제 때 멈춥니다.
-            /// [EN] Tween scheduling this slot's expiry, stopped on reuse and cleanup.
+            /// この枠の移動とフェードを同時に進め、返却時に止める Tween。
+            /// [KO] 이 슬롯의 이동·페이드를 함께 진행하고 반환 시 멈출 Tween입니다.
+            /// [EN] Tween advancing this slot's movement and fade together, stopped on return.
             /// </summary>
-            private Tween _timer;
+            private Tween _animation;
 
             /// <summary>
-            /// 再表示または解除ごとに増やし、前の表示の callback を無効にする番号。
-            /// [KO] 재표시나 해제마다 증가하여 이전 표시 콜백을 무효화하는 번호입니다.
-            /// [EN] Counter increased on display or cleanup to invalidate callbacks from earlier uses.
+            /// 返却ごとに増やし、以前の完了 callback が新しい表示を消すのを防ぎます。
+            /// [KO] 반환마다 증가하여 이전 완료 콜백이 새 표시를 지우지 못하게 합니다.
+            /// [EN] Increases on return so an earlier completion callback cannot erase a new display.
             /// </summary>
             private int _version;
 
             /// <summary>
-            /// 数字とアイコンが全て接続されているか確認します。
-            /// [KO] 숫자와 아이콘이 모두 연결되었는지 확인합니다.
-            /// [EN] Checks that both labels and the icon are assigned.
+            /// このスロットに数字を表示している間は true。完了または Clear で false に戻ります。
+            /// [KO] 이 슬롯에 숫자를 표시하는 동안 true이며 완료 또는 Clear 시 false로 돌아갑니다.
+            /// [EN] True while this slot displays a hit, reset on completion or Clear.
             /// </summary>
-            public void Validate()
+            public bool IsInUse { get; private set; }
+
+            /// <summary>
+            /// 数字とアイコンが同じ枠の直接の子として接続されているか確認します。
+            /// [KO] 숫자와 아이콘이 같은 슬롯의 직계 자식으로 연결됐는지 확인합니다.
+            /// [EN] Checks both labels and the icon are connected as direct children of the same slot.
+            /// </summary>
+            public void Validate(Transform owner)
             {
-                if (_healthDamage == null || _shieldDamage == null || _shieldIcon == null)
-                    throw new InvalidOperationException("Each damage slot requires two labels and a shield icon.");
+                if (_group == null || _healthDamage == null || _shieldDamage == null || _shieldIcon == null ||
+                    _group.transform.parent != owner || _group.transform is not RectTransform ||
+                    _healthDamage.transform.parent != _group.transform ||
+                    _shieldDamage.transform.parent != _group.transform ||
+                    _shieldIcon.transform.parent != _group.transform || _group.transform.childCount != 3)
+                    throw new InvalidOperationException(
+                        "Each damage slot requires a group with two labels and a shield icon.");
             }
 
             /// <summary>
-            /// HUD が所有する一つの材質を両方の数字へ借用し、ここでは複製も破棄もしません。
-            /// [KO] HUD 소유 재질 하나를 두 숫자에 빌려 쓰며 여기서는 복제하거나 파괴하지 않습니다.
-            /// [EN] Borrows the HUD-owned material for both labels without cloning or destroying it.
+            /// 全枠使用中の時だけ既存の表示構成を複製し、空き枠として返します。
+            /// [KO] 모든 슬롯이 사용 중일 때만 기존 표시 구성을 복제해 빈 슬롯으로 반환합니다.
+            /// [EN] Copies an existing display only on exhaustion and returns it as a free slot.
             /// </summary>
-            public void ApplyMaterial(Material material)
+            public DamageSlot CreateCopy(int index)
+            {
+                var copy = Instantiate(_group, _group.transform.parent);
+                copy.name = "UI_DamageSlot" + index;
+                // 複製元と同じ子の順序で数字とアイコンを取得する。
+                var slot = new DamageSlot
+                {
+                    _group = copy,
+                    _healthDamage = copy.transform.GetChild(_healthDamage.transform.GetSiblingIndex())
+                        .GetComponent<TMP_Text>(),
+                    _shieldDamage = copy.transform.GetChild(_shieldDamage.transform.GetSiblingIndex())
+                        .GetComponent<TMP_Text>(),
+                    _shieldIcon = copy.transform.GetChild(_shieldIcon.transform.GetSiblingIndex())
+                        .GetComponent<UnityEngine.UI.Image>()
+                };
+                // 複製元が上昇中でも、コピーした位置・透明度・文字を初期化してから貸し出す。
+                slot.Clear();
+                return slot;
+            }
+
+            /// <summary>
+            /// HUD 所有の共通材質を数字へ設定し、初期枠のパレット色を数字とアイコンへ適用します。
+            /// [KO] HUD 소유 공통 재질을 숫자에 설정하고 초기 슬롯의 팔레트 색상을 숫자와 아이콘에 적용합니다.
+            /// [EN] Assigns the HUD-owned shared material to labels and applies the initial slot's palette colors to labels and icon.
+            /// </summary>
+            public void ApplyStyle(Material material, DamageSlot source)
             {
                 _healthDamage.fontSharedMaterial = material;
                 _shieldDamage.fontSharedMaterial = material;
+                _healthDamage.color = source._healthDamage.color;
+                _shieldDamage.color = source._shieldDamage.color;
+                _shieldIcon.color = source._shieldIcon.color;
             }
 
             /// <summary>
-            /// 前の予約を止めて新しい数字を表示し、この使用番号の時だけ終了させます。
-            /// [KO] 이전 예약을 멈추고 새 숫자를 표시하며 이번 사용 번호일 때만 종료합니다.
-            /// [EN] Replaces the previous timer with new numbers and expires only this use of the slot.
+            /// 空き枠を初期化して最前面へ出し、完了時に同じ使用番号の表示だけを返却します。
+            /// [KO] 빈 슬롯을 초기화해 맨 앞으로 배치하고 완료 시 같은 사용 번호의 표시만 반환합니다.
+            /// [EN] Resets a free slot, brings it forward and returns only the matching rental on completion.
             /// </summary>
             public void Show(DamageNumberView owner, int healthDamage, int shieldDamage)
             {
                 Clear();
+                IsInUse = true;
                 var version = _version;
+                var root = (RectTransform)_group.transform;
+                root.anchoredPosition = Vector2.down * owner._startBelowAnchor;
+                _group.alpha = 1f;
                 _healthDamage.text = healthDamage > 0 ? "-" + healthDamage : "";
                 _shieldDamage.text = shieldDamage > 0 ? "-" + shieldDamage : "";
                 _shieldIcon.gameObject.SetActive(shieldDamage > 0);
-                // 再利用と OnDisable は番号を変える。Kill 後に古い callback が呼ばれても新表示を消さない。
-                // owner は Unity の破棄済み判定に使い、表示と同じ scaled 時間でこの枠だけを終了する。
-                _timer = DOVirtual.DelayedCall(DisplaySeconds, () =>
-                {
-                    if (owner != null && version == _version)
+                root.gameObject.SetActive(true);
+                // Overlay Canvas は後の兄弟を手前に描く。枠だけを動かし、数字・輪郭・アイコンの内部順は保つ。
+                root.SetAsLastSibling();
+                // スロットの位置と透明度を同時に変え、完了時に返却する。
+                _animation = DOTween.Sequence()
+                    .Append(DOTween.To(() => root.anchoredPosition,
+                            position => root.anchoredPosition = position,
+                            Vector2.up * (owner._riseDistance - owner._startBelowAnchor), owner._displaySeconds)
+                        .SetEase(Ease.OutQuad))
+                    .Join(DOTween.To(() => _group.alpha, alpha => _group.alpha = alpha, 0f, owner._displaySeconds)
+                        .SetEase(Ease.InQuad))
+                    .SetUpdate(UpdateType.Normal, false)
+                    .OnComplete(() =>
                     {
-                        _timer = null;
+                        // Clear は Kill より先に番号を変える。返却・再貸出後の古い完了通知は何も変更しない。
+                        if (owner == null || !IsInUse || version != _version) return;
+                        _animation = null;
                         Clear();
-                    }
-                }, false).SetUpdate(UpdateType.Normal, false);
+                    });
             }
 
             /// <summary>
-            /// 古い終了処理を無効にしてタイマーと数字を消します。未初期化時の解除も受け付けます。
-            /// [KO] 이전 종료 처리를 무효화하고 타이머와 숫자를 지우며 초기화 전 해제도 허용합니다.
-            /// [EN] Invalidates old completions and clears the timer and labels, including cleanup before initialization.
+            /// 古い callback を無効にして全表示状態を戻し、非表示の空き枠として保持します。
+            /// [KO] 이전 콜백을 무효화하고 표시 상태를 모두 초기화해 비활성 빈 슬롯으로 보관합니다.
+            /// [EN] Invalidates old callbacks and resets all display state, retaining the slot hidden and available.
             /// </summary>
             public void Clear()
             {
                 _version++;
-                _timer?.Kill();
-                _timer = null;
+                _animation?.Kill();
+                _animation = null;
+                IsInUse = false;
                 if (_healthDamage != null) _healthDamage.text = "";
                 if (_shieldDamage != null) _shieldDamage.text = "";
                 if (_shieldIcon != null) _shieldIcon.gameObject.SetActive(false);
+                if (_group == null) return;
+                _group.alpha = 0f;
+                var root = (RectTransform)_group.transform;
+                root.anchoredPosition = Vector2.zero;
+                root.localScale = Vector3.one;
+                root.localRotation = Quaternion.identity;
+                root.gameObject.SetActive(false);
+                // 親の OnDisable 中は兄弟順を変えられない。次の Show が表示直前に最前面へ置く。
             }
         }
 
         /// <summary>
-        /// 実行前にプレハブの三枠と各参照を確認します。
-        /// [KO] 실행 전에 프리팹의 세 슬롯과 각 참조를 확인합니다.
-        /// [EN] Checks the prefab's three slots and their references before use.
+        /// 接続を確認してプレハブの全枠を空き状態にします。
+        /// [KO] 연결을 확인하고 프리팹의 모든 슬롯을 빈 상태로 만듭니다.
+        /// [EN] Validates references and clears all prefab slots for rental.
         /// </summary>
-        private void Awake() => Validate();
+        private void Awake()
+        {
+            Validate();
+            Clear();
+        }
 
         /// <summary>
-        /// 三枠が揃っていることを、材質設定前にも確認します。
-        /// [KO] 재질 설정 전에도 세 슬롯이 갖춰졌는지 확인합니다.
-        /// [EN] Checks that all three slots exist, including before material assignment.
+        /// 初期三枠以上と演出時間・距離を、材質設定前にも確認します。
+        /// [KO] 초기 세 슬롯 이상과 연출 시간·거리를 재질 설정 전에도 확인합니다.
+        /// [EN] Checks at least three initial slots and valid animation timing and distances before material assignment.
         /// </summary>
         private void Validate()
         {
-            if (_slots == null || _slots.Length != Define.SlotsPerTeam)
-                throw new InvalidOperationException("Damage numbers require three authored slots.");
+            if (_slots == null || _slots.Count < Define.SlotsPerTeam ||
+                !float.IsFinite(_displaySeconds) || _displaySeconds <= 0f ||
+                !float.IsFinite(_startBelowAnchor) || _startBelowAnchor < 0f ||
+                !float.IsFinite(_riseDistance) || _riseDistance < 0f)
+                throw new InvalidOperationException(
+                    "Damage numbers require three authored slots and valid animation settings.");
             foreach (var slot in _slots)
             {
                 if (slot == null) throw new InvalidOperationException("Damage slots cannot be null.");
-                slot.Validate();
+                slot.Validate(transform);
             }
         }
 
         /// <summary>
-        /// BattleHudView から渡された共通数字材質を全枠へ適用します。
-        /// [KO] BattleHudView가 전달한 공통 숫자 재질을 모든 슬롯에 적용합니다.
-        /// [EN] Applies the shared number material supplied by BattleHudView to every slot.
+        /// BattleHudView から借りた共通材質を全枠へ適用します。追加枠もこの参照を複製します。
+        /// [KO] BattleHudView에서 빌린 공통 재질을 모든 슬롯에 적용하며 추가 슬롯도 이 참조를 복사합니다.
+        /// [EN] Applies the shared material borrowed from BattleHudView to all slots, including the reference copied by new slots.
         /// </summary>
         public void ApplyMaterial(Material material)
         {
             if (material == null) throw new ArgumentNullException(nameof(material));
             Validate();
-            foreach (var slot in _slots) slot.ApplyMaterial(material);
+            // パレット適用済みの初期スロットから、追加スロットにも色を揃える。
+            foreach (var slot in _slots) slot.ApplyStyle(material, _slots[0]);
         }
 
         /// <summary>
-        /// UnitStatusView が命中時に呼び、次の枠へ HP 損失と盾吸収を一緒に表示します。
-        /// [KO] UnitStatusView가 명중 시 호출하여 다음 슬롯에 HP 손실과 방어막 흡수를 함께 표시합니다.
-        /// [EN] Called by UnitStatusView on impact to show health loss and shield absorption in the next slot.
+        /// UnitStatusView が命中時に呼び、空き枠を優先し、不足時だけ一枠追加して被害を表示します。
+        /// [KO] UnitStatusView가 명중 시 호출하며 빈 슬롯을 우선 사용하고 부족할 때만 하나 추가해 피해를 표시합니다.
+        /// [EN] Called by UnitStatusView at impact to show damage in a free slot, adding one only when exhausted.
         /// </summary>
         public void Show(int healthDamage, int shieldDamage)
         {
-            var slot = _slots[_nextSlot];
-            _nextSlot = (_nextSlot + 1) % _slots.Length;
-            slot.Show(this, healthDamage, shieldDamage);
+            if (healthDamage < 0) throw new ArgumentOutOfRangeException(nameof(healthDamage));
+            if (shieldDamage < 0) throw new ArgumentOutOfRangeException(nameof(shieldDamage));
+            if (healthDamage == 0 && shieldDamage == 0) return;
+            if (!isActiveAndEnabled) throw new InvalidOperationException("Damage numbers require an active view.");
+            foreach (var slot in _slots)
+            {
+                if (slot.IsInUse) continue;
+                slot.Show(this, healthDamage, shieldDamage);
+                return;
+            }
+
+            // 同時命中には初期 3 枠を使い、全て使用中なら一枠追加して表示を続ける。
+            var extra = _slots[0].CreateCopy(_slots.Count);
+            _slots.Add(extra);
+            extra.Show(this, healthDamage, shieldDamage);
         }
 
         /// <summary>
-        /// 全枠の予約と表示を解除し、次回は最初の枠から再開します。
-        /// [KO] 모든 슬롯의 예약과 표시를 해제하고 다음에는 첫 슬롯부터 재개합니다.
-        /// [EN] Clears every slot and timer so the next hit starts at the first slot.
+        /// 終了・再接続時に全枠を返却します。追加枠も HUD の寿命中は保持して再利用します。
+        /// [KO] 종료·재연결 시 모든 슬롯을 반환하며 추가 슬롯도 HUD 수명 동안 보관해 재사용합니다.
+        /// [EN] Returns every slot on shutdown or rebinding, retaining extra slots for reuse during the HUD lifetime.
         /// </summary>
         public void Clear()
         {
-            _nextSlot = 0;
             if (_slots == null) return;
             foreach (var slot in _slots) slot?.Clear();
         }
 
         /// <summary>
-        /// 非表示または破棄時に所有する全タイマーを解除します。
-        /// [KO] 비활성화 또는 파괴 시 소유한 모든 타이머를 해제합니다.
-        /// [EN] Releases all owned timers when hidden or destroyed.
+        /// 非表示・破棄時に全枠の Tween と callback を解除します。追加の子枠も HUD と共に破棄されます。
+        /// [KO] 비활성화·파괴 시 모든 슬롯의 Tween·콜백을 해제하며 추가 자식 슬롯도 HUD와 함께 파괴됩니다.
+        /// [EN] Releases all tweens and callbacks on disable or destruction; extra children are destroyed with the HUD.
         /// </summary>
         private void OnDisable() => Clear();
     }

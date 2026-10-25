@@ -7,9 +7,9 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.UI
 {
     /// <summary>
-    /// 一人分の名前・HP バー・防御膜・被害数字を表示します。渡された値を描画し、戦闘の計算は行いません。
-    /// [KO] 한 명의 이름·HP 바·방어막·피해 숫자를 표시합니다. 전달받은 값을 그리며 전투 계산은 하지 않습니다.
-    /// [EN] Displays one unit’s name, health bar, shield and damage numbers using supplied values, without combat calculations.
+    /// 一人分の名前・HP バー・防御膜・被害数字を、Presenter から渡された値で表示します。
+    /// [KO] Presenter가 전달한 값으로 한 명의 이름·HP 바·방어막·피해 숫자를 표시합니다.
+    /// [EN] Displays one unit’s name, health bar, shield and damage numbers using values supplied by the presenter.
     /// </summary>
     public sealed class UnitStatusView : MonoBehaviour
     {
@@ -35,23 +35,23 @@ namespace UnityCombatLab.Presentation.UI
         private const float TrailingLerpSeconds = 0.35f;
 
         /// <summary>
-        /// 役割名の表示先。
-        /// [KO] 역할 이름 표시 대상.
-        /// [EN] Role label.
+        /// ユニットの役割名を表示する文字。
+        /// [KO] 유닛의 역할 이름을 표시할 글자입니다.
+        /// [EN] Text displaying the unit's role name.
         /// </summary>
         [SerializeField] private TMP_Text _name;
 
         /// <summary>
-        /// 正確な HP と死亡状態の表示先。
-        /// [KO] 정확한 HP 및 사망 상태 표시 대상.
-        /// [EN] Exact health and death label.
+        /// 現在 HP と最大 HP を表示する文字。
+        /// [KO] 현재 HP와 최대 HP를 표시할 글자입니다.
+        /// [EN] Text displaying current and maximum health.
         /// </summary>
         [SerializeField] private TMP_Text _health;
 
         /// <summary>
-        /// 防御膜の独立表示。
-        /// [KO] 방어막의 독립 표시.
-        /// [EN] Separate shield label.
+        /// 残っている防御膜を表示する文字。
+        /// [KO] 남아 있는 방어막을 표시할 글자입니다.
+        /// [EN] Text displaying the remaining shield value.
         /// </summary>
         [SerializeField] private TMP_Text _shield;
 
@@ -63,9 +63,9 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private UnityEngine.UI.Image _fill;
 
         /// <summary>
-        /// 購入プレハブの表示専用 Slider。SetHealth が HP 比率を渡し、枠を変形せず塗り幅だけを変えます。
-        /// [KO] 구매 프리팹의 표시 전용 Slider입니다. SetHealth가 HP 비율을 전달해 테두리 변형 없이 채움 너비만 바꿉니다.
-        /// [EN] Display-only slider from the purchased prefab; SetHealth supplies the HP ratio to resize its fill without distorting the border.
+        /// HP 比率に応じて塗り幅を変える表示用 Slider。
+        /// [KO] HP 비율에 따라 채움 너비를 바꿀 표시용 Slider입니다.
+        /// [EN] Display slider whose fill width follows the health ratio.
         /// </summary>
         [SerializeField] private UnityEngine.UI.Slider _healthBar;
 
@@ -105,9 +105,9 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private TMP_Text _defeated;
 
         /// <summary>
-        /// 被害数字の三枠と終了処理を所有する表示コンポーネント。
-        /// [KO] 피해 숫자 세 슬롯과 종료 처리를 소유한 표시 컴포넌트입니다.
-        /// [EN] Display component owning the three damage-number slots and their expiry.
+        /// 被害数字専用プールと各表示の終了処理を所有するコンポーネント。
+        /// [KO] 피해 숫자 전용 풀과 각 표시의 종료 처리를 소유한 컴포넌트입니다.
+        /// [EN] Component owning the damage-number pool and each display's expiry.
         /// </summary>
         [SerializeField] private DamageNumberView _damageNumbers;
 
@@ -154,16 +154,16 @@ namespace UnityCombatLab.Presentation.UI
         private float _healthElapsed;
 
         /// <summary>
-        /// 新通知時点の本体ゲージ比率。連続被害でも表示を巻き戻しません。
-        /// [KO] 새 알림 시점 본 게이지 비율입니다. 연속 피해에도 표시를 되돌리지 않습니다.
-        /// [EN] Main-fill ratio when a notification arrives, preserving continuity through repeated hits.
+        /// 最新の HP 通知を受けた時点のゲージ比率。補間の開始値に使います。
+        /// [KO] 최신 HP 알림을 받은 시점의 게이지 비율이며 보간 시작값으로 사용합니다.
+        /// [EN] Gauge ratio when the latest health notification arrived, used as the interpolation start.
         /// </summary>
         private float _healthStart;
 
         /// <summary>
-        /// ReadModel の確定 HP 比率。表示の遅れを戦闘状態へ戻しません。
-        /// [KO] ReadModel의 확정 HP 비율입니다. 표시 지연을 전투 상태로 되돌리지 않습니다.
-        /// [EN] Confirmed ReadModel health ratio; presentation delay never feeds back into combat state.
+        /// ゲージの移動先となる、通知された HP の比率。
+        /// [KO] 게이지가 이동할 목표인 알림으로 받은 HP 비율입니다.
+        /// [EN] Notified health ratio used as the gauge's destination.
         /// </summary>
         private float _healthTarget;
 
@@ -175,9 +175,9 @@ namespace UnityCombatLab.Presentation.UI
         private float _trailingStart;
 
         /// <summary>
-        /// 前回の最大 HP。別の最大値へ切り替わる時は古い比率を引き継ぎません。
-        /// [KO] 이전 최대 HP입니다. 최대값이 바뀌면 이전 비율을 이어받지 않습니다.
-        /// [EN] Previous maximum health; a changed maximum resets old ratios.
+        /// 前回の最大 HP。最大値の変更時にゲージを再初期化するために使います。
+        /// [KO] 이전 최대 HP이며 최대값 변경 시 게이지를 다시 초기화하는 데 사용합니다.
+        /// [EN] Previous maximum health, used to reinitialize the gauge when the maximum changes.
         /// </summary>
         private int _maxHealth;
 
@@ -190,16 +190,16 @@ namespace UnityCombatLab.Presentation.UI
 
 
         /// <summary>
-        /// 検証可能な表示 HP。
-        /// [KO] 검증 가능한 표시 HP.
-        /// [EN] Displayed health available for validation.
+        /// 現在表示している HP。
+        /// [KO] 현재 표시 중인 HP입니다.
+        /// [EN] Currently displayed health.
         /// </summary>
         public int DisplayedHealth { get; private set; }
 
         /// <summary>
-        /// 検証可能な表示防御膜。
-        /// [KO] 검증 가능한 표시 방어막.
-        /// [EN] Displayed shield available for validation.
+        /// 現在表示している防御膜。
+        /// [KO] 현재 표시 중인 방어막입니다.
+        /// [EN] Currently displayed shield value.
         /// </summary>
         public int DisplayedShield { get; private set; }
 
@@ -211,9 +211,9 @@ namespace UnityCombatLab.Presentation.UI
         public int HealthRenderCount { get; private set; }
 
         /// <summary>
-        /// 再利用前に短命演出を除去します。
-        /// [KO] 재사용 전에 짧은 연출을 제거합니다.
-        /// [EN] Removes transient presentation before reuse.
+        /// 名前と陣営色を設定し、被害数字とゲージの補間を初期化します。
+        /// [KO] 이름과 팀 색상을 설정하고 피해 숫자와 게이지 보간을 초기화합니다.
+        /// [EN] Sets the name and team colors and resets damage numbers and gauge interpolation.
         /// </summary>
         public void Initialize(string displayName, Define.BattleTeam team)
         {
@@ -237,9 +237,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// BattleHudView が開始時に色設定と HUD 所有の共有材質を渡します。購入材質は変更しません。
-        /// [KO] BattleHudView가 시작 시 색상 설정과 HUD 소유 공유 재질을 전달합니다. 구매 재질은 수정하지 않습니다.
-        /// [EN] BattleHudView supplies shared colors and its owned damage material at startup, leaving purchased materials untouched.
+        /// BattleHudView が渡すパレットを保持し、HUD 所有の共通数字材質を DamageNumberView へ渡します。
+        /// [KO] BattleHudView가 전달한 팔레트를 보관하고 HUD 소유 공통 숫자 재질을 DamageNumberView에 전달합니다.
+        /// [EN] Stores the palette supplied by BattleHudView and forwards the HUD-owned shared number material to DamageNumberView.
         /// </summary>
         public void ApplyPalette(GameColorPalette colors, Material damageMaterial)
         {
@@ -250,9 +250,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// BattleHudPresenter が命中済み HP を渡します。数字と死亡表示を変え、命中時は追加待機なしで補間します。
-        /// [KO] BattleHudPresenter가 명중한 HP를 전달합니다. 숫자·사망 표시를 바꾸고 명중 때는 추가 대기 없이 보간합니다.
-        /// [EN] Receives arrived health from BattleHudPresenter, updating numbers and defeat while starting interpolation without another impact delay.
+        /// 通知された HP と戦闘不能表示を更新し、ゲージを新しい HP へ動かします。
+        /// [KO] 알림으로 받은 HP와 전투 불능 표시를 갱신하고 게이지를 새 HP로 움직입니다.
+        /// [EN] Updates notified health and defeat indicators and moves the gauge toward the new health value.
         /// </summary>
         public void SetHealth(int health, int maxHealth)
         {
@@ -270,7 +270,7 @@ namespace UnityCombatLab.Presentation.UI
             _shieldIcon.gameObject.SetActive(health > 0);
             _badge.color = health == 0 ? _colors.GetColor(Define.PaletteColor.MutedText) : _teamColor;
             _name.color = _colors.GetColor(health == 0 ? Define.PaletteColor.MutedText : Define.PaletteColor.Text);
-            // HP 75/100 → 0.75。数字と死亡は確定値、以下の比率は表示専用で戦闘計算へ返さない。
+            // HP 75/100 はゲージ比率 0.75。
             var target = (float)health / maxHealth;
             if (!_hasHealth || _maxHealth != maxHealth || !isActiveAndEnabled)
             {
@@ -296,9 +296,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 表示中のゲージだけを進めます。通知がない間は UI に値を書き込みません。
-        /// [KO] 움직이는 게이지만 진행합니다. 진행 중 연출이 없으면 UI 값을 쓰지 않습니다.
-        /// [EN] Advances active gauge transitions without writing UI values while idle.
+        /// 進行中の HP ゲージのアニメーションを一フレーム進めます。
+        /// [KO] 진행 중인 HP 게이지 애니메이션을 한 프레임 진행합니다.
+        /// [EN] Advances active health-gauge animations by one frame.
         /// </summary>
         private void Update()
         {
@@ -400,9 +400,9 @@ namespace UnityCombatLab.Presentation.UI
         public void ShowDamage(int healthDamage, int shieldDamage) => _damageNumbers.Show(healthDamage, shieldDamage);
 
         /// <summary>
-        /// 所有する短命表示だけを解除します。
-        /// [KO] 소유한 짧은 표시만 해제합니다.
-        /// [EN] Clears only the transient presentation owned here.
+        /// 被害数字を消し、HP ゲージの補間を止めて現在 HP に揃えます。
+        /// [KO] 피해 숫자를 지우고 HP 게이지 보간을 멈춰 현재 HP에 맞춥니다.
+        /// [EN] Clears damage numbers and stops gauge interpolation at current health.
         /// </summary>
         public void ClearTransient()
         {
@@ -412,9 +412,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 非表示化で遅延 callback も無効にします。
-        /// [KO] 비활성화 시 지연 콜백도 무효화합니다.
-        /// [EN] Invalidates delayed callbacks on disable.
+        /// 非表示時に被害数字と HP ゲージのアニメーションを止めます。
+        /// [KO] 비활성화 시 피해 숫자와 HP 게이지 애니메이션을 멈춥니다.
+        /// [EN] Stops damage-number and health-gauge animations when disabled.
         /// </summary>
         private void OnDisable()
         {

@@ -22,9 +22,9 @@ using Object = UnityEngine.Object;
 namespace UnityCombatLab.Tests.PlayMode
 {
     /// <summary>
-    /// 実際のシーン・HUD・購読・古い callback を検証します。
-    /// [KO] 실제 씬·HUD·구독·이전 콜백을 검증합니다.
-    /// [EN] Verifies real scenes, HUD, subscriptions and stale callbacks.
+    /// 戦闘中の HP と演出、HUD の接続・解除と古い callback の扱いを確認します。
+    /// [KO] 전투 중 HP와 연출, HUD 연결·해제와 이전 콜백 처리를 확인합니다.
+    /// [EN] Checks combat health and effects, HUD binding and disposal, and stale callback handling.
     /// </summary>
     public sealed class BattlePresentationTests
     {
@@ -59,9 +59,9 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
-        /// テスト所有の寿命を後に残しません。
-        /// [KO] 테스트 소유 수명을 남기지 않습니다.
-        /// [EN] Leaves no test-owned lifetime behind.
+        /// テストで作成した Dungeon Scope と AppRoot を破棄します。
+        /// [KO] 테스트에서 만든 Dungeon Scope와 AppRoot를 파괴합니다.
+        /// [EN] Destroys the Dungeon scope and AppRoot created by the test.
         /// </summary>
         [UnityTearDown]
         public IEnumerator Cleanup()
@@ -138,7 +138,7 @@ namespace UnityCombatLab.Tests.PlayMode
             runner.Advance(100);
             Assert.That(runner.CurrentTick, Is.EqualTo(tick));
             Assert.That(lastEventCount, Is.EqualTo(1));
-            // 数字と死亡は上で即時確認し、最後の損失・残像が終わってからゲージの到着値を確認する。
+            // HP ゲージの補間と残像が終わってから、最終の表示比率を確認する。
             yield return new WaitForSeconds(0.8f);
             for (var index = 0; index < runner.ReadModel.Units.Count; index++)
             {
@@ -376,13 +376,13 @@ namespace UnityCombatLab.Tests.PlayMode
             status.ShowDamage(40, 0);
             status.ShowDamage(34, 0);
             status.ShowDamage(58, 0);
-            var labels = new[] { "Damage", "UI_Damage1", "UI_Damage2" }
+            var labels = new[] { "UI_DamageSlot0/Damage", "UI_DamageSlot1/UI_Damage1", "UI_DamageSlot2/UI_Damage2" }
                 .Select(name => status.transform.Find(name).GetComponent<TMPro.TMP_Text>().text).ToArray();
             Assert.That(labels, Is.EqualTo(new[] { "-40", "-34", "-58" }));
             view.ShowDeath(runId);
             Assert.That(view.CurrentAnimation, Is.EqualTo("Death"));
             status.ClearTransient();
-            Assert.That(new[] { "Damage", "UI_Damage1", "UI_Damage2" }
+            Assert.That(new[] { "UI_DamageSlot0/Damage", "UI_DamageSlot1/UI_Damage1", "UI_DamageSlot2/UI_Damage2" }
                 .All(name => status.transform.Find(name).GetComponent<TMPro.TMP_Text>().text == ""), Is.True);
             yield return null;
         }
@@ -451,9 +451,9 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
-        /// Presenter 解放後、別モデルの変更でも View を更新しません。
-        /// [KO] Presenter 해제 후 별도 모델이 변해도 View를 갱신하지 않습니다.
-        /// [EN] Detached presenters cannot update a view when their model changes.
+        /// Presenter を解除すると更新が止まり、新しい Presenter で表示を接続し直せることを確認します。
+        /// [KO] Presenter 해제 시 갱신이 멈추고 새 Presenter로 표시를 다시 연결할 수 있는지 확인합니다.
+        /// [EN] Checks that disposing a presenter stops updates and a new presenter can rebind the display.
         /// </summary>
         [UnityTest]
         public IEnumerator HudSubscriptionIsReleasedAndCanRebind()
@@ -536,17 +536,17 @@ namespace UnityCombatLab.Tests.PlayMode
             const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
             var numbers = view.GetComponent<DamageNumberView>();
             var slotsField = typeof(DamageNumberView).GetField("_slots", Flags);
-            var firstSlot = ((Array)slotsField.GetValue(numbers)).GetValue(0);
-            var timerField = firstSlot.GetType().GetField("_timer", Flags);
+            var firstSlot = ((IList)slotsField.GetValue(numbers))[0];
+            var timerField = firstSlot.GetType().GetField("_animation", Flags);
             view.ClearTransient();
             view.ShowDamage(12, 3);
-            var callback = ((Tween)timerField.GetValue(firstSlot)).onStepComplete;
+            var callback = ((Tween)timerField.GetValue(firstSlot)).onComplete;
             view.ClearTransient();
             view.ShowDamage(9, 6);
-            var label = view.transform.Find("Damage").GetComponent<TMPro.TMP_Text>();
+            var label = view.transform.Find("UI_DamageSlot0/Damage").GetComponent<TMPro.TMP_Text>();
             var expectedText = label.text;
-            var shieldLabel = view.transform.Find("UI_ShieldDamage").GetComponent<TMPro.TMP_Text>();
-            var shieldIcon = view.transform.Find("UI_ShieldDamageIcon").gameObject;
+            var shieldLabel = view.transform.Find("UI_DamageSlot0/UI_ShieldDamage").GetComponent<TMPro.TMP_Text>();
+            var shieldIcon = view.transform.Find("UI_DamageSlot0/UI_ShieldDamageIcon").gameObject;
             callback();
             Assert.That(label.text, Is.EqualTo(expectedText));
             Assert.That(shieldLabel.text, Is.EqualTo("-6"));
@@ -554,6 +554,87 @@ namespace UnityCombatLab.Tests.PlayMode
             view.ClearTransient();
             Assert.That(shieldLabel.text, Is.Empty);
             Assert.That(shieldIcon.activeSelf, Is.False);
+            yield return null;
+        }
+
+        /// <summary>
+        /// 連続被害の独立進行・不足時の追加・空き枠の再利用・非表示後の再接続を確認します。
+        /// [KO] 연속 피해의 독립 진행·부족 시 확장·빈 슬롯 재사용·비활성화 후 재연결을 확인합니다.
+        /// [EN] Checks independent hits, exhaustion growth, free-slot reuse and rebinding after disable.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator DamagePoolGrowsWithoutInterruptingAndReusesReturnedSlots()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var status = entry.Hud.Units[0];
+            var numbers = status.GetComponent<DamageNumberView>();
+            const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            // 使用中の Tween を直接進め、他の数字へ影響しないかを同じフレーム内で比較する。
+            var slots = (IList)typeof(DamageNumberView).GetField("_slots", Flags).GetValue(numbers);
+            var animationField = slots[0].GetType().GetField("_animation", Flags);
+            status.ClearTransient();
+            status.ShowDamage(40, 3);
+            var firstRoot = (RectTransform)status.transform.Find("UI_DamageSlot0");
+            var firstGroup = firstRoot.GetComponent<CanvasGroup>();
+            var firstText = firstRoot.Find("Damage").GetComponent<TMPro.TMP_Text>();
+            var firstAnimation = (Tween)animationField.GetValue(slots[0]);
+            firstAnimation.Goto(0.3f);
+            var position = firstRoot.anchoredPosition;
+            var alpha = firstGroup.alpha;
+            Assert.That(position.y, Is.GreaterThan(-18f));
+            Assert.That(alpha, Is.InRange(0.01f, 0.99f));
+            status.ShowDamage(34, 0);
+            status.ShowDamage(58, 0);
+            status.ShowDamage(22, 0);
+            Assert.That(slots.Count, Is.EqualTo(4));
+            Assert.That(firstText.text, Is.EqualTo("-40"));
+            Assert.That(firstRoot.anchoredPosition, Is.EqualTo(position));
+            Assert.That(firstGroup.alpha, Is.EqualTo(alpha));
+            Assert.That(animationField.GetValue(slots[0]), Is.SameAs(firstAnimation));
+            var extraRoot = (RectTransform)status.transform.Find("UI_DamageSlot3");
+            var extraText = extraRoot.GetComponentInChildren<TMPro.TMP_Text>();
+            Assert.That(extraText.text, Is.EqualTo("-22"));
+            Assert.That(extraText.fontSharedMaterial, Is.SameAs(firstText.fontSharedMaterial));
+            Assert.That(extraText.font, Is.SameAs(firstText.font));
+            Assert.That(extraRoot.anchoredPosition, Is.EqualTo(new Vector2(0, -18)));
+            Assert.That(extraRoot.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
+            Assert.That(extraRoot.GetSiblingIndex(), Is.GreaterThan(firstRoot.GetSiblingIndex()));
+            var secondRoot = (RectTransform)status.transform.Find("UI_DamageSlot1");
+            var secondAnimation = (Tween)animationField.GetValue(slots[1]);
+            var oldCallback = secondAnimation.onComplete;
+            secondAnimation.Complete();
+            Assert.That(secondRoot.gameObject.activeSelf, Is.False);
+            status.ShowDamage(9, 0);
+            Assert.That(slots.Count, Is.EqualTo(4));
+            Assert.That(secondRoot.anchoredPosition, Is.EqualTo(new Vector2(0, -18)));
+            Assert.That(secondRoot.localScale, Is.EqualTo(Vector3.one));
+            Assert.That(secondRoot.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
+            Assert.That(secondRoot.GetSiblingIndex(), Is.GreaterThan(extraRoot.GetSiblingIndex()));
+            oldCallback();
+            Assert.That(secondRoot.Find("UI_Damage1").GetComponent<TMPro.TMP_Text>().text, Is.EqualTo("-9"));
+            Assert.That(secondRoot.Find("UI_ShieldDamage1").GetComponent<TMPro.TMP_Text>().text, Is.Empty);
+            Assert.That(secondRoot.Find("UI_ShieldDamageIcon1").gameObject.activeSelf, Is.False);
+            status.gameObject.SetActive(false);
+            foreach (var slot in slots) Assert.That(animationField.GetValue(slot), Is.Null);
+            foreach (var group in status.GetComponentsInChildren<CanvasGroup>(true))
+            {
+                Assert.That(group.gameObject.activeSelf, Is.False);
+                Assert.That(group.alpha, Is.Zero);
+                Assert.That(((RectTransform)group.transform).anchoredPosition, Is.EqualTo(Vector2.zero));
+            }
+
+            status.gameObject.SetActive(true);
+            var colors = UnityEditor.AssetDatabase.LoadAssetAtPath<GameColorPalette>(
+                "Assets/UnityCombatLab/Settings/UI_GameColors.asset");
+            entry.Hud.ApplyPalette(colors);
+            status.Initialize("騎士", Define.BattleTeam.Ally);
+            status.ShowDamage(7, 0);
+            Assert.That(slots.Count, Is.EqualTo(4));
+            Assert.That(firstText.text, Is.EqualTo("-7"));
+            Assert.That(firstGroup.alpha, Is.EqualTo(1f));
+            Assert.That(firstText.color, Is.EqualTo(colors.GetColor(Define.PaletteColor.OnAccent)));
+            Assert.That(extraText.color, Is.EqualTo(firstText.color));
+            status.ClearTransient();
             yield return null;
         }
 
