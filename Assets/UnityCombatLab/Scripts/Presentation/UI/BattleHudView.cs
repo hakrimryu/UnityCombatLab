@@ -17,6 +17,20 @@ namespace UnityCombatLab.Presentation.UI
     public sealed class BattleHudView : MonoBehaviour
     {
         /// <summary>
+        /// 安全領域の端と状態パネルの間に残すUI単位。
+        /// [KO] 안전 영역 경계와 상태 패널 사이에 남길 UI 단위입니다.
+        /// [EN] UI-unit padding between safe-area edges and status panels.
+        /// </summary>
+        private const float PanelEdgePadding = 16f;
+
+        /// <summary>
+        /// 上部の戦闘見出し用に空けるUI単位。
+        /// [KO] 위쪽 전투 제목을 위해 비울 UI 단위입니다.
+        /// [EN] UI units reserved for the battle heading above status panels.
+        /// </summary>
+        private const float HeadingClearance = 140f;
+
+        /// <summary>
         /// 味方・敵を交互に並べた 6 人分の状態パネル。
         /// [KO] 아군·적을 번갈아 배치한 6명의 상태 패널입니다.
         /// [EN] Six unit status panels ordered alternately by ally and enemy.
@@ -36,6 +50,13 @@ namespace UnityCombatLab.Presentation.UI
         /// [EN] HUD layout region sized to the screen safe area.
         /// </summary>
         [SerializeField] private RectTransform _safeArea;
+
+        /// <summary>
+        /// Frontendと同じ計算で安全領域のアンカーを更新するコンポーネント。
+        /// [KO] Frontend와 같은 계산으로 안전 영역 앵커를 갱신하는 컴포넌트입니다.
+        /// [EN] Component applying the same safe-area anchor calculation as Frontend.
+        /// </summary>
+        [SerializeField] private SafeAreaFitter _safeAreaFitter;
 
         /// <summary>
         /// 戦闘中に表示する見出しの背景。
@@ -115,20 +136,6 @@ namespace UnityCombatLab.Presentation.UI
         private RectTransform[] _panelRects;
 
         /// <summary>
-        /// HUD に最後に適用した画面の安全領域。
-        /// [KO] HUD에 마지막으로 적용한 화면 안전 영역입니다.
-        /// [EN] Screen safe area last applied to the HUD.
-        /// </summary>
-        private Rect _lastSafeArea;
-
-        /// <summary>
-        /// HUD の配置を最後に更新した時の画面サイズ。
-        /// [KO] HUD 배치를 마지막으로 갱신했을 때의 화면 크기입니다.
-        /// [EN] Screen size used for the last HUD layout update.
-        /// </summary>
-        private Vector2Int _lastScreenSize;
-
-        /// <summary>
         /// 表示対象の読み取り専用一覧。
         /// [KO] 표시 대상의 읽기 전용 목록.
         /// [EN] Read-only collection of display targets.
@@ -150,7 +157,8 @@ namespace UnityCombatLab.Presentation.UI
         public void Validate(int unitCount)
         {
             if (_units == null || _units.Length != unitCount || _units.Any(unit => unit == null) ||
-                _result == null || _safeArea == null || _resultPanel == null || _damageMaterialSource == null ||
+                _result == null || _safeArea == null || _safeAreaFitter == null ||
+                _safeAreaFitter.transform != _safeArea || _resultPanel == null || _damageMaterialSource == null ||
                 _victoryResult == null || _defeatResult == null || _defeatReason == null ||
                 _paletteBindings == null || _paletteBindings.Length == 0 ||
                 _paletteBindings.Any(binding => binding == null))
@@ -260,17 +268,7 @@ namespace UnityCombatLab.Presentation.UI
                 return;
             }
 
-            if (area != _lastSafeArea || size != _lastScreenSize)
-            {
-                _lastSafeArea = area;
-                _lastScreenSize = size;
-                // 画面幅 1000 の左端 50px は anchor x=0.05。全画面が安全なら (0,0)〜(1,1)。
-                _safeArea.anchorMin = new Vector2(area.xMin / size.x, area.yMin / size.y);
-                _safeArea.anchorMax = new Vector2(area.xMax / size.x, area.yMax / size.y);
-                // 解像度変更直後は CanvasScaler の新しい寸法を確定してから射影する。
-                // 古い Canvas 寸法を使うと、最初の 1 フレームだけパネルが中央で重なる。
-                Canvas.ForceUpdateCanvases();
-            }
+            _safeAreaFitter.Apply(area, size);
 
             if (_battleCamera == null || _panelPositions == null)
             {
@@ -285,10 +283,10 @@ namespace UnityCombatLab.Presentation.UI
                 var panel = _panelRects[index];
                 var halfWidth = panel.rect.width * 0.5f;
                 // pivot=(0.5,0) の底を頭上に置く。上 140 は見出し用、端の 16 はパネルと安全境界の余白。
-                point.x = Mathf.Clamp(point.x, _safeArea.rect.xMin + halfWidth + 16,
-                    _safeArea.rect.xMax - halfWidth - 16);
-                point.y = Mathf.Clamp(point.y, _safeArea.rect.yMin + 16,
-                    _safeArea.rect.yMax - panel.rect.height - 140);
+                point.x = Mathf.Clamp(point.x, _safeArea.rect.xMin + halfWidth + PanelEdgePadding,
+                    _safeArea.rect.xMax - halfWidth - PanelEdgePadding);
+                point.y = Mathf.Clamp(point.y, _safeArea.rect.yMin + PanelEdgePadding,
+                    _safeArea.rect.yMax - panel.rect.height - HeadingClearance);
                 panel.localPosition = new Vector3(point.x, point.y, 0);
             }
         }

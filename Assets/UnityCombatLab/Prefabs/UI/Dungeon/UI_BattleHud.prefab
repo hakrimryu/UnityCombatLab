@@ -4059,6 +4059,7 @@ MonoBehaviour:
   - {fileID: 2564829437294518205}
   _result: {fileID: 1733840384565094662}
   _safeArea: {fileID: 3642117412541087666}
+  _safeAreaFitter: {fileID: 7034134046073699551}
   _resultPanel: {fileID: 991908712631571737}
   _victoryResult: {fileID: 6687604408842401397}
   _defeatResult: {fileID: 9144263271819497502}
@@ -12549,6 +12550,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3642117412541087666}
+  - component: {fileID: 7034134046073699551}
   m_Layer: 0
   m_Name: SafeArea
   m_TagString: Untagged
@@ -12582,6 +12584,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &7034134046073699551
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6627818030155919304}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9cea0b28348bf1346964d58d98bb6f28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityCombatLab.Presentation::UnityCombatLab.Presentation.UI.SafeAreaFitter
 --- !u!1 &6706169889763890380
 GameObject:
   m_ObjectHideFlags: 0
