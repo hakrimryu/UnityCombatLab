@@ -1,12 +1,16 @@
 using UnityCombatLab.Application.Run;
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityCombatLab.Common;
 using UnityCombatLab.Domain.Run;
 using UnityCombatLab.Infrastructure.Balance;
+using UnityCombatLab.Infrastructure.Assets;
+using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.UI;
 using VContainer.Unity;
+using UnityEngine;
 
 namespace UnityCombatLab.Bootstrap
 {
@@ -29,7 +33,45 @@ namespace UnityCombatLab.Bootstrap
         /// [KO] 이 씬의 View에서 입력을 받을 Presenter입니다.
         /// [EN] Presenter receiving input from this scene's view.
         /// </summary>
-        private readonly FrontendPresenter _presenter;
+        private FrontendPresenter _presenter;
+
+        /// <summary>
+        /// シーン内の表示と、その表示が終了するまで保持する共通素材。
+        /// [KO] 씬 내부 표시와 표시가 종료할 때까지 유지할 공통 소재입니다.
+        /// [EN] Scene view and shared assets retained until that view ends.
+        /// </summary>
+        private readonly FrontendView _view;
+        /// <summary>
+        /// 新しいカードにも適用する共通色。
+        /// [KO] 새 카드에도 적용할 공통 색상입니다.
+        /// [EN] Shared colors also applied to newly created cards.
+        /// </summary>
+        private readonly GameColorPalette _colors;
+        /// <summary>
+        /// カード・配置枠・職業画像の型付き参照。
+        /// [KO] 카드·배치 슬롯·직업 이미지의 타입 지정 참조입니다.
+        /// [EN] Typed references for cards, slots and role images.
+        /// </summary>
+        private readonly UiAssetCatalog _catalog;
+        /// <summary>
+        /// このFrontendが生成した表示の破棄後に解放する素材。
+        /// [KO] 이 Frontend에서 생성한 표시를 파괴한 후 해제할 소재입니다.
+        /// [EN] Assets released after this Frontend's generated views are destroyed.
+        /// </summary>
+        private readonly AddressableAssetScope _assets;
+        /// <summary>
+        /// UnitDefinitionから作った職業名と実能力の説明。
+        /// [KO] UnitDefinition으로 만든 직업 이름과 실제 능력 설명입니다.
+        /// [EN] Role names and actual stat descriptions built from UnitDefinition.
+        /// </summary>
+        private readonly string[] _descriptions;
+
+        /// <summary>
+        /// シーン終了で読込結果の使用を取り消します。
+        /// [KO] 씬 종료 시 로딩 결과 사용을 취소합니다.
+        /// [EN] Cancels use of loading results when the scene ends.
+        /// </summary>
+        private readonly CancellationTokenSource _lifetime = new();
 
         /// <summary>
         /// 二重解除を防ぎます。
@@ -46,11 +88,12 @@ namespace UnityCombatLab.Bootstrap
         private bool _isStarted;
 
         /// <summary>
-        /// 実データの英雄説明と共通色を画面へ渡し、Presenter を作ります。
-        /// [KO] 실제 데이터 영웅 설명과 공통 색을 화면에 전달하고 Presenter를 만듭니다.
-        /// [EN] Supplies real hero descriptions and shared colors and creates the presenter.
+        /// 実データの英雄説明を作り、非同期のUI準備に使う依存関係を保持します。
+        /// [KO] 실제 데이터 영웅 설명을 만들고 비동기 UI 준비에 사용할 의존성을 보관합니다.
+        /// [EN] Builds actual hero descriptions and retains dependencies for async UI preparation.
         /// </summary>
-        public FrontendEntryPoint(RunFlowCoordinator flow, FrontendView view, UnitDefinition[] heroes, GameColorPalette colors)
+        public FrontendEntryPoint(RunFlowCoordinator flow, FrontendView view, UnitDefinition[] heroes,
+            GameColorPalette colors, AddressableAssetManager assets, UiAssetCatalog catalog)
         {
             _flow = flow ?? throw new ArgumentNullException(nameof(flow));
             if (view == null)
@@ -62,7 +105,10 @@ namespace UnityCombatLab.Bootstrap
             if (heroes == null || heroes.Length != Define.SlotsPerTeam)
                 throw new ArgumentException("Frontend requires three hero definitions.", nameof(heroes));
 
-            var descriptions = new string[Define.SlotsPerTeam];
+            _view = view;
+            _colors = colors;
+            _catalog = catalog != null ? catalog : throw new ArgumentNullException(nameof(catalog));
+            _descriptions = new string[Define.SlotsPerTeam];
             for (var index = 0; index < heroes.Length; index++)
             {
                 if (heroes[index] == null)
@@ -72,17 +118,16 @@ namespace UnityCombatLab.Bootstrap
                 if ((int)input.Role != index)
                     throw new InvalidOperationException("Hero definitions must be knight, ranger and mage.");
 
-                descriptions[index] = GameText.HeroDescription(input);
+                _descriptions[index] = GameText.HeroDescription(input);
             }
-            view.Initialize();
-            view.ApplyPalette(colors);
-            _presenter = new FrontendPresenter(flow.Controller, view, descriptions);
+
+            _assets = (assets ?? throw new ArgumentNullException(nameof(assets))).CreateScope();
         }
 
         /// <summary>
-        /// 入力と画面変更の接続を開始し、現在のページを表示します。
-        /// [KO] 입력과 화면 변경 연결을 시작하고 현재 페이지를 표시합니다.
-        /// [EN] Connects input and screen updates and renders the current page.
+        /// 共通切替処理にUI準備を登録し、素材が揃うまで入力を止めます。
+        /// [KO] 공통 전환 처리에 UI 준비를 등록하고 소재가 준비될 때까지 입력을 멈춥니다.
+        /// [EN] Registers UI preparation with shared transitions and disables input until assets are ready.
         /// </summary>
         public void Start()
         {
@@ -91,12 +136,57 @@ namespace UnityCombatLab.Bootstrap
 
             try
             {
+                _view.Initialize();
+                _view.SetInteractable(false);
+                _flow.RegisterFrontendPreparation(PrepareAsync);
+                _isStarted = true;
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 共通prefabと職業画像を読み込み、生成・入力接続・初回表示が揃ってから準備完了を通知します。
+        /// [KO] 공통 prefab과 직업 이미지를 로드하고 생성·입력 연결·첫 표시 후 준비 완료를 알립니다.
+        /// [EN] Loads shared prefabs and role images and signals readiness after creation, input setup and first rendering.
+        /// </summary>
+        private async UniTask PrepareAsync(CancellationToken cancellationToken)
+        {
+            if (_isDisposed)
+                throw new ObjectDisposedException(nameof(FrontendEntryPoint));
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+            var token = linked.Token;
+            try
+            {
+                var heroAsset = await _assets.LoadAsync(_catalog.HeroCard, token);
+                var slotAsset = await _assets.LoadAsync(_catalog.FormationSlot, token);
+                var heroPrefab = heroAsset.GetComponent<HeroCardView>();
+                var slotPrefab = slotAsset.GetComponent<FormationSlotView>();
+                if (heroPrefab == null || slotPrefab == null)
+                    throw new InvalidOperationException("UI catalog prefabs require HeroCardView and FormationSlotView.");
+
+                var heroes = new HeroCardData[Define.SlotsPerTeam];
+                for (var index = 0; index < heroes.Length; index++)
+                {
+                    var role = (Define.UnitRole)index;
+                    var visual = _catalog.GetHero(role);
+                    var icon = await _assets.LoadAsync(visual.Icon, token);
+                    heroes[index] = new HeroCardData(role, _descriptions[index], icon, visual.Tint);
+                }
+
+                token.ThrowIfCancellationRequested();
+                _view.CreateFormation(heroPrefab, slotPrefab, heroes, _colors);
+                _view.ApplyPalette(_colors);
+                _presenter = new FrontendPresenter(_flow.Controller, _view, _descriptions);
                 _presenter.DepartureRequested += HandleDepartureRequested;
                 _presenter.NavigationRequested += HandleNavigationRequested;
                 _presenter.VolumeRequested += HandleVolumeRequested;
                 _flow.Changed += HandleFlowChanged;
                 HandleFlowChanged();
-                _isStarted = true;
                 _flow.MarkFrontendReady();
             }
             catch
@@ -146,11 +236,32 @@ namespace UnityCombatLab.Bootstrap
                 return;
 
             _isDisposed = true;
+            _lifetime.Cancel();
             _flow.Changed -= HandleFlowChanged;
-            _presenter.DepartureRequested -= HandleDepartureRequested;
-            _presenter.NavigationRequested -= HandleNavigationRequested;
-            _presenter.VolumeRequested -= HandleVolumeRequested;
-            _presenter.Dispose();
+            if (_presenter != null)
+            {
+                _presenter.DepartureRequested -= HandleDepartureRequested;
+                _presenter.NavigationRequested -= HandleNavigationRequested;
+                _presenter.VolumeRequested -= HandleVolumeRequested;
+                _presenter.Dispose();
+            }
+
+            if (_view != null)
+                _view.DestroyFormation();
+
+            ReleaseAssetsAsync().Forget(Debug.LogException);
+            _lifetime.Dispose();
+        }
+
+        /// <summary>
+        /// 子ViewのDestroyとシーン破棄が完了する次フレームに素材の所有権を解放します。
+        /// [KO] 자식 View Destroy와 씬 파괴가 끝나는 다음 프레임에 소재 소유권을 해제합니다.
+        /// [EN] Releases asset ownership on the frame after child-view and scene destruction complete.
+        /// </summary>
+        private async UniTask ReleaseAssetsAsync()
+        {
+            await UniTask.NextFrame();
+            _assets.Dispose();
         }
     }
 }

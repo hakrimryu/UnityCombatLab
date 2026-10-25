@@ -373,8 +373,8 @@ namespace UnityCombatLab.Tests.PlayMode
             try
             {
                 // このRunの資産生成だけを置き換え、実際の読込失敗から復帰する経路を通す。
-                address.SetValue(flow, (Func<IRunResources>)(() => new RunAssetScope("")));
-                LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("HUD address is required"));
+                address.SetValue(flow, (Func<IRunResources>)(() => new RunAssetScope(new AddressableAssetManager(), null)));
+                LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("Run requires a UI asset catalog"));
                 yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
                 Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Error));
                 Assert.That(flow.CanRetry, Is.True);

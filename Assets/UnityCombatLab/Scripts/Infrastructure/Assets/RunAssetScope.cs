@@ -1,99 +1,114 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using UnityEngine;
 using UnityCombatLab.Application.Ports;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityCombatLab.Common;
+using UnityEngine;
 
 namespace UnityCombatLab.Infrastructure.Assets
 {
     /// <summary>
-    /// 一回の挑戦で読み込む HUD の handle を所有し、失敗・取消でも一度だけ解放します。
-    /// [KO] 한 번의 도전에서 로드하는 HUD handle을 소유하고 실패·취소에도 한 번만 해제합니다.
-    /// [EN] Owns one run's HUD handle and releases it once, including failure and cancellation.
+    /// 一回のRunが使うHUDを共通ローダーで準備し、表示破棄後に解放します。
+    /// [KO] 한 번의 Run이 사용할 HUD를 공통 로더로 준비하고 표시 파괴 후 해제합니다.
+    /// [EN] Prepares one run's HUD through the shared loader and releases it after view destruction.
     /// </summary>
     public sealed class RunAssetScope : IRunResources
     {
         /// <summary>
-        /// App Scopeが各Runへ渡すHUDの登録アドレス。
-        /// [KO] App Scope가 각 Run에 전달하는 HUD 등록 주소입니다.
-        /// [EN] HUD address supplied to each run by App Scope.
+        /// Run専用の資産所有範囲と型付きUIカタログ。
+        /// [KO] Run 전용 자산 소유 범위와 타입 지정 UI 카탈로그입니다.
+        /// [EN] Run-specific asset ownership scope and typed UI catalog.
         /// </summary>
-        private readonly string _address;
+        private readonly AddressableAssetScope _scope;
+        /// <summary>
+        /// HUDと職業画像の型付き参照元。
+        /// [KO] HUD와 직업 이미지의 타입 지정 참조 원본입니다.
+        /// [EN] Source of typed HUD and role-image references.
+        /// </summary>
+        private readonly UiAssetCatalog _catalog;
 
         /// <summary>
-        /// 準備完了後にDungeonの構成処理へ渡すHUD原型。
-        /// [KO] 준비 완료 후 Dungeon 구성 처리로 넘길 HUD 원형입니다.
-        /// [EN] HUD prefab handed to Dungeon composition after preparation.
+        /// 職業からHUD画像を選ぶ読込結果。Run終了時に参照を消します。
+        /// [KO] 직업으로 HUD 이미지를 선택할 로딩 결과이며 Run 종료 시 참조를 지웁니다.
+        /// [EN] Loaded role-to-HUD images, cleared when the run ends.
         /// </summary>
-        public GameObject HudPrefab { get; private set; }
+        private readonly Dictionary<Define.UnitRole, Sprite> _icons = new();
 
         /// <summary>
-        /// 今回の挑戦で読むHUDアドレスを保存します。
-        /// [KO] 이번 도전에서 읽을 HUD 주소를 저장합니다.
-        /// [EN] Stores the HUD address to load for this run.
+        /// HUD Presenterへ渡す職業別画像。
+        /// [KO] HUD Presenter에 전달할 직업별 이미지입니다.
+        /// [EN] Images by role supplied to the HUD presenter.
         /// </summary>
-        public RunAssetScope(string address)
-            => _address = address;
+        public IReadOnlyDictionary<Define.UnitRole, Sprite> Icons => _icons;
 
         /// <summary>
-        /// Runからの準備要求でHUDを読み込み、構成処理が参照できるよう保持します。
-        /// [KO] Run의 준비 요청으로 HUD를 로드하고 구성 처리에서 참조하도록 보관합니다.
-        /// [EN] Loads and retains the HUD on a run preparation request for later composition.
+        /// 同じRunでの重複準備と破棄後の再開を防ぎます。
+        /// [KO] 같은 Run에서 중복 준비와 파괴 후 재개를 막습니다.
+        /// [EN] Prevents repeated preparation and resuming after disposal.
         /// </summary>
-        public async UniTask PrepareAsync(CancellationToken cancellationToken)
-            => HudPrefab = await LoadHudAsync(_address, cancellationToken);
-
+        private bool _isPrepared;
         /// <summary>
-        /// 結果を使用する前から記録する、この Scope の読み込み所有権。
-        /// [KO] 결과를 사용하기 전부터 기록하는 이 Scope의 로딩 소유권입니다.
-        /// [EN] Owned loading handle recorded before its result can be used.
-        /// </summary>
-        private AsyncOperationHandle<GameObject>? _hud;
-
-        /// <summary>
-        /// 解放後の再読み込みと二重解放を防ぎます。
-        /// [KO] 해제 후 재로딩과 이중 해제를 막습니다.
-        /// [EN] Prevents loading after disposal and duplicate release.
+        /// 終了後の再利用と二重解放を防ぎます。
+        /// [KO] 종료 후 재사용과 중복 해제를 막습니다.
+        /// [EN] Prevents reuse and duplicate release after exit.
         /// </summary>
         private bool _isDisposed;
 
         /// <summary>
-        /// 内部ロードの完了を待ち、その後に取消を確認して HUD の原型を返します。
-        /// [KO] 내부 로드 완료를 기다린 뒤 취소를 확인하고 HUD 원형을 반환합니다.
-        /// [EN] Waits for the internal load, checks cancellation, and returns the HUD prefab.
+        /// Dungeonの構成処理に渡す読込済みHUD。
+        /// [KO] Dungeon 구성 처리에 전달할 로드된 HUD입니다.
+        /// [EN] Loaded HUD supplied to Dungeon composition.
         /// </summary>
-        public async UniTask<GameObject> LoadHudAsync(string address, CancellationToken cancellationToken)
+        public GameObject HudPrefab { get; private set; }
+
+        /// <summary>
+        /// App Scopeの共通サービスから、このRunだけの所有範囲を作ります。
+        /// [KO] App Scope의 공통 서비스에서 이번 Run만의 소유 범위를 만듭니다.
+        /// [EN] Creates this run's ownership scope from the app's shared service.
+        /// </summary>
+        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog)
+        {
+            _scope = (assets ?? throw new ArgumentNullException(nameof(assets))).CreateScope();
+            _catalog = catalog;
+        }
+
+        /// <summary>
+        /// カタログのHUDを一度読み込みます。失敗時は取得済み資産も解放します。
+        /// [KO] 카탈로그의 HUD를 한 번 로드하며 실패 시 취득한 자산도 해제합니다.
+        /// [EN] Loads the catalog's HUD once and releases acquired assets on failure.
+        /// </summary>
+        public async UniTask PrepareAsync(CancellationToken cancellationToken)
         {
             if (_isDisposed)
                 throw new ObjectDisposedException(nameof(RunAssetScope));
 
-            if (_hud.HasValue)
-                throw new InvalidOperationException("This run already owns a HUD load.");
+            if (_isPrepared)
+                throw new InvalidOperationException("This run has already started preparing assets.");
 
-            if (string.IsNullOrWhiteSpace(address))
-                throw new ArgumentException("HUD address is required.", nameof(address));
+            _isPrepared = true;
+            try
+            {
+                if (_catalog == null)
+                    throw new InvalidOperationException("Run requires a UI asset catalog.");
 
-            cancellationToken.ThrowIfCancellationRequested();
-            var handle = Addressables.LoadAssetAsync<GameObject>(address);
-            _hud = handle;
-            // 内部ロードを早期取消しない。遅い完了もこの Scope に戻してから、使用可否を判定する。
-            var prefab = await handle;
-            cancellationToken.ThrowIfCancellationRequested();
-            if (_isDisposed)
-                throw new OperationCanceledException(cancellationToken);
+                var hud = await _scope.LoadAsync(_catalog.BattleHud, cancellationToken);
+                foreach (Define.UnitRole role in Enum.GetValues(typeof(Define.UnitRole)))
+                    _icons.Add(role, await _scope.LoadAsync(_catalog.GetBattleIcon(role), cancellationToken));
 
-            if (prefab == null)
-                throw new InvalidOperationException("The HUD address returned no prefab.");
-
-            return prefab;
+                HudPrefab = hud;
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         /// <summary>
-        /// HUD インスタンスの破棄後に呼び、所有 handle を解放します。未完了なら完了時に解放します。
-        /// [KO] HUD 인스턴스 파괴 후 호출해 소유 handle을 해제하며 미완료이면 완료 시 해제합니다.
-        /// [EN] Releases the owned handle after HUD destruction, or on completion if still loading.
+        /// Run調整役がHUD破棄後に呼び、Runの資産だけを解放します。
+        /// [KO] Run 조정자가 HUD 파괴 후 호출하여 Run 자산만 해제합니다.
+        /// [EN] Called by run coordination after HUD destruction to release only this run's assets.
         /// </summary>
         public void Dispose()
         {
@@ -102,18 +117,8 @@ namespace UnityCombatLab.Infrastructure.Assets
 
             _isDisposed = true;
             HudPrefab = null;
-            if (!_hud.HasValue)
-                return;
-
-            var handle = _hud.Value;
-            _hud = null;
-            if (!handle.IsValid())
-                return;
-
-            if (handle.IsDone)
-                Addressables.Release(handle);
-            else
-                handle.Completed += completed => Addressables.Release(completed);
+            _icons.Clear();
+            _scope.Dispose();
         }
     }
 }

@@ -5,6 +5,7 @@
         "VContainer",
         "UnityEngine.UI",
         "UniTask",
+        "Unity.Addressables",
         "UnityCombatLab.Common",
         "UnityCombatLab.Infrastructure",
         "UnityCombatLab.Domain",

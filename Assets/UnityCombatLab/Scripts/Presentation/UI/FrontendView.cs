@@ -87,51 +87,31 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private Button _errorTitle;
 
         /// <summary>
-        /// 騎士・弓使い・魔法使いを選択するカード。
-        /// [KO] 기사·궁수·마법사를 선택할 카드입니다.
-        /// [EN] Cards selecting knight, ranger and mage.
+        /// 騎士・弓使い・魔法使いのカードを生成する配置先。
+        /// [KO] 기사·궁수·마법사 카드를 생성할 배치 위치입니다.
+        /// [EN] Authored hosts for knight, ranger and mage cards.
         /// </summary>
-        [SerializeField] private Button[] _heroButtons;
+        [SerializeField] private RectTransform[] _heroCardHosts;
         /// <summary>
-        /// 英雄の名前と実際の能力を示すカード文字。
-        /// [KO] 영웅의 이름과 실제 능력을 보여줄 카드 글자입니다.
-        /// [EN] Card text showing hero names and actual stats.
+        /// 前列・後列上・後列下の共通枠を生成する配置先。
+        /// [KO] 전열·위쪽 후열·아래쪽 후열 공통 슬롯을 생성할 배치 위치입니다.
+        /// [EN] Authored hosts for front, upper-back and lower-back slots.
         /// </summary>
-        [SerializeField] private TMP_Text[] _heroTexts;
+        [SerializeField] private RectTransform[] _slotHosts;
 
         /// <summary>
-        /// 騎士・弓使い・魔法使いの順に、選択時だけ黄色へ変えるカード背景。
-        /// [KO] 기사·궁수·마법사 순서로 선택 시에만 노란색으로 바꿀 카드 배경입니다.
-        /// [EN] Card backgrounds tinted yellow only when selected, in knight, ranger and mage order.
+        /// この画面が生成して破棄する三枚のカード。
+        /// [KO] 이 화면이 생성하고 파괴할 카드 세 개입니다.
+        /// [EN] Three cards created and destroyed by this screen.
         /// </summary>
-        [SerializeField] private Image[] _heroBackgrounds;
+        private readonly HeroCardView[] _heroCards = new HeroCardView[Define.SlotsPerTeam];
 
         /// <summary>
-        /// 選択した英雄のカードだけに表示するチェックバッジ。
-        /// [KO] 선택한 영웅 카드에만 표시할 체크 배지입니다.
-        /// [EN] Check badges shown only on the selected hero card.
+        /// この画面が生成して破棄する三つの配置枠。
+        /// [KO] 이 화면이 생성하고 파괴할 배치 슬롯 세 개입니다.
+        /// [EN] Three slots created and destroyed by this screen.
         /// </summary>
-        [SerializeField] private GameObject[] _heroSelectionBadges;
-
-        /// <summary>
-        /// 選択した英雄のカード背景色。未選択の背景には白を使います。
-        /// [KO] 선택한 영웅의 카드 배경색이며 선택하지 않은 배경에는 흰색을 사용합니다.
-        /// [EN] Selected hero background color; unselected backgrounds use white.
-        /// </summary>
-        [SerializeField] private Color _selectedHeroColor = new Color(0.98f, 0.643f, 0.11f, 1f);
-
-        /// <summary>
-        /// 前列・後列上・後列下の順の移動先。
-        /// [KO] 전열·위쪽 후열·아래쪽 후열 순서의 이동 위치입니다.
-        /// [EN] Destination slots in front, upper-back and lower-back order.
-        /// </summary>
-        [SerializeField] private Button[] _slotButtons;
-        /// <summary>
-        /// 各配置枠と、現在そこにいる英雄を示す文字。
-        /// [KO] 각 배치 슬롯과 현재 영웅을 나타내는 글자입니다.
-        /// [EN] Text identifying each slot and its current hero.
-        /// </summary>
-        [SerializeField] private TMP_Text[] _slotTexts;
+        private readonly FormationSlotView[] _slots = new FormationSlotView[Define.SlotsPerTeam];
         /// <summary>
         /// 標準・やさしいの選択ボタン。
         /// [KO] 표준·쉬움 선택 버튼입니다.
@@ -286,14 +266,6 @@ namespace UnityCombatLab.Presentation.UI
             _resultTitle.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Title));
             _retry.onClick.AddListener(() => RetryRequested?.Invoke());
             _errorTitle.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Title));
-            for (var index = 0; index < Define.SlotsPerTeam; index++)
-            {
-                var selection = index;
-                // 0/1/2 は騎士/弓使い/魔法使い、および前列/後列上/後列下の順。
-                _heroButtons[index].onClick.AddListener(() => HeroSelected?.Invoke((Define.UnitRole)selection));
-                _slotButtons[index].onClick.AddListener(() => SlotSelected?.Invoke((Define.BattleSlot)selection));
-            }
-
             _difficultyButtons[0].onClick.AddListener(() => DifficultySelected?.Invoke(Define.Difficulty.Standard));
             _difficultyButtons[1].onClick.AddListener(() => DifficultySelected?.Invoke(Define.Difficulty.Easy));
             _depart.onClick.AddListener(() => DepartureRequested?.Invoke());
@@ -327,12 +299,8 @@ namespace UnityCombatLab.Presentation.UI
             RequireReference(_errorText, nameof(_errorText));
             RequireReference(_volume, nameof(_volume));
             RequireReference(_volumeText, nameof(_volumeText));
-            ValidateReferences(_heroButtons, Define.SlotsPerTeam, nameof(_heroButtons));
-            ValidateReferences(_heroTexts, Define.SlotsPerTeam, nameof(_heroTexts));
-            ValidateReferences(_heroBackgrounds, Define.SlotsPerTeam, nameof(_heroBackgrounds));
-            ValidateReferences(_heroSelectionBadges, Define.SlotsPerTeam, nameof(_heroSelectionBadges));
-            ValidateReferences(_slotButtons, Define.SlotsPerTeam, nameof(_slotButtons));
-            ValidateReferences(_slotTexts, Define.SlotsPerTeam, nameof(_slotTexts));
+            ValidateReferences(_heroCardHosts, Define.SlotsPerTeam, nameof(_heroCardHosts));
+            ValidateReferences(_slotHosts, Define.SlotsPerTeam, nameof(_slotHosts));
             ValidateReferences(_difficultyButtons, 2, nameof(_difficultyButtons));
             ValidateReferences(_difficultyTexts, 2, nameof(_difficultyTexts));
             if (_paletteBindings == null || _paletteBindings.Length == 0)
@@ -341,6 +309,106 @@ namespace UnityCombatLab.Presentation.UI
             for (var index = 0; index < _paletteBindings.Length; index++)
                 if (_paletteBindings[index] == null)
                     throw new InvalidOperationException($"Frontend palette binding {index} is missing.");
+        }
+
+        /// <summary>
+        /// 読込済みの共通prefabを配置先へ生成し、職業データと入力通知を接続します。
+        /// [KO] 로드된 공통 prefab을 배치 위치에 생성하고 직업 데이터와 입력 알림을 연결합니다.
+        /// [EN] Creates loaded shared prefabs in authored hosts and connects role data and input notifications.
+        /// </summary>
+        public void CreateFormation(HeroCardView heroPrefab, FormationSlotView slotPrefab,
+            IReadOnlyList<HeroCardData> heroes, GameColorPalette colors)
+        {
+            Validate();
+            if (heroPrefab == null || slotPrefab == null || colors == null || heroes == null || heroes.Count != Define.SlotsPerTeam)
+                throw new ArgumentException("Formation requires shared prefabs, a palette and three hero records.");
+
+            for (var index = 0; index < Define.SlotsPerTeam; index++)
+            {
+                if (_heroCards[index] != null || _slots[index] != null)
+                    throw new InvalidOperationException("Formation has already been created.");
+
+                if (heroes[index] == null || (int)heroes[index].Role != index)
+                    throw new ArgumentException("Hero records must be knight, ranger and mage.", nameof(heroes));
+            }
+
+            try
+            {
+                for (var index = 0; index < Define.SlotsPerTeam; index++)
+                {
+                    _heroCards[index] = Instantiate(heroPrefab, _heroCardHosts[index], false);
+                    FillHost((RectTransform)_heroCards[index].transform);
+                    _heroCards[index].Bind(heroes[index], colors);
+                    _heroCards[index].Selected += HandleHeroSelected;
+                    _slots[index] = Instantiate(slotPrefab, _slotHosts[index], false);
+                    FillHost((RectTransform)_slots[index].transform);
+                    // 0/1/2は前列/後列上/後列下。位置はprefabの配置先に保存されている。
+                    _slots[index].Bind((Define.BattleSlot)index, colors);
+                    _slots[index].Selected += HandleSlotSelected;
+                }
+            }
+            catch
+            {
+                DestroyFormation();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 生成した共通部品を、画面に保存された配置先の大きさへ合わせます。
+        /// [KO] 생성한 공통 부품을 화면에 저장된 배치 위치 크기에 맞춥니다.
+        /// [EN] Fits a generated shared component to its screen-authored host size.
+        /// </summary>
+        private static void FillHost(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>
+        /// 子カードの職業選択をPresenterへ転送します。
+        /// [KO] 자식 카드의 직업 선택을 Presenter에 전달합니다.
+        /// [EN] Forwards child-card role selection to the presenter.
+        /// </summary>
+        private void HandleHeroSelected(Define.UnitRole role)
+            => HeroSelected?.Invoke(role);
+
+        /// <summary>
+        /// 子の配置枠の入力をPresenterへ転送します。
+        /// [KO] 자식 배치 슬롯의 입력을 Presenter에 전달합니다.
+        /// [EN] Forwards child-slot input to the presenter.
+        /// </summary>
+        private void HandleSlotSelected(Define.BattleSlot slot)
+            => SlotSelected?.Invoke(slot);
+
+        /// <summary>
+        /// 入力を解除して生成した表示を破棄します。EntryPointは次フレーム以降に資産を解放します。
+        /// [KO] 입력을 해제하고 생성한 표시를 파괴합니다. EntryPoint는 다음 프레임 이후 자산을 해제합니다.
+        /// [EN] Detaches input and destroys generated views; the entry point releases assets from the next frame onward.
+        /// </summary>
+        public void DestroyFormation()
+        {
+            for (var index = 0; index < Define.SlotsPerTeam; index++)
+            {
+                if (_heroCards[index] != null)
+                {
+                    _heroCards[index].Selected -= HandleHeroSelected;
+                    _heroCards[index].gameObject.SetActive(false);
+                    Destroy(_heroCards[index].gameObject);
+                }
+
+                if (_slots[index] != null)
+                {
+                    _slots[index].Selected -= HandleSlotSelected;
+                    _slots[index].gameObject.SetActive(false);
+                    Destroy(_slots[index].gameObject);
+                }
+
+                _heroCards[index] = null;
+                _slots[index] = null;
+            }
         }
 
         /// <summary>
@@ -416,16 +484,11 @@ namespace UnityCombatLab.Presentation.UI
         /// </summary>
         public void ShowFormation(FormationDisplay display)
         {
-            for (var index = 0; index < _heroTexts.Length; index++)
-            {
-                _heroTexts[index].text = display.Heroes[index];
-                var isSelected = display.HeroSelections[index];
-                _heroBackgrounds[index].color = isSelected ? _selectedHeroColor : Color.white;
-                _heroSelectionBadges[index].SetActive(isSelected);
-            }
+            for (var index = 0; index < _heroCards.Length; index++)
+                _heroCards[index].Show(display.Heroes[index], display.HeroSelections[index]);
 
-            for (var index = 0; index < _slotTexts.Length; index++)
-                _slotTexts[index].text = display.Slots[index];
+            for (var index = 0; index < _slots.Length; index++)
+                _slots[index].Show(display.Slots[index]);
 
             for (var index = 0; index < _difficultyTexts.Length; index++)
                 _difficultyTexts[index].text = display.Difficulties[index];

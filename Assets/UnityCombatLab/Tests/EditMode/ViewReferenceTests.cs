@@ -22,8 +22,8 @@ namespace UnityCombatLab.Tests.EditMode
         /// [EN] Reports missing buttons, incorrect array lengths and missing entries by field name before input setup.
         /// </summary>
         [TestCase("_titleStart")]
-        [TestCase("_heroButtons")]
-        [TestCase("_slotTexts.Array.data[1]")]
+        [TestCase("_heroCardHosts")]
+        [TestCase("_slotHosts.Array.data[1]")]
         public void FrontendRejectsIncompleteReferences(string propertyPath)
         {
             var owner = new GameObject("InactiveFrontendTest");

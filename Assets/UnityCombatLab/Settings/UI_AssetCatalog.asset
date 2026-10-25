@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c2c0bf1c949c664c9ac3ad69248c40b, type: 3}
+  m_Name: UI_AssetCatalog
+  m_EditorClassIdentifier: UnityCombatLab.Infrastructure::UnityCombatLab.Infrastructure.Assets.UiAssetCatalog
+  _heroCard:
+    m_AssetGUID: 2b4706fa42eb72741b00ff6e457b54f5
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 0
+  _formationSlot:
+    m_AssetGUID: 7499acc09b3c97e4591f6e19e52c5ccc
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 0
+  _battleHud:
+    m_AssetGUID: 1c2ba7418accf8f4a9c9534724fd4338
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 0
+  _heroes:
+  - _icon:
+      m_AssetGUID: 5abb7f6a07a164340a0b4ae2fbc2ad7d
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 1
+    _tint: {r: 0.39215684, g: 0.7515984, b: 1, a: 1}
+  - _icon:
+      m_AssetGUID: 0f2bb0cb411a3421d92341f6c48d9f7a
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 1
+    _tint: {r: 0.59607846, g: 1, b: 0.39215687, a: 1}
+  - _icon:
+      m_AssetGUID: ac83b41d897ca43f788522aa88c24c83
+      m_SubObjectName: 
+      m_SubObjectType: 
+      m_SubObjectGUID: 
+      m_EditorAssetChanged: 1
+    _tint: {r: 0.9411765, g: 0.5686275, b: 0.92156863, a: 1}
+  _battleIcons:
+  - m_AssetGUID: d1e579f9b9fca424e863bbe58c5a2dd0
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 1
+  - m_AssetGUID: ef1fa0ae616f741f2a317da5fa6483ed
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 1
+  - m_AssetGUID: 235b185def889413b8a59230b31a8fcd
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 1
+  - m_AssetGUID: 6f88df0f9e7f24896890050163db4dd3
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 1
+  - m_AssetGUID: ef1fa0ae616f741f2a317da5fa6483ed
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 1
+  - m_AssetGUID: 6f88df0f9e7f24896890050163db4dd3
+    m_SubObjectName: 
+    m_SubObjectType: 
+    m_SubObjectGUID: 
+    m_EditorAssetChanged: 1

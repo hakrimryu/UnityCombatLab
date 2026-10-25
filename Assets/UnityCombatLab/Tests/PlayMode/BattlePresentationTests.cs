@@ -9,6 +9,7 @@ using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Bootstrap;
 using UnityCombatLab.Common;
 using UnityCombatLab.Infrastructure.Balance;
+using UnityCombatLab.Infrastructure.Assets;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
@@ -29,6 +30,17 @@ namespace UnityCombatLab.Tests.PlayMode
     /// </summary>
     public sealed class BattlePresentationTests
     {
+        /// <summary>
+        /// 実際のRunが保持する騎士画像を表示の再初期化へ渡します。
+        /// [KO] 실제 Run이 보관한 기사 이미지를 표시 재초기화에 전달합니다.
+        /// [EN] Supplies the knight image retained by the actual run when reinitializing views.
+        /// </summary>
+        private static Sprite GetKnightIcon()
+        {
+            var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
+            return ((RunAssetScope)flow.ActiveSession.Resources).Icons[Define.UnitRole.Knight];
+        }
+
         /// <summary>
         /// 各検証を独立した AppRoot から起動します。
         /// [KO] 각 검증을 독립 AppRoot에서 시작합니다.
@@ -187,7 +199,7 @@ namespace UnityCombatLab.Tests.PlayMode
                 var colors = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<GameColorPalette>();
                 hud.ApplyPalette(colors);
                 var view = hud.Units[0];
-                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.Initialize("騎士", Define.BattleTeam.Ally, GetKnightIcon());
                 var bar = view.transform.Find("HealthBar").GetComponent<UnityEngine.UI.Slider>();
                 var preview = view.transform.Find("HealthBar/FillArea/UI_DamagePreview")
                     .GetComponent<UnityEngine.UI.Image>();
@@ -227,7 +239,7 @@ namespace UnityCombatLab.Tests.PlayMode
                 Assert.That(trail.enabled, Is.False);
                 Assert.That(preview.enabled, Is.False);
 
-                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.Initialize("騎士", Define.BattleTeam.Ally, GetKnightIcon());
                 view.SetHealth(100, 100);
                 view.SetHealth(60, 100);
                 // 0.12 秒を 4 フレームに分けても、上の 1 フレームと同じ 80% に到着する。
@@ -456,7 +468,7 @@ namespace UnityCombatLab.Tests.PlayMode
                 var trail = view.transform.Find("HealthBar/FillArea/UI_TrailingHealth")
                     .GetComponent<UnityEngine.UI.Image>();
 
-                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.Initialize("騎士", Define.BattleTeam.Ally, GetKnightIcon());
                 view.SetHealth(40, 100);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.4f).Within(0.001f));
                 view.SetShield(20);
@@ -473,14 +485,14 @@ namespace UnityCombatLab.Tests.PlayMode
                 view.Advance(1f);
                 Assert.That(bar.normalizedValue, Is.Zero);
                 Assert.That(preview.enabled || trail.enabled, Is.False);
-                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.Initialize("騎士", Define.BattleTeam.Ally, GetKnightIcon());
                 view.SetHealth(100, 100);
                 view.SetHealth(30, 100);
                 view.gameObject.SetActive(false);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.3f).Within(0.001f));
                 Assert.That(preview.enabled || trail.enabled, Is.False);
                 view.gameObject.SetActive(true);
-                view.Initialize("騎士", Define.BattleTeam.Ally);
+                view.Initialize("騎士", Define.BattleTeam.Ally, GetKnightIcon());
                 view.SetHealth(75, 100);
                 view.Advance(2f);
                 Assert.That(bar.normalizedValue, Is.EqualTo(0.75f).Within(0.001f));
@@ -512,7 +524,9 @@ namespace UnityCombatLab.Tests.PlayMode
             using var runner = new BattleRunner(Guid.NewGuid(), 1, inputs);
             using var presented = new BattlePresentationReadModel(inputs);
             var colors = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<GameColorPalette>();
-            var presenter = new BattleHudPresenter(presented, hud, colors);
+            var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
+            var icons = ((RunAssetScope)flow.ActiveSession.Resources).Icons;
+            var presenter = new BattleHudPresenter(presented, hud, colors, icons);
             var initial = hud.Units.Select(unit => unit.HealthRenderCount).ToArray();
             runner.Advance(0.4);
             Assert.That(hud.Units.Select(unit => unit.HealthRenderCount), Is.EqualTo(initial));
@@ -522,7 +536,7 @@ namespace UnityCombatLab.Tests.PlayMode
             presented.Units[0].ReserveDamage(10);
             presented.Units[0].ApplyDamage(10, 0);
             Assert.That(hud.Units.Select(unit => unit.HealthRenderCount), Is.EqualTo(initial));
-            using (new BattleHudPresenter(presented, hud, colors))
+            using (new BattleHudPresenter(presented, hud, colors, icons))
             {
                 for (var index = 0; index < inputs.Length; index++)
                 {
@@ -676,7 +690,9 @@ namespace UnityCombatLab.Tests.PlayMode
             var colors = UnityEditor.AssetDatabase.LoadAssetAtPath<GameColorPalette>(
                 "Assets/UnityCombatLab/Settings/UI_GameColors.asset");
             entry.Hud.ApplyPalette(colors);
-            status.Initialize("騎士", Define.BattleTeam.Ally);
+            var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
+            var icon = ((RunAssetScope)flow.ActiveSession.Resources).Icons[Define.UnitRole.Knight];
+            status.Initialize("騎士", Define.BattleTeam.Ally, icon);
             status.ShowDamage(7, 0);
             Assert.That(slots.Count, Is.EqualTo(4));
             Assert.That(firstText.text, Is.EqualTo("-7"));

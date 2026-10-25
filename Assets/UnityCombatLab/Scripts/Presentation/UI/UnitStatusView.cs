@@ -98,6 +98,13 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private UnityEngine.UI.Image _badge;
 
         /// <summary>
+        /// 配置順ではなく、Presenterが渡す実際の職業画像を表示します。
+        /// [KO] 배치 순서 대신 Presenter가 전달하는 실제 직업 이미지를 표시합니다.
+        /// [EN] Shows the actual role image supplied by the presenter rather than an image fixed to a slot.
+        /// </summary>
+        [SerializeField] private UnityEngine.UI.Image _roleIcon;
+
+        /// <summary>
         /// HP 0 を色だけでなく「戦闘不能」と伝える表示先。
         /// [KO] HP 0을 색뿐 아니라 '전투 불능' 문구로 알리는 표시 대상입니다.
         /// [EN] Label explicitly identifying defeat at zero HP rather than relying on color alone.
@@ -110,6 +117,13 @@ namespace UnityCombatLab.Presentation.UI
         /// [EN] Component owning the damage-number pool and each display's expiry.
         /// </summary>
         [SerializeField] private DamageNumberView _damageNumbers;
+
+        /// <summary>
+        /// この共通パネル内の固定色。親HUDはパネル内部の部品を直接参照しません。
+        /// [KO] 공통 패널 내부 고정 색상이며 부모 HUD는 패널 내부 부품을 직접 참조하지 않습니다.
+        /// [EN] Static colors within this shared panel, keeping its internal graphics out of the parent HUD's bindings.
+        /// </summary>
+        [SerializeField] private PaletteGraphicBinding[] _paletteBindings;
 
         /// <summary>
         /// 再バインド時にも生存色へ戻せるよう Initialize で記録する陣営色。
@@ -211,16 +225,16 @@ namespace UnityCombatLab.Presentation.UI
         public int HealthRenderCount { get; private set; }
 
         /// <summary>
-        /// 名前と陣営色を設定し、被害数字とゲージの補間を初期化します。
-        /// [KO] 이름과 팀 색상을 설정하고 피해 숫자와 게이지 보간을 초기화합니다.
-        /// [EN] Sets the name and team colors and resets damage numbers and gauge interpolation.
+        /// 名前・職業画像・陣営色を設定し、被害数字とゲージの補間を初期化します。
+        /// [KO] 이름·직업 이미지·팀 색상을 설정하고 피해 숫자와 게이지 보간을 초기화합니다.
+        /// [EN] Sets the name, role image and team colors and resets damage numbers and gauge interpolation.
         /// </summary>
-        public void Initialize(string displayName, Define.BattleTeam team)
+        public void Initialize(string displayName, Define.BattleTeam team, Sprite icon)
         {
             if (_name == null || _health == null || _shield == null || _fill == null || _healthBar == null ||
                 _damageNumbers == null || _shieldIcon == null ||
                 _badge == null || _defeated == null || _colors == null ||
-                _damagePreview == null || _trailingHealth == null)
+                _damagePreview == null || _trailingHealth == null || _roleIcon == null || icon == null)
             {
                 throw new InvalidOperationException("Unit status references must be assigned.");
             }
@@ -229,6 +243,7 @@ namespace UnityCombatLab.Presentation.UI
             _hasHealth = false;
             _previewTarget = 1f;
             _name.text = displayName;
+            _roleIcon.sprite = icon;
             _teamColor = _colors.GetTeamColor(team);
             _fill.color = _teamColor;
             _badge.color = _teamColor;
@@ -244,8 +259,20 @@ namespace UnityCombatLab.Presentation.UI
         public void ApplyPalette(GameColorPalette colors, Material damageMaterial)
         {
             _colors = colors != null ? colors : throw new ArgumentNullException(nameof(colors));
+            if (_paletteBindings == null || _paletteBindings.Length == 0)
+                throw new InvalidOperationException("Unit status requires local palette bindings.");
+
+            foreach (var binding in _paletteBindings)
+            {
+                if (binding == null)
+                    throw new InvalidOperationException("Unit status has a missing palette binding.");
+
+                binding.Apply(colors);
+            }
+
             if (_damageNumbers == null)
                 throw new InvalidOperationException("Damage number view must be assigned.");
+
             _damageNumbers.ApplyMaterial(damageMaterial);
         }
 

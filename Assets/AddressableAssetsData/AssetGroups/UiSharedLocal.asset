@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: UiSharedLocal
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: UiSharedLocal
+  m_GUID: 7ea27f65e0abbe14e9107839e17f638f
+  m_SerializeEntries:
+  - m_GUID: 0f2bb0cb411a3421d92341f6c48d9f7a
+    m_Address: UnityCombatLab/UI/HeroIcon/Ranger
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 235b185def889413b8a59230b31a8fcd
+    m_Address: UnityCombatLab/UI/BattleIcon/wand_star
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5abb7f6a07a164340a0b4ae2fbc2ad7d
+    m_Address: UnityCombatLab/UI/HeroIcon/Knight
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6f88df0f9e7f24896890050163db4dd3
+    m_Address: UnityCombatLab/UI/BattleIcon/skull_1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ac83b41d897ca43f788522aa88c24c83
+    m_Address: UnityCombatLab/UI/HeroIcon/Mage
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d1e579f9b9fca424e863bbe58c5a2dd0
+    m_Address: UnityCombatLab/UI/BattleIcon/warrior
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ef1fa0ae616f741f2a317da5fa6483ed
+    m_Address: UnityCombatLab/UI/BattleIcon/archer
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 24f19ee2c8e3c1d4dab4b11d9a3350aa, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 95bd3f38cf40ff94ea82002dbca13bb6, type: 2}
+    - {fileID: 11400000, guid: 2eaac122cfd07bc4a9049c1ed77600ad, type: 2}

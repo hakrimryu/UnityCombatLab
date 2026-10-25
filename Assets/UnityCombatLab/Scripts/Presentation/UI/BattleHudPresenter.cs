@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 using R3;
 using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Common;
@@ -46,10 +48,14 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] BattleEntryPoint.Start가 호출합니다. 초기 HP를 즉시 표시하고 이후에는 값이 바뀔 때 같은 HUD를 갱신합니다.
         /// [EN] Called by BattleEntryPoint.Start to display initial health immediately and then update the HUD on changes.
         /// </summary>
-        public BattleHudPresenter(BattlePresentationReadModel model, BattleHudView view, GameColorPalette colors, bool showResult = true)
+        public BattleHudPresenter(BattlePresentationReadModel model, BattleHudView view, GameColorPalette colors,
+            IReadOnlyDictionary<Define.UnitRole, Sprite> icons, bool showResult = true)
         {
             _view = view != null ? view : throw new ArgumentNullException(nameof(view));
             _showResult = showResult;
+            if (icons == null)
+                throw new ArgumentNullException(nameof(icons));
+
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model));
@@ -65,7 +71,7 @@ namespace UnityCombatLab.Presentation.UI
                     // 同じ index のユニットと状態パネルを接続する。
                     var unit = model.Units[index];
                     var status = view.Units[index];
-                    status.Initialize(GameText.RoleName(unit.Input.Role), unit.Input.Team);
+                    status.Initialize(GameText.RoleName(unit.Input.Role), unit.Input.Team, icons[unit.Input.Role]);
                     // 初期 HP と命中後の HP を対応するパネルへ表示する。
                     unit.Health.Subscribe(value =>
                     {

@@ -2,6 +2,7 @@ using UnityCombatLab.Application.Run;
 using System;
 using System.Linq;
 using UnityCombatLab.Infrastructure.Balance;
+using UnityCombatLab.Infrastructure.Assets;
 using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.UI;
@@ -57,7 +58,9 @@ namespace UnityCombatLab.Bootstrap
             (resolver.Resolve<RunFlowCoordinator>(),
                 _view,
                 _heroes,
-                resolver.Resolve<GameColorPalette>()), Lifetime.Scoped).AsSelf();
+                resolver.Resolve<GameColorPalette>(),
+                resolver.Resolve<AddressableAssetManager>(),
+                resolver.Resolve<UiAssetCatalog>()), Lifetime.Scoped).AsSelf();
         }
     }
 }

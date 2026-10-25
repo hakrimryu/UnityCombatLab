@@ -1,5 +1,6 @@
 using UnityCombatLab.Application.Run;
 using System;
+using System.Collections.Generic;
 using UnityCombatLab.Application.Ports;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Presentation.UI;
@@ -40,6 +41,13 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] HUD prefab instantiated at battle startup.
         /// </summary>
         private readonly BattleHudView _hudPrefab;
+
+        /// <summary>
+        /// RunがHUDと一緒に保持する職業別画像。
+        /// [KO] Run이 HUD와 함께 유지할 직업별 이미지입니다.
+        /// [EN] Role images retained by the run together with the HUD.
+        /// </summary>
+        private readonly IReadOnlyDictionary<Define.UnitRole, Sprite> _icons;
 
         /// <summary>
         /// Dungeon に配置された、今回の戦闘に使うユニットの View。
@@ -138,13 +146,15 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Stores the runner, battle identifiers, views and settings supplied by BattleLifetimeScope for connection in Start.
         /// </summary>
         public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, UnitView[] unitViews,
-            BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors, RunSession session = null)
+            BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors,
+            IReadOnlyDictionary<Define.UnitRole, Sprite> icons, RunSession session = null)
         {
             Runner = runner;
             _runId = runId;
             _wave = wave;
             _unitViews = unitViews;
             _hudPrefab = hudPrefab;
+            _icons = icons ?? throw new ArgumentNullException(nameof(icons));
             _hudParent = hudParent;
             _battleCamera = battleCamera;
             _colors = colors;
@@ -179,7 +189,7 @@ namespace UnityCombatLab.Bootstrap
                     unit.PrepareEffects();
                 }
 
-                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors, _session == null);
+                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors, _icons, _session == null);
                 _presenter = new BattlePresenter(Runner, _runId, _wave, _unitViews, Hud, Presentation);
                 // 接続途中に Tick が来ても進まないよう、すべて成功した後で開始済みにする。
                 _isStarted = true;

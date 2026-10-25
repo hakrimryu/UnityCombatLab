@@ -91,7 +91,8 @@ namespace UnityCombatLab.Bootstrap
             if (session.Token.IsCancellationRequested)
                 return;
 
-            var hudObject = (session.Resources as RunAssetScope)?.HudPrefab;
+            var resources = session.Resources as RunAssetScope;
+            var hudObject = resources?.HudPrefab;
             var hudPrefab = hudObject != null ? hudObject.GetComponent<BattleHudView>() : null;
             if (hudPrefab == null)
                 throw new InvalidOperationException("Run HUD must finish loading before Dungeon.");
@@ -115,6 +116,7 @@ namespace UnityCombatLab.Bootstrap
                     _hudCanvas.transform,
                     _battleCamera,
                     resolver.Resolve<GameColorPalette>(),
+                    resources.Icons,
                     session);
                 session.AttachBattle(battle);
                 return battle;
