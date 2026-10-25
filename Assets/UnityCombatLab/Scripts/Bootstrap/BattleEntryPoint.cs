@@ -12,58 +12,58 @@ using VContainer.Unity;
 namespace UnityCombatLab.Bootstrap
 {
     /// <summary>
-    /// VContainer が Start/Tick/Dispose を呼ぶ戦闘の窓口。画面を接続してから進行し、退場時に片付けます。
-    /// [KO] VContainer가 Start/Tick/Dispose를 호출하는 전투 진입점입니다. 화면 연결 후 진행하고 씬을 떠날 때 정리합니다.
-    /// [EN] VContainer calls Start/Tick/Dispose here to connect the display, advance combat and clean up on scene exit.
+    /// 戦闘の開始・毎フレームの進行・終了時の片付けを担当します。
+    /// [KO] 전투 시작·매 프레임 진행·종료 시 정리를 담당합니다.
+    /// [EN] Handles battle startup, per-frame advancement and cleanup.
     /// </summary>
     public sealed class BattleEntryPoint : IStartable, ITickable, IDisposable
     {
         /// <summary>
-        /// この戦闘が所有するコア接続。
-        /// [KO] 이 전투가 소유하는 코어 연결.
-        /// [EN] Core connection owned by this battle.
+        /// この戦闘の計算とイベント通知を進める Runner。
+        /// [KO] 이번 전투의 계산과 이벤트 알림을 진행할 Runner입니다.
+        /// [EN] Runner advancing this battle's calculations and event delivery.
         /// </summary>
         public BattleRunner Runner { get; }
 
         /// <summary>
-        /// 共通 Canvas から借りる配置先。
-        /// [KO] 공통 Canvas에서 빌려 쓰는 배치 대상.
-        /// [EN] Borrowed host under the common canvas.
+        /// Dungeon の戦闘専用 Canvas から借りる配置先。
+        /// [KO] Dungeon의 전투 전용 Canvas에서 빌려 쓰는 배치 대상입니다.
+        /// [EN] Borrowed host under the Dungeon-owned battle canvas.
         /// </summary>
         private readonly Transform _hudParent;
 
         /// <summary>
-        /// 生成元だけを借用する HUD。
-        /// [KO] 생성 원본만 빌려 쓰는 HUD.
-        /// [EN] Borrowed HUD template.
+        /// 戦闘開始時に複製する HUD プレハブ。
+        /// [KO] 전투 시작 시 복제할 HUD 프리팹입니다.
+        /// [EN] HUD prefab instantiated at battle startup.
         /// </summary>
         private readonly BattleHudView _hudPrefab;
 
         /// <summary>
-        /// Dungeon が所有するモデル。
-        /// [KO] Dungeon이 소유하는 모델.
-        /// [EN] Models owned by Dungeon.
+        /// Dungeon に配置された、今回の戦闘に使うユニットの View。
+        /// [KO] Dungeon에 배치된 이번 전투의 유닛 View입니다.
+        /// [EN] Unit views placed in Dungeon for this battle.
         /// </summary>
         private readonly UnitView[] _unitViews;
 
         /// <summary>
-        /// Dungeon が所有するカメラ。背景色と HUD の座標変換に使い、このクラスでは破棄しません。
-        /// [KO] Dungeon이 소유한 카메라입니다. 배경색과 HUD 좌표 변환에 사용하며 이 클래스에서 파괴하지 않습니다.
-        /// [EN] Dungeon-owned camera used for the background color and HUD projection; this class does not destroy it.
+        /// 背景色の設定と HUD の座標変換に使う Dungeon カメラ。
+        /// [KO] 배경색 설정과 HUD 좌표 변환에 사용할 Dungeon 카메라입니다.
+        /// [EN] Dungeon camera used for the background color and HUD projection.
         /// </summary>
         private readonly Camera _battleCamera;
 
         /// <summary>
-        /// App Scope から借りる色アセット。HUD とカメラへ同じ設定を渡し、この戦闘では破棄しません。
-        /// [KO] App Scope에서 빌리는 색상 에셋입니다. HUD와 카메라에 같은 설정을 전달하며 이 전투에서 파괴하지 않습니다.
-        /// [EN] Shared app-scope colors passed to the HUD and camera without transferring asset ownership.
+        /// HUD とカメラの色に使う共通パレット。
+        /// [KO] HUD와 카메라 색상에 사용할 공통 팔레트입니다.
+        /// [EN] Shared palette for HUD and camera colors.
         /// </summary>
         private readonly GameColorPalette _colors;
 
         /// <summary>
-        /// 表示寿命識別子。
-        /// [KO] 표시 수명 식별자.
-        /// [EN] Presentation lifetime identifier.
+        /// 今回の戦闘を識別する ID。
+        /// [KO] 이번 전투를 구별할 ID입니다.
+        /// [EN] ID identifying this battle.
         /// </summary>
         private readonly Guid _runId;
 
@@ -75,16 +75,16 @@ namespace UnityCombatLab.Bootstrap
         private readonly int _wave;
 
         /// <summary>
-        /// 所有する表現イベント購読。
-        /// [KO] 소유한 표현 이벤트 구독.
-        /// [EN] Owned presentation event subscription.
+        /// 戦闘イベントを受け取り、ユニットの演出を進める Presenter。
+        /// [KO] 전투 이벤트를 받아 유닛 연출을 진행할 Presenter입니다.
+        /// [EN] Presenter receiving battle events and advancing unit effects.
         /// </summary>
         private BattlePresenter _presenter;
 
         /// <summary>
-        /// 所有する R3 購読。
-        /// [KO] 소유한 R3 구독.
-        /// [EN] Owned R3 subscriptions.
+        /// 表示用 HP・盾・勝敗の変更を HUD へ伝える Presenter。
+        /// [KO] 표시용 HP·방어막·승패 변경을 HUD에 전달할 Presenter입니다.
+        /// [EN] Presenter forwarding displayed health, shield and result changes to the HUD.
         /// </summary>
         private BattleHudPresenter _hudPresenter;
 
@@ -103,9 +103,9 @@ namespace UnityCombatLab.Bootstrap
         public BattlePresenter Presenter => _presenter;
 
         /// <summary>
-        /// 生成した HUD は親が DDOL でも戦闘側で破棄します。
-        /// [KO] 생성한 HUD는 부모가 DDOL이어도 전투 측에서 해제합니다.
-        /// [EN] Generated HUD is battle-owned even under a DDOL parent.
+        /// Dungeon の Canvas 下に生成し、この戦闘の終了時に解放する HUD。
+        /// [KO] Dungeon Canvas 아래에 생성하고 이번 전투 종료 시 해제할 HUD입니다.
+        /// [EN] HUD created under the Dungeon canvas and released when this battle ends.
         /// </summary>
         public BattleHudView Hud { get; private set; }
 
@@ -124,9 +124,9 @@ namespace UnityCombatLab.Bootstrap
         public bool IsDisposed { get; private set; }
 
         /// <summary>
-        /// BattleLifetimeScope が用意した Runner とシーンの表示先を受け取ります。まだ戦闘は進めません。
-        /// [KO] BattleLifetimeScope가 준비한 Runner와 씬의 표시 대상을 받습니다. 여기서는 아직 전투를 진행하지 않습니다.
-        /// [EN] Receives the runner and scene display references prepared by BattleLifetimeScope; does not advance combat yet.
+        /// BattleLifetimeScope が用意した Runner・戦闘識別子・View・設定を保持し、Start の接続に使います。
+        /// [KO] BattleLifetimeScope가 준비한 Runner·전투 식별자·View·설정을 보관해 Start에서 연결합니다.
+        /// [EN] Stores the runner, battle identifiers, views and settings supplied by BattleLifetimeScope for connection in Start.
         /// </summary>
         public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, UnitView[] unitViews,
             BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors)
@@ -155,7 +155,6 @@ namespace UnityCombatLab.Bootstrap
 
             try
             {
-                // 共通 Canvas の下に置くが、この戦闘が作った HUD はこのクラスの Dispose で削除する。
                 Hud = UnityEngine.Object.Instantiate(_hudPrefab, _hudParent);
                 Hud.name = "UI_BattleHud";
                 // スロット位置だけを記録するので、攻撃中のモデルの踏み込みにパネルは追従しない。
@@ -166,7 +165,7 @@ namespace UnityCombatLab.Bootstrap
                 foreach (var unit in _unitViews)
                 {
                     unit.ApplyPalette(_colors);
-                    // 色の適用とは別に効果を準備し、後の Bind は生成済みの効果を再利用する。
+                    // 接続前に各ユニットのエフェクトを準備する。
                     unit.PrepareEffects();
                 }
 

@@ -6,6 +6,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityCombatLab.Bootstrap;
+using UnityCombatLab.Presentation.UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -87,7 +88,10 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(SceneManager.sceneCount, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<AudioListener>(true).Length, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<EventSystem>(true).Length, Is.EqualTo(1));
-            Assert.That(root.GetComponentsInChildren<Canvas>(true).Length, Is.EqualTo(1));
+            Assert.That(root.GetComponentsInChildren<Canvas>(true), Is.Empty);
+            Assert.That(root.GetComponentsInChildren<BootStatusView>(true), Is.Empty);
+            Assert.That(Object.FindFirstObjectByType<BattleHudView>().gameObject.scene,
+                Is.EqualTo(SceneManager.GetActiveScene()));
             Assert.That(Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<EventSystem>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
             Assert.That(root.GetComponentsInChildren<Camera>(true), Is.Empty);
@@ -172,7 +176,7 @@ namespace UnityCombatLab.Tests.PlayMode
                 failedRoot.SetActive(false);
                 var failedScope = failedRoot.AddComponent<AppLifetimeScope>();
                 LogAssert.Expect(LogType.Exception,
-                    new System.Text.RegularExpressions.Regex("The startup label must be assigned in Boot"));
+                    new System.Text.RegularExpressions.Regex("The shared color palette must be assigned in Boot"));
                 failedRoot.SetActive(true);
                 Assert.That(failedRoot.activeSelf, Is.False);
                 Assert.That(failedScope.Container, Is.Null);
@@ -207,9 +211,9 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
-        /// 取消済みの起動要求が表示状態もシーンも変更しないことを検証します。
-        /// [KO] 이미 취소된 시작 요청이 표시 상태와 씬을 변경하지 않는지 검증합니다.
-        /// [EN] Verifies pre-cancelled startup changes neither the UI nor the scene.
+        /// 取消済みの起動要求が現在の戦闘 HUD とシーンを変更しないことを検証します。
+        /// [KO] 이미 취소된 시작 요청이 현재 전투 HUD와 씬을 변경하지 않는지 검증합니다.
+        /// [EN] Verifies pre-cancelled startup preserves the current battle HUD and scene.
         /// </summary>
         [UnityTest]
         public IEnumerator CancelledStartupPreservesUiAndScene()
@@ -218,30 +222,30 @@ namespace UnityCombatLab.Tests.PlayMode
             {
                 var scope = Object.FindFirstObjectByType<AppLifetimeScope>();
                 var manager = scope.Container.Resolve<SceneTransitionManager>();
-                var label = scope.GetComponentInChildren<UnityEngine.UI.Text>(true);
-                var originalText = label.text;
-                var wasActive = label.gameObject.activeSelf;
+                var hud = Object.FindFirstObjectByType<BattleHudView>();
+                var resultText = hud.ResultText;
+                var wasActive = hud.gameObject.activeSelf;
                 var knight = GameObject.Find("Unit_Knight");
                 using var cancellation = new CancellationTokenSource();
                 cancellation.Cancel();
+                var entry = new AppEntryPoint(manager);
+                var isCancelled = false;
                 try
                 {
-                    label.text = "Keep";
-                    var entry = new AppEntryPoint(label, manager);
-                    var isCancelled = false;
-                    try { await entry.StartAsync(cancellation.Token); }
-                    catch (OperationCanceledException) { isCancelled = true; }
-                    Assert.That(isCancelled, Is.True);
-                    Assert.That(label.text, Is.EqualTo("Keep"));
-                    Assert.That(label.gameObject.activeSelf, Is.EqualTo(wasActive));
-                    Assert.That(entry.IsStarted, Is.False);
-                    Assert.That(manager.IsLoading, Is.False);
-                    Assert.That(GameObject.Find("Unit_Knight"), Is.SameAs(knight));
+                    await entry.StartAsync(cancellation.Token);
                 }
-                finally
+                catch (OperationCanceledException)
                 {
-                    label.text = originalText;
+                    isCancelled = true;
                 }
+
+                Assert.That(isCancelled, Is.True);
+                Assert.That(Object.FindFirstObjectByType<BattleHudView>(), Is.SameAs(hud));
+                Assert.That(hud.ResultText, Is.EqualTo(resultText));
+                Assert.That(hud.gameObject.activeSelf, Is.EqualTo(wasActive));
+                Assert.That(entry.IsStarted, Is.False);
+                Assert.That(manager.IsLoading, Is.False);
+                Assert.That(GameObject.Find("Unit_Knight"), Is.SameAs(knight));
             });
         }
 
@@ -255,17 +259,32 @@ namespace UnityCombatLab.Tests.PlayMode
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var transition = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<SceneTransitionManager>();
+                var transition = Object.FindFirstObjectByType<AppLifetimeScope>().Container
+                    .Resolve<SceneTransitionManager>();
                 var knight = GameObject.Find("Unit_Knight");
                 var isRejected = false;
-                try { await transition.LoadSceneAsync((Define.SceneType)int.MaxValue); }
-                catch (ArgumentOutOfRangeException) { isRejected = true; }
+                try
+                {
+                    await transition.LoadSceneAsync((Define.SceneType)int.MaxValue);
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    isRejected = true;
+                }
+
                 Assert.That(isRejected, Is.True);
                 using var cancellation = new CancellationTokenSource();
                 cancellation.Cancel();
                 var isCancelled = false;
-                try { await transition.LoadSceneAsync(Define.SceneType.Dungeon, cancellation.Token); }
-                catch (OperationCanceledException) { isCancelled = true; }
+                try
+                {
+                    await transition.LoadSceneAsync(Define.SceneType.Dungeon, cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    isCancelled = true;
+                }
+
                 Assert.That(isCancelled, Is.True);
                 Assert.That(transition.IsLoading, Is.False);
                 Assert.That(GameObject.Find("Unit_Knight"), Is.SameAs(knight));
@@ -289,12 +308,26 @@ namespace UnityCombatLab.Tests.PlayMode
                 Assert.That(transition.IsLoading, Is.True);
                 cancellation.Cancel();
                 var isRejected = false;
-                try { await transition.LoadSceneAsync(Define.SceneType.Dungeon, CancellationToken.None); }
-                catch (InvalidOperationException) { isRejected = true; }
+                try
+                {
+                    await transition.LoadSceneAsync(Define.SceneType.Dungeon, CancellationToken.None);
+                }
+                catch (InvalidOperationException)
+                {
+                    isRejected = true;
+                }
+
                 Assert.That(isRejected, Is.True);
                 var isCancelled = false;
-                try { await loading; }
-                catch (OperationCanceledException) { isCancelled = true; }
+                try
+                {
+                    await loading;
+                }
+                catch (OperationCanceledException)
+                {
+                    isCancelled = true;
+                }
+
                 Assert.That(isCancelled, Is.True);
                 Assert.That(transition.IsLoading, Is.False);
                 Assert.That(SceneManager.GetActiveScene().buildIndex, Is.EqualTo((int)Define.SceneType.Dungeon));

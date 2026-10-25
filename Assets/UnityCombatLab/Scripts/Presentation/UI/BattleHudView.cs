@@ -10,30 +10,30 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.UI
 {
     /// <summary>
-    /// 6 人の固定スロット上に状態を表示します。BattleEntryPoint が共通 Canvas に作り、退場時に削除します。
-    /// [KO] 6명의 고정 슬롯 위에 상태를 표시합니다. BattleEntryPoint가 공통 Canvas에 만들고 퇴장 시 삭제합니다.
-    /// [EN] Displays status above six fixed slots; BattleEntryPoint creates it under the shared canvas and removes it on exit.
+    /// 6 人の固定スロット上に状態を表示します。BattleEntryPoint が Dungeon 専用 Canvas に作ります。
+    /// [KO] 6명의 고정 슬롯 위에 상태를 표시하며 BattleEntryPoint가 Dungeon 전용 Canvas에 생성합니다.
+    /// [EN] Displays status above six fixed slots, created by BattleEntryPoint under the Dungeon-owned canvas.
     /// </summary>
     public sealed class BattleHudView : MonoBehaviour
     {
         /// <summary>
-        /// 交互スロット順の HP 表示。
-        /// [KO] 교차 슬롯 순서의 HP 표시.
-        /// [EN] Health views in interleaved slot order.
+        /// 味方・敵を交互に並べた 6 人分の状態パネル。
+        /// [KO] 아군·적을 번갈아 배치한 6명의 상태 패널입니다.
+        /// [EN] Six unit status panels ordered alternately by ally and enemy.
         /// </summary>
         [SerializeField] private UnitStatusView[] _units;
 
         /// <summary>
-        /// 戦闘終了だけを示す短い見出し。
-        /// [KO] 전투 종료만 알리는 짧은 제목.
-        /// [EN] Short label indicating combat outcome only.
+        /// 「戦闘中」「勝利」など、戦闘状況を示す見出し。
+        /// [KO] '전투 중'·'승리' 등 전투 상황을 표시할 제목입니다.
+        /// [EN] Heading showing battle status, such as ongoing combat or victory.
         /// </summary>
         [SerializeField] private TMP_Text _result;
 
         /// <summary>
-        /// 画面内に収める UI 領域。
-        /// [KO] 화면 안에 배치할 UI 영역.
-        /// [EN] UI region constrained to the safe area.
+        /// 画面の安全領域に合わせて伸縮する HUD の配置範囲。
+        /// [KO] 화면 안전 영역에 맞춰 크기를 조정할 HUD 배치 영역입니다.
+        /// [EN] HUD layout region sized to the screen safe area.
         /// </summary>
         [SerializeField] private RectTransform _safeArea;
 
@@ -66,9 +66,9 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private Material _damageMaterialSource;
 
         /// <summary>
-        /// 12 個の被害文字で共有する HUD 所有のコピー。HUD 破棄時に解放します。
-        /// [KO] 피해 텍스트 12개가 공유하는 HUD 소유 복사본입니다. HUD 파괴 시 해제합니다.
-        /// [EN] HUD-owned copy shared by twelve damage labels and released when the HUD is destroyed.
+        /// プール内の全被害数字で共有する HUD 所有のコピー。HUD 破棄時に解放します。
+        /// [KO] 풀의 모든 피해 숫자가 공유하는 HUD 소유 복사본이며 HUD 파괴 시 해제합니다.
+        /// [EN] HUD-owned copy shared by all pooled damage labels and released when the HUD is destroyed.
         /// </summary>
         private Material _damageMaterial;
 
@@ -80,30 +80,30 @@ namespace UnityCombatLab.Presentation.UI
         private Camera _battleCamera;
 
         /// <summary>
-        /// 開始時にコピーしたスロット頭上の位置。動くモデルや再利用イベントは保持しません。
-        /// [KO] 시작 시 복사한 슬롯 머리 위 위치입니다. 움직이는 모델이나 재사용 이벤트는 보관하지 않습니다.
-        /// [EN] Slot head positions copied at startup, without retaining moving models or reused events.
+        /// BindLayout がスロット座標と高さから計算し、パネルの画面位置へ投影する頭上の座標。
+        /// [KO] BindLayout이 슬롯 좌표와 높이로 계산하고 패널의 화면 위치로 투영할 머리 위 좌표입니다.
+        /// [EN] Head positions calculated by BindLayout from slot coordinates and height, then projected to panel screen positions.
         /// </summary>
         private Vector3[] _panelPositions;
 
         /// <summary>
-        /// 一度取得して再利用する 6 枚の RectTransform。毎フレームのコンポーネント検索を避けます。
-        /// [KO] 한 번 얻어 재사용하는 패널 6개의 RectTransform입니다. 매 프레임 컴포넌트 검색을 피합니다.
-        /// [EN] Six panel transforms cached once to avoid per-frame component searches.
+        /// 各スロットの状態パネルの位置を更新する RectTransform。
+        /// [KO] 각 슬롯 상태 패널의 위치를 갱신할 RectTransform입니다.
+        /// [EN] RectTransforms used to position each slot's status panel.
         /// </summary>
         private RectTransform[] _panelRects;
 
         /// <summary>
-        /// 最後に適用した画面領域。
-        /// [KO] 마지막으로 적용한 화면 영역.
-        /// [EN] Last applied screen region.
+        /// HUD に最後に適用した画面の安全領域。
+        /// [KO] HUD에 마지막으로 적용한 화면 안전 영역입니다.
+        /// [EN] Screen safe area last applied to the HUD.
         /// </summary>
         private Rect _lastSafeArea;
 
         /// <summary>
-        /// 画面の寸法変更も検出します。
-        /// [KO] 화면 크기 변경도 검출합니다.
-        /// [EN] Detects screen dimension changes as well.
+        /// HUD の配置を最後に更新した時の画面サイズ。
+        /// [KO] HUD 배치를 마지막으로 갱신했을 때의 화면 크기입니다.
+        /// [EN] Screen size used for the last HUD layout update.
         /// </summary>
         private Vector2Int _lastScreenSize;
 
@@ -115,16 +115,16 @@ namespace UnityCombatLab.Presentation.UI
         public IReadOnlyList<UnitStatusView> Units => _units;
 
         /// <summary>
-        /// 検証用の実際の表示文。
-        /// [KO] 검증용 실제 표시 문구.
-        /// [EN] Actual label text for validation.
+        /// HUD に現在表示している戦闘状況の文字列。
+        /// [KO] 현재 HUD에 표시 중인 전투 상황 문자열입니다.
+        /// [EN] Battle-status text currently displayed by the HUD.
         /// </summary>
         public string ResultText => _result.text;
 
         /// <summary>
-        /// 参照不足を開始前に拒否します。
-        /// [KO] 시작 전에 참조 누락을 거부합니다.
-        /// [EN] Rejects missing references before starting.
+        /// 必要な UI 参照と状態パネル数を確認します。
+        /// [KO] 필수 UI 참조와 상태 패널 수를 확인합니다.
+        /// [EN] Checks required UI references and the number of status panels.
         /// </summary>
         public void Validate(int unitCount)
         {
@@ -138,9 +138,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// Presenter が選んだ見出しだけを表示します。
-        /// [KO] Presenter가 선택한 제목만 표시합니다.
-        /// [EN] Displays only the outcome label selected by the presenter.
+        /// 戦闘状況の文字列を設定し、終了時は見出しの背景を広げます。
+        /// [KO] 전투 상황 문자열을 설정하고 종료 시 제목 배경을 넓힙니다.
+        /// [EN] Sets battle-status text and expands the heading background when finished.
         /// </summary>
         public void SetResult(string text, bool isFinished)
         {
@@ -166,13 +166,14 @@ namespace UnityCombatLab.Presentation.UI
                 binding.Apply(colors);
             }
 
-            // 再バインド時は同じコピーを再利用する。アセット自体と他の HUD の材質は変更しない。
+            // この HUD 用に一つ作った数字材質を、再接続時も共有する。
             if (_damageMaterial == null)
             {
                 _damageMaterial = new Material(_damageMaterialSource);
             }
 
-            _damageMaterial.SetColor(ShaderUtilities.ID_OutlineColor, colors.GetColor(Define.PaletteColor.DamageOutline));
+            _damageMaterial.SetColor(ShaderUtilities.ID_OutlineColor,
+                colors.GetColor(Define.PaletteColor.DamageOutline));
             foreach (var unit in _units)
             {
                 unit.ApplyPalette(colors, _damageMaterial);
@@ -180,9 +181,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// BattleEntryPoint が HUD を削除した時、借用アセットではなく自分で作った材質だけを解放します。
-        /// [KO] BattleEntryPoint가 HUD를 삭제하면 빌린 에셋 대신 직접 만든 재질만 해제합니다.
-        /// [EN] Releases only the owned material copy when BattleEntryPoint destroys the HUD, preserving borrowed assets.
+        /// HUD が作成した共通数字材質を破棄します。
+        /// [KO] HUD가 만든 공통 숫자 재질을 파괴합니다.
+        /// [EN] Destroys the shared number material created by this HUD.
         /// </summary>
         private void OnDestroy()
         {
@@ -214,9 +215,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// カメラの描画前に固定スロットと安全領域へパネルを合わせます。HP の更新や戦闘計算は行いません。
-        /// [KO] 카메라 렌더링 전에 고정 슬롯과 안전 영역에 패널을 맞춥니다. HP 갱신이나 전투 계산은 하지 않습니다.
-        /// [EN] Aligns panels to fixed slots and the safe area before camera rendering, without health updates or combat logic.
+        /// カメラの描画前に、画面サイズと安全領域に合わせて各スロットのパネル位置を更新します。
+        /// [KO] 카메라 렌더링 전에 화면 크기와 안전 영역에 맞춰 각 슬롯의 패널 위치를 갱신합니다.
+        /// [EN] Updates each slot panel position for the screen size and safe area before camera rendering.
         /// </summary>
         private void LateUpdate()
         {
@@ -252,8 +253,7 @@ namespace UnityCombatLab.Presentation.UI
                 return;
             }
 
-            // Overlay Canvas なので UI カメラ引数は null。射影には Dungeon カメラだけを使う。
-            // 6 個の固定配列を再利用する。HP 通知や被害イベントの消費はここでは行わない。
+            // Dungeon カメラで求めた画面位置を、Overlay Canvas の座標へ変換する。
             for (var index = 0; index < _panelPositions.Length; index++)
             {
                 var screenPoint = _battleCamera.WorldToScreenPoint(_panelPositions[index]);

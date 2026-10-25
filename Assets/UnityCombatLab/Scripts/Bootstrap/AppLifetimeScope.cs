@@ -1,8 +1,6 @@
 using UnityCombatLab.Infrastructure.Scenes;
-using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
-using UnityEngine.UI;
 using VContainer;
 using VContainer.Unity;
 
@@ -16,18 +14,11 @@ namespace UnityCombatLab.Bootstrap
     public sealed class AppLifetimeScope : LifetimeScope
     {
         /// <summary>
-        /// 重複した共通ルートを起動しないための生存インスタンス。
-        /// [KO] 중복 공통 루트의 시작을 막는 생존 인스턴스입니다.
-        /// [EN] The live instance used to prevent duplicate app roots.
+        /// 現在の AppRoot。重複して生成されたルートの検出に使います。
+        /// [KO] 현재 AppRoot이며 중복 생성된 루트를 감지하는 데 사용합니다.
+        /// [EN] Current AppRoot, used to detect duplicate roots.
         /// </summary>
         private static AppLifetimeScope _instance;
-
-        /// <summary>
-        /// AppRoot が所有する起動状態の表示先。
-        /// [KO] AppRoot가 소유하는 시작 상태 표시 대상입니다.
-        /// [EN] The startup label owned by AppRoot.
-        /// </summary>
-        [SerializeField] private Text _statusText;
 
         /// <summary>
         /// 全画面が共有する唯一の色アセット。子の Dungeon Scope も同じインスタンスを受け取ります。
@@ -91,31 +82,19 @@ namespace UnityCombatLab.Bootstrap
         }
 
         /// <summary>
-        /// 表示先とアプリ起動処理を App Scope に登録します。
-        /// [KO] 표시 대상과 앱 시작 처리를 App Scope에 등록합니다.
-        /// [EN] Registers the startup label and entry point in the app scope.
+        /// 共通パレット・シーン切替・アプリ起動処理を App Scope に登録します。
+        /// [KO] 공통 팔레트·씬 전환·앱 시작 처리를 App Scope에 등록합니다.
+        /// [EN] Registers shared colors, scene transitions and startup in the app scope.
         /// </summary>
-        /// <param name="builder">
-        /// VContainer が所有する App Scope の登録先。
-        /// [KO] VContainer가 소유하는 App Scope의 등록 대상입니다.
-        /// [EN] The app-scope registration builder owned by VContainer.
-        /// </param>
         protected override void Configure(IContainerBuilder builder)
         {
-            if (_statusText == null)
-            {
-                throw new System.InvalidOperationException("The startup label must be assigned in Boot.");
-            }
-
-            builder.RegisterComponent(_statusText);
             if (_colors == null)
             {
                 throw new System.InvalidOperationException("The shared color palette must be assigned in Boot.");
             }
 
-            // アセットは借用するだけで、AppRoot や戦闘の終了時に破棄しない。
+            // Boot で指定した色アセットを App Scope と子の Dungeon Scope で共有する。
             builder.RegisterInstance(_colors);
-            _statusText.color = _colors.GetColor(Define.PaletteColor.OnBackground);
             builder.Register<SceneTransitionManager>(Lifetime.Singleton);
             builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
         }

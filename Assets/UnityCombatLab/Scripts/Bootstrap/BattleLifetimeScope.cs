@@ -34,11 +34,18 @@ namespace UnityCombatLab.Bootstrap
         [SerializeField] private UnitView[] _unitViews;
 
         /// <summary>
-        /// AppRoot Canvas に生成する HUD の原型。
-        /// [KO] AppRoot Canvas에 생성할 HUD 원형.
-        /// [EN] HUD prefab instantiated under the AppRoot canvas.
+        /// Dungeon 専用 Canvas に生成する HUD の原型。
+        /// [KO] Dungeon 전용 Canvas에 생성할 HUD 원형입니다.
+        /// [EN] HUD prefab instantiated under the Dungeon-owned canvas.
         /// </summary>
         [SerializeField] private BattleHudView _hudPrefab;
+
+        /// <summary>
+        /// この Dungeon シーンが所有し、BattleEntryPoint が HUD を生成する Canvas。
+        /// [KO] 이 Dungeon 씬이 소유하며 BattleEntryPoint가 HUD를 생성할 Canvas입니다.
+        /// [EN] Dungeon-owned canvas where BattleEntryPoint creates the HUD.
+        /// </summary>
+        [SerializeField] private Canvas _hudCanvas;
 
         /// <summary>
         /// Dungeon のカメラを HUD に渡し、固定スロットの頭上へ状態パネルを投影します。
@@ -48,9 +55,9 @@ namespace UnityCombatLab.Bootstrap
         [SerializeField] private Camera _battleCamera;
 
         /// <summary>
-        /// Boot から残った AppLifetimeScope を DI の親にします。Hierarchy の親子関係は変更しません。
-        /// [KO] Boot에서 유지된 AppLifetimeScope를 DI 부모로 사용합니다. Hierarchy의 부모·자식 관계는 바꾸지 않습니다.
-        /// [EN] Uses the AppLifetimeScope retained from Boot as the DI parent without changing the Hierarchy.
+        /// 共通サービスを解決するため、Boot で作成した AppLifetimeScope を Dungeon の DI 親として返します。
+        /// [KO] 공통 서비스를 가져오도록 Boot에서 생성한 AppLifetimeScope를 Dungeon의 DI 부모로 반환합니다.
+        /// [EN] Returns the AppLifetimeScope created in Boot as the Dungeon DI parent for resolving shared services.
         /// </summary>
         protected override LifetimeScope FindParent()
         {
@@ -58,9 +65,9 @@ namespace UnityCombatLab.Bootstrap
         }
 
         /// <summary>
-        /// 継承元の Awake → Build から呼ばれ、6 人の開始データと BattleEntryPoint の作り方を登録します。
-        /// [KO] 상속받은 Awake → Build에서 호출되어, 6명의 시작 데이터와 BattleEntryPoint 생성 방법을 등록합니다.
-        /// [EN] Called by inherited Awake → Build to prepare six starting inputs and register how to create BattleEntryPoint.
+        /// 6 人の開始データを作り、Runner と View をつなぐ BattleEntryPoint を登録します。
+        /// [KO] 6명의 시작 데이터를 만들고 Runner와 View를 연결할 BattleEntryPoint를 등록합니다.
+        /// [EN] Creates six units' starting data and registers BattleEntryPoint to connect the runner and views.
         /// </summary>
         protected override void Configure(IContainerBuilder builder)
         {
@@ -74,33 +81,26 @@ namespace UnityCombatLab.Bootstrap
                     "Battle requires six distinct views, definitions, HUD, camera and AppRoot.");
             }
 
-            var canvas = Parent.GetComponentInChildren<Canvas>(true);
-            if (canvas == null)
+            if (_hudCanvas == null || _hudCanvas.gameObject.scene != gameObject.scene ||
+                _hudCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
             {
-                throw new InvalidOperationException("AppRoot must own the shared canvas.");
+                throw new InvalidOperationException("Battle requires an Overlay canvas owned by its Dungeon scene.");
             }
 
             // Inspector の並びから ID・陣営・配置枠を決める。両配列は同じ並びであることが前提。
             // index 0/1 → 味方/敵の前列、2/3 → 味方/敵の後列上、4/5 → 味方/敵の後列下。
-            // % 2 は 0,1,0,1,0,1 となり味方/敵を交互に選ぶ。整数の / 2 は 0,0,1,1,2,2 となり配置枠を選ぶ。
             // index + 1 は ID 1〜6。ID 0 は「単一対象なし」のイベント用なのでユニットには使わない。
             var inputs = _definitions.Select((definition, index) => definition.CreateInput(index + 1,
                 (Define.BattleTeam)(index % Define.BattleTeamCount),
                 (Define.BattleSlot)(index / Define.BattleTeamCount))).ToArray();
             // 再読込前のイベントと区別するため、新しい戦闘 ID を一度だけ作る。
             var runId = Guid.NewGuid();
-            // 今回は単一戦闘だけを起動するため wave は 1。ここでは 5 ウェーブの進行を実装しない。
+            // 単一戦闘の開始ウェーブは 1。
             const int InitialWave = 1;
-            // Boot の RegisterEntryPoint<AppEntryPoint>() は登録済みの型から引数を自動でそろえる。
-            // ここはシーンの配列・HUD・今回だけの runId を渡すため、生成方法をラムダで指定する。
-            // resolver から親 App Scope の共通パレットを取得する。ラムダは毎フレーム呼ばれない。
-            // new BattleRunner(...) は計算担当、その後の引数は同じ戦闘 ID・wave と表示対象。
-            // runId/wave を両方へ渡すのは、Runner が出すイベントと Presenter が受け取る戦闘を一致させるため。
-            // Scoped はこの Dungeon のコンテナで一つを共有し、破棄時に Dispose する指定。
-            // AsSelf はテストなどで具体的な型 BattleEntryPoint としても取得できるようにする指定。
+            // 同じ runId/wave の Runner と EntryPoint を作り、シーンの View と共通パレットを渡す。
             builder.RegisterEntryPoint(resolver => new BattleEntryPoint(
                 new BattleRunner(runId, InitialWave, inputs), runId, InitialWave,
-                _unitViews, _hudPrefab, canvas.transform, _battleCamera,
+                _unitViews, _hudPrefab, _hudCanvas.transform, _battleCamera,
                 resolver.Resolve<GameColorPalette>()), Lifetime.Scoped).AsSelf();
         }
     }

@@ -93,7 +93,10 @@ namespace UnityCombatLab.Tests.PlayMode
             var views = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
             Assert.That(views.Length, Is.EqualTo(6));
             Assert.That(entry.Hud.transform.IsChildOf(Object.FindFirstObjectByType<AppLifetimeScope>().transform),
-                Is.True);
+                Is.False);
+            Assert.That(entry.Hud.gameObject.scene, Is.EqualTo(SceneManager.GetActiveScene()));
+            Assert.That(entry.Hud.GetComponentInParent<Canvas>().gameObject.scene,
+                Is.EqualTo(entry.Hud.gameObject.scene));
             var lastEventCount = 0;
             runner.EventOccurred += item =>
             {
