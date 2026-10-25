@@ -181,6 +181,20 @@ namespace UnityCombatLab.Common
         public const uint DefaultRunSeed = 20261024u;
 
         /// <summary>
+        /// 最初の戦闘に付けるウェーブ番号。
+        /// [KO] 첫 전투에 부여할 웨이브 번호입니다.
+        /// [EN] Wave number assigned to the first battle.
+        /// </summary>
+        public const int InitialWave = 1;
+
+        /// <summary>
+        /// 一回の挑戦で実行し、結果画面に表示する戦闘数。
+        /// [KO] 한 번의 도전에서 실행하고 결과 화면에 표시하는 전투 수입니다.
+        /// [EN] Number of battles executed in one run and shown on its results screen.
+        /// </summary>
+        public const int RunBattleCount = 1;
+
+        /// <summary>
         /// やさしい難易度で敵のHPと攻撃力に掛ける百分率。
         /// [KO] 쉬움 난이도에서 적 HP와 공격력에 곱할 백분율입니다.
         /// [EN] Percentage applied to enemy health and attack on easy difficulty.

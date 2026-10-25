@@ -57,7 +57,7 @@ namespace UnityCombatLab.Presentation.UI
                     // 同じ index のユニットと状態パネルを接続する。
                     var unit = model.Units[index];
                     var status = view.Units[index];
-                    status.Initialize(RoleName(unit.Input.Role), unit.Input.Team);
+                    status.Initialize(GameText.RoleName(unit.Input.Role), unit.Input.Team);
                     // 初期 HP と命中後の HP を対応するパネルへ表示する。
                     unit.Health.Subscribe(value =>
                     {
@@ -94,25 +94,6 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// ユニットの役割を日本語の表示名へ変換します。
-        /// [KO] 유닛 역할을 일본어 표시 이름으로 변환합니다.
-        /// [EN] Converts a unit role to its Japanese display name.
-        /// </summary>
-        private static string RoleName(Define.UnitRole role)
-        {
-            return role switch
-            {
-                Define.UnitRole.Knight => "騎士",
-                Define.UnitRole.Ranger => "弓使い",
-                Define.UnitRole.Mage => "魔法使い",
-                Define.UnitRole.SkeletonMelee => "骸骨兵",
-                Define.UnitRole.SkeletonRanged => "骸骨射手",
-                Define.UnitRole.SkeletonCaptain => "骸骨隊長",
-                _ => throw new ArgumentOutOfRangeException(nameof(role))
-            };
-        }
-
-        /// <summary>
         /// 通知された勝敗に応じて、HUD の結果表示を切り替えます。
         /// [KO] 알림으로 받은 승패에 따라 HUD 결과 표시를 전환합니다.
         /// [EN] Switches the HUD result display for the notified battle outcome.
@@ -124,14 +105,7 @@ namespace UnityCombatLab.Presentation.UI
                 return;
             }
 
-            _view.SetResult(result switch
-            {
-                Define.BattleResult.Ongoing => "戦闘中",
-                Define.BattleResult.Victory => "勝利",
-                Define.BattleResult.Defeat => "パーティが全滅しました。",
-                Define.BattleResult.Timeout => "制限時間に達しました。",
-                _ => throw new ArgumentOutOfRangeException(nameof(result))
-            }, result);
+            _view.SetResult(GameText.BattleHeading(result), result);
         }
 
         /// <summary>
