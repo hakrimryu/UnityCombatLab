@@ -152,17 +152,12 @@ namespace UnityCombatLab.Presentation.Units
                 var view = _views[actor];
                 var target = item.TargetId == 0 ? -1 : _indices[item.TargetId];
                 var isArea = target < 0;
-                var isMelee = !isArea && input.Role is Define.UnitRole.Knight or
-                    Define.UnitRole.SkeletonMelee or Define.UnitRole.SkeletonCaptain;
                 var state = _runner.GetUnit(input.Team, input.Slot);
                 var isSpecial = isArea || (input.Role == Define.UnitRole.Ranger &&
                                            state.AttackCount % Define.RangerSpecialAttackPeriod == 0);
-                var targetPosition = isArea ? view.transform.position : _views[target].transform.position;
-                var shareApproach = !isArea && input.Slot == Define.BattleSlot.Front &&
-                                    _model.Units[target].Input.Slot == Define.BattleSlot.Front;
-                view.ShowAttack(_runId, targetPosition, isMelee, isSpecial,
-                    shareApproach ? SharedFrontApproachFraction : 1f);
-                _timeline.BeginAttack(actor, item.Tick, view.AttackDuration, view.ReleaseDelay, view.ImpactDelay);
+                var cueIndex = _timeline.BeginAttack(actor, item.Tick, view.AttackDuration, view.ReleaseDelay,
+                    view.ImpactDelay, target, isSpecial);
+                StartMotionWhenReady(cueIndex);
             }
             else if (item.Kind == Define.BattleEventKind.DamageApplied)
             {
@@ -203,10 +198,35 @@ namespace UnityCombatLab.Presentation.Units
             {
                 var cue = _timeline.Attacks[index];
                 var actor = _views[cue.Actor];
+                StartMotionWhenReady(index);
                 AdvanceProjectiles(index, cue, actor);
                 ApplyImpactWhenReady(index, cue, actor);
-                if (_timeline.RemoveIfFinished(index)) index--;
+                if (_timeline.RemoveIfFinished(index))
+                    index--;
             }
+        }
+
+        /// <summary>
+        /// 待機を終えた攻撃の対象と特性を読み、そのユニットのモーションを開始します。
+        /// [KO] 대기를 마친 공격의 대상과 특성을 읽고 해당 유닛의 모션을 시작합니다.
+        /// [EN] Starts the actor's motion using the queued attack's target and special-motion choice when its wait ends.
+        /// </summary>
+        private void StartMotionWhenReady(int index)
+        {
+            if (!_timeline.TryStartMotion(index))
+                return;
+
+            var cue = _timeline.Attacks[index];
+            var view = _views[cue.Actor];
+            var input = _model.Units[cue.Actor].Input;
+            var isArea = cue.Target < 0;
+            var isMelee = !isArea && input.Role is Define.UnitRole.Knight or
+                Define.UnitRole.SkeletonMelee or Define.UnitRole.SkeletonCaptain;
+            var targetPosition = isArea ? view.transform.position : _views[cue.Target].transform.position;
+            var shareApproach = !isArea && input.Slot == Define.BattleSlot.Front &&
+                                _model.Units[cue.Target].Input.Slot == Define.BattleSlot.Front;
+            view.ShowAttack(_runId, targetPosition, isMelee, cue.IsSpecial,
+                shareApproach ? SharedFrontApproachFraction : 1f);
         }
 
         /// <summary>
@@ -216,7 +236,9 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void AdvanceProjectiles(int index, BattlePresentationTimeline.AttackCue cue, UnitView actor)
         {
-            if (!_timeline.TryGetProjectileProgress(index, out var progress)) return;
+            if (!_timeline.TryGetProjectileProgress(index, out var progress))
+                return;
+
             for (var target = 0; target < cue.Damage.Count; target++)
             {
                 var targetView = _views[_indices[cue.Damage[target].TargetId]];
@@ -231,7 +253,9 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void ApplyImpactWhenReady(int index, BattlePresentationTimeline.AttackCue cue, UnitView actor)
         {
-            if (!_timeline.TryImpact(index)) return;
+            if (!_timeline.TryImpact(index))
+                return;
+
             actor.HideProjectiles();
             actor.ShowStrike(_runId);
             for (var hit = 0; hit < cue.Damage.Count; hit++)
@@ -257,6 +281,7 @@ namespace UnityCombatLab.Presentation.Units
             {
                 if (!_timeline.CanPresentDeath(index, _model.Units[index].Health.CurrentValue, _views[index].IsDead))
                     continue;
+
                 _views[index].ShowDeath(_runId);
                 _timeline.RecordDeath();
             }
@@ -269,7 +294,9 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         private void CompleteWhenReady()
         {
-            if (!_timeline.CanComplete) return;
+            if (!_timeline.CanComplete)
+                return;
+
             foreach (var view in _views)
             {
                 view.FinishBattle();

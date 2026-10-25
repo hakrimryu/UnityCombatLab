@@ -71,6 +71,38 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
+        /// 同じ攻撃者の連続予約だけを順番に開始し、他の攻撃者は待たせません。
+        /// [KO] 같은 공격자의 연속 예약만 순서대로 시작하고 다른 공격자는 대기시키지 않습니다.
+        /// [EN] Starts consecutive cues from one actor in order without blocking another actor.
+        /// </summary>
+        [Test]
+        public void SameActorWaitsForPreviousMotionAndProjectile()
+        {
+            var timeline = new BattlePresentationTimeline();
+            timeline.BeginAttack(0, 10, 0.5f, 0.1f, 0.75f, 1, true);
+            timeline.BeginAttack(0, 14, 0.5f, 0.1f, 0.25f, 3);
+            timeline.BeginAttack(1, 10, 0.5f, 0.1f, 0.25f);
+            Assert.That(timeline.TryStartMotion(0), Is.True);
+            Assert.That(timeline.TryStartMotion(0), Is.False);
+            Assert.That(timeline.TryStartMotion(1), Is.False);
+            Assert.That(timeline.TryStartMotion(2), Is.True);
+            Assert.That(timeline.Attacks[0].Target, Is.EqualTo(1));
+            Assert.That(timeline.Attacks[0].IsSpecial, Is.True);
+            Assert.That(timeline.Attacks[1].IsSpecial, Is.False);
+            timeline.Advance(0.5);
+            Assert.That(timeline.TryStartMotion(1), Is.False);
+            Assert.That(timeline.TryGetProjectileProgress(1, out _), Is.False);
+            Assert.That(timeline.TryImpact(1), Is.False);
+            timeline.Advance(0.25);
+            Assert.That(timeline.TryImpact(0), Is.True);
+            Assert.That(timeline.RemoveIfFinished(0), Is.True);
+            Assert.That(timeline.TryStartMotion(0), Is.True);
+            Assert.That(timeline.TryImpact(0), Is.False);
+            timeline.Advance(0.25);
+            Assert.That(timeline.TryImpact(0), Is.True);
+        }
+
+        /// <summary>
         /// 死亡は自分の最終命中だけを待ち、他人の未到着攻撃には待たされません。
         /// [KO] 사망은 자신의 최종 명중만 기다리고 다른 유닛의 미도착 공격은 기다리지 않습니다.
         /// [EN] Death waits only for the actor's own final impact, not pending attacks from other actors.

@@ -1,3 +1,4 @@
+using UnityCombatLab.Common;
 using System;
 using UnityEngine;
 
@@ -57,7 +58,7 @@ namespace UnityCombatLab.Presentation.Units
             gameObject.SetActive(true);
             _root.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             transform.SetPositionAndRotation(position,
-                forward.sqrMagnitude > 0.001f ? Quaternion.LookRotation(forward) : Quaternion.identity);
+                forward.sqrMagnitude > Define.MinimumDirectionSqrMagnitude ? Quaternion.LookRotation(forward) : Quaternion.identity);
             IsEmitting = true;
             _root.Play(true);
         }

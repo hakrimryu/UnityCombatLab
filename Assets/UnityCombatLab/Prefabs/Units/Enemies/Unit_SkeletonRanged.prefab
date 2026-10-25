@@ -94,6 +94,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8984776902785596038}
   - component: {fileID: 8612090552270072021}
+  - component: {fileID: 5489674809270268014}
   m_Layer: 0
   m_Name: Unit_SkeletonRanged
   m_TagString: Untagged
@@ -137,8 +138,21 @@ MonoBehaviour:
   _releaseNormalized: 0.35
   _flightSeconds: 0.18
   _attackClipSeconds: 1.0666667
-  _projectilePrefab: {fileID: 8328438099804655328, guid: 66c331871ee36d64aac49c261f6fd24e, type: 3}
   _usesLeftHand: 0
+  _effects: {fileID: 5489674809270268014}
+--- !u!114 &5489674809270268014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8032327810723345651}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe58a467c3d166247b2f69cdfc929916, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityCombatLab.Presentation::UnityCombatLab.Presentation.Units.UnitEffectsView
+  _projectilePrefab: {fileID: 8328438099804655328, guid: 66c331871ee36d64aac49c261f6fd24e, type: 3}
   _impactPrefab: {fileID: 1822290031681781920, guid: fec1a1bccc978ca4980a8c630199eeed, type: 3}
   _strikePrefab: {fileID: 0}
   _deathPrefab: {fileID: 6156465146768680735, guid: a46a44f0859ead34687745d82b52a389, type: 3}

@@ -7,12 +7,40 @@ using UnityEngine;
 namespace UnityCombatLab.Presentation.Units
 {
     /// <summary>
-    /// ユニットの攻撃・接近・投射物・被弾・死亡の演出を進めます。
-    /// [KO] 유닛의 공격·접근·투사체·피격·사망 연출을 진행합니다.
-    /// [EN] Runs a unit's attack, approach, projectile, hit and death presentation.
+    /// Runの要求を検査してAnimatorと攻撃移動を進め、効果と被弾反応を専用コンポーネントへ渡します。
+    /// [KO] Run 요청을 검사해 Animator와 공격 이동을 진행하고 효과와 피격 반응을 전용 컴포넌트에 전달합니다.
+    /// [EN] Validates run requests, advances the Animator and attack movement, and delegates effects and hit reactions to their components.
     /// </summary>
     public sealed class UnitView : MonoBehaviour
     {
+        /// <summary>
+        /// 待機姿勢のAnimator状態名。
+        /// [KO] 대기 자세 Animator 상태 이름입니다.
+        /// [EN] Animator state for the idle pose.
+        /// </summary>
+        private const string IdleState = "Idle";
+
+        /// <summary>
+        /// 攻撃姿勢のAnimator状態名。
+        /// [KO] 공격 자세 Animator 상태 이름입니다.
+        /// [EN] Animator state for the attack pose.
+        /// </summary>
+        private const string AttackState = "Attack";
+
+        /// <summary>
+        /// 攻撃していない時の被弾姿勢。
+        /// [KO] 공격하지 않을 때의 피격 자세입니다.
+        /// [EN] Hit pose used while not attacking.
+        /// </summary>
+        private const string HitState = "Hit";
+
+        /// <summary>
+        /// 死亡姿勢のAnimator状態名。
+        /// [KO] 사망 자세 Animator 상태 이름입니다.
+        /// [EN] Animator state for the death pose.
+        /// </summary>
+        private const string DeathState = "Death";
+
         /// <summary>
         /// 接近後に武器の間合いとして残すワールド距離。
         /// [KO] 접근 후 무기 간격으로 남길 월드 거리입니다.
@@ -49,13 +77,6 @@ namespace UnityCombatLab.Presentation.Units
         private const float NormalAttackScaleMultiplier = 1.025f;
 
         /// <summary>
-        /// 飛行の中央で投射物を持ち上げるワールド高さ。
-        /// [KO] 비행 중간에서 투사체를 들어 올리는 월드 높이입니다.
-        /// [EN] World-space projectile height at the middle of its arc.
-        /// </summary>
-        private const float ProjectileArcHeightWorldUnits = 0.25f;
-
-        /// <summary>
         /// 手から剣先効果を前方へずらすワールド距離。
         /// [KO] 손에서 검 끝 효과를 앞쪽으로 옮길 월드 거리입니다.
         /// [EN] World-space forward offset of the blade effect from the hand.
@@ -75,13 +96,6 @@ namespace UnityCombatLab.Presentation.Units
         /// [EN] Death-effect height at unit root scale one.
         /// </summary>
         private const float DeathHeightPerUnitScale = 0.5f;
-
-        /// <summary>
-        /// ほぼ同じ位置で不定な向きを作らないための距離二乗。
-        /// [KO] 거의 같은 위치에서 불확정 방향을 만들지 않을 제곱 거리 기준입니다.
-        /// [EN] Squared-distance threshold avoiding an undefined direction at nearly identical positions.
-        /// </summary>
-        private const float MinimumDirectionSqrMagnitude = 0.001f;
 
         /// <summary>
         /// 自身の Animator。
@@ -140,13 +154,6 @@ namespace UnityCombatLab.Presentation.Units
         [SerializeField] private float _attackClipSeconds = 1.0666667f;
 
         /// <summary>
-        /// 開始時に三個作り広域攻撃にも使い回す投射体。
-        /// [KO] 시작 시 세 개를 만들어 광역 공격에도 재사용할 투사체입니다.
-        /// [EN] Projectile instantiated three times at startup for single and area attacks.
-        /// </summary>
-        [SerializeField] private BattleEffectView _projectilePrefab;
-
-        /// <summary>
         /// 弓は左手、杖と銃は右手から発射。
         /// [KO] 활은 왼손, 지팡이·총은 오른손에서 발사합니다.
         /// [EN] Bows release from the left hand; staffs and crossbows use the right.
@@ -154,25 +161,11 @@ namespace UnityCombatLab.Presentation.Units
         [SerializeField] private bool _usesLeftHand;
 
         /// <summary>
-        /// この攻撃者の命中を相手の位置に示す効果。近接・矢・魔法で使い分けます。
-        /// [KO] 이 공격자의 명중을 상대 위치에 표시할 효과이며 근접·화살·마법별로 구분합니다.
-        /// [EN] Effect showing this attacker's impact at its target, selected for melee, arrows or magic.
+        /// 同じユニットの効果を生成・再使用・停止するコンポーネント。
+        /// [KO] 같은 유닛의 효과를 생성·재사용·정지하는 컴포넌트입니다.
+        /// [EN] Component creating, reusing and stopping this unit's effects.
         /// </summary>
-        [SerializeField] private BattleEffectView _impactPrefab;
-
-        /// <summary>
-        /// 近接の命中時に剣先で再生する効果。遠距離には設定しません。
-        /// [KO] 근접 명중 때 검 끝에서 재생할 효과이며 원거리에는 설정하지 않습니다.
-        /// [EN] Effect played at the blade on melee impact, left unassigned for ranged units.
-        /// </summary>
-        [SerializeField] private BattleEffectView _strikePrefab;
-
-        /// <summary>
-        /// 自身の死亡位置から一度だけ再生する魂の効果。
-        /// [KO] 자체 사망 위치에서 한 번만 재생할 영혼 효과입니다.
-        /// [EN] Soul effect played once at this unit's death position.
-        /// </summary>
-        [SerializeField] private BattleEffectView _deathPrefab;
+        [SerializeField] private UnitEffectsView _effects;
 
         /// <summary>
         /// 接続や攻撃が切り替わるたびに増やし、古い Tween の完了通知を見分ける番号。
@@ -217,6 +210,13 @@ namespace UnityCombatLab.Presentation.Units
         private Quaternion _homeRotation;
 
         /// <summary>
+        /// 必須参照の確認後に元の姿勢を保存できた場合だけ復元を許可します。
+        /// [KO] 필수 참조 확인 후 원래 자세를 저장한 경우에만 복원을 허용합니다.
+        /// [EN] Allows pose restoration only after required references were validated and the home pose was captured.
+        /// </summary>
+        private bool _hasHomePose;
+
+        /// <summary>
         /// この View が所有する接近・復帰 Tween。
         /// [KO] 이 View가 소유하는 접근·복귀 Tween입니다.
         /// [EN] Approach and return tween owned by this view.
@@ -232,47 +232,11 @@ namespace UnityCombatLab.Presentation.Units
 
 
         /// <summary>
-        /// View の寿命で生成し、最大三対象へ同時に飛ばす表示。
-        /// [KO] View 수명에 생성해 최대 세 대상에 동시에 날릴 표시입니다.
-        /// [EN] View-owned visuals supporting up to three simultaneous targets.
-        /// </summary>
-        private readonly BattleEffectView[] _projectiles = new BattleEffectView[Define.SlotsPerTeam];
-
-        /// <summary>
-        /// 各発射で一度だけ記録する手元の座標。
-        /// [KO] 발사마다 한 번 기록할 손의 위치입니다.
-        /// [EN] Hand position recorded once for each projectile release.
-        /// </summary>
-        private readonly Vector3[] _projectileStarts = new Vector3[Define.SlotsPerTeam];
-
-        /// <summary>
         /// 矢・魔法弾の発射位置を読む手の骨。
         /// [KO] 화살·마법탄 발사 위치를 읽는 손 뼈입니다.
         /// [EN] Hand bone supplying arrow and bolt release positions.
         /// </summary>
         private Transform _hand;
-
-        /// <summary>
-        /// 最大三対象の命中で再利用し、View の破棄と共に消える効果。
-        /// [KO] 최대 세 대상 명중에 재사용하고 View 파괴와 함께 사라질 효과입니다.
-        /// [EN] Reusable impact effects for up to three targets, destroyed with their owning view.
-        /// </summary>
-        private readonly BattleEffectView[] _impacts = new BattleEffectView[Define.SlotsPerTeam];
-
-        /// <summary>
-        /// このユニットが所有する剣先の一時表示。
-        /// [KO] 이 유닛이 소유할 검 끝의 일시 표시입니다.
-        /// [EN] Temporary blade effect owned by this unit.
-        /// </summary>
-        private BattleEffectView _strike;
-
-        /// <summary>
-        /// このユニットが所有し、死亡後も原点へ戻さず再生する魂。
-        /// [KO] 이 유닛이 소유하고 사망 후 원점으로 되돌리지 않고 재생할 영혼입니다.
-        /// [EN] Unit-owned soul effect played at death without returning to the home position.
-        /// </summary>
-        private BattleEffectView _death;
-
 
         /// <summary>
         /// 購入クリップを指定秒数で再生する Controller パラメーター。
@@ -346,9 +310,11 @@ namespace UnityCombatLab.Presentation.Units
         private void Awake()
         {
             if (_animator == null || _model == null || _motionRoot == null || _hitReaction == null ||
+                _effects == null || _effects.gameObject != gameObject ||
                 _motionRoot.parent != transform || _hitReaction.transform.parent != _motionRoot ||
-                !_model.IsChildOf(_hitReaction.transform) || _attackSeconds <= 0 || _releaseNormalized <= 0 ||
-                _releaseNormalized >= 1 || _attackClipSeconds <= 0 || _flightSeconds < 0)
+                !_model.IsChildOf(_hitReaction.transform) || !(_attackSeconds > 0) || float.IsInfinity(_attackSeconds) ||
+                !(_releaseNormalized > 0 && _releaseNormalized < 1) || !(_attackClipSeconds > 0) ||
+                float.IsInfinity(_attackClipSeconds) || !(_flightSeconds >= 0) || float.IsInfinity(_flightSeconds))
             {
                 throw new InvalidOperationException(
                     "Unit presentation references, authored pivots and timings must be valid.");
@@ -357,6 +323,7 @@ namespace UnityCombatLab.Presentation.Units
             _homeMotionPosition = _motionRoot.localPosition;
             _homeScale = _model.localScale;
             _homeRotation = _model.localRotation;
+            _hasHomePose = true;
             _hand = _animator.GetBoneTransform(_usesLeftHand ? HumanBodyBones.LeftHand : HumanBodyBones.RightHand);
         }
 
@@ -365,53 +332,61 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] 피격 섬광에 사용할 팔레트를 UnitHitReactionView에 전달합니다.
         /// [EN] Passes the hit-flash palette to UnitHitReactionView.
         /// </summary>
-        public void ApplyPalette(GameColorPalette colors) => _hitReaction.ApplyPalette(colors);
+        public void ApplyPalette(GameColorPalette colors)
+            => _hitReaction.ApplyPalette(colors);
 
         /// <summary>
-        /// EntryPoint が接続前に呼び、ユニット所有の効果を一度準備します。再呼出しでは既存効果を再利用します。
-        /// [KO] EntryPoint가 연결 전에 호출하여 유닛 소유 효과를 한 번 준비하며 재호출 시 기존 효과를 재사용합니다.
-        /// [EN] Called by EntryPoint before binding to prepare unit-owned effects once, reusing them on subsequent calls.
+        /// EntryPointが戦闘を接続する前に、このユニットの効果を準備します。
+        /// [KO] EntryPoint가 전투를 연결하기 전에 이 유닛의 효과를 준비합니다.
+        /// [EN] Prepares this unit's effects before EntryPoint connects the battle.
         /// </summary>
         public void PrepareEffects()
+            => _effects.PrepareEffects();
+
+        /// <summary>
+        /// 接続中の攻撃の投射物を、手元から現在の対象位置へ進めます。
+        /// [KO] 연결 중인 공격의 투사체를 손 위치에서 현재 대상 위치로 진행합니다.
+        /// [EN] Advances the bound attack's projectile from the hand toward the current target position.
+        /// </summary>
+        public void PresentProjectile(int slot, Vector3 targetPosition, float progress)
         {
-            if (_projectilePrefab != null && _projectiles[0] == null)
-            {
-                for (var i = 0; i < _projectiles.Length; i++)
-                {
-                    _projectiles[i] = CreateEffect(_projectilePrefab, "VFX_Projectile" + i);
-                }
-            }
+            if (!_isBound)
+                return;
 
-            if (_impactPrefab != null && _impacts[0] == null)
-            {
-                for (var i = 0; i < _impacts.Length; i++)
-                {
-                    _impacts[i] = CreateEffect(_impactPrefab, "VFX_Impact" + i);
-                }
-            }
-
-            if (_strikePrefab != null && _strike == null)
-            {
-                _strike = CreateEffect(_strikePrefab, "VFX_SwordStrike");
-            }
-
-            if (_deathPrefab != null && _death == null)
-            {
-                _death = CreateEffect(_deathPrefab, "VFX_Death");
-            }
+            _effects.PresentProjectile(slot, _hand != null ? _hand.position : ImpactPosition, targetPosition, progress);
         }
 
         /// <summary>
-        /// ユニットの子としてエフェクトを作り、再生待ちの状態にします。
-        /// [KO] 유닛 자식으로 효과를 생성해 재생 대기 상태로 만듭니다.
-        /// [EN] Creates an effect as a unit child and leaves it ready for playback.
+        /// 到着した投射物の先端を止め、尾は残り寿命だけ再生します。
+        /// [KO] 도착한 투사체 선두를 멈추고 꼬리는 남은 수명만 재생합니다.
+        /// [EN] Stops arrived projectile heads while allowing their trails to finish.
         /// </summary>
-        private BattleEffectView CreateEffect(BattleEffectView prefab, string effectName)
+        public void HideProjectiles()
+            => _effects.HideProjectiles();
+
+        /// <summary>
+        /// 現在のRunから届いた命中だけを対象位置に再生します。
+        /// [KO] 현재 Run에서 전달한 명중만 대상 위치에 재생합니다.
+        /// [EN] Plays only impacts from the current run at the target position.
+        /// </summary>
+        public void ShowImpact(Guid runId, int slot, Vector3 position)
         {
-            var effect = Instantiate(prefab, transform);
-            effect.name = effectName;
-            effect.Clear();
-            return effect;
+            if (_isBound && runId == _runId)
+                _effects.ShowImpact(slot, position);
+        }
+
+        /// <summary>
+        /// 現在のRunの生存中の攻撃者について、剣先の効果を一度再生します。
+        /// [KO] 현재 Run에서 살아 있는 공격자에 대해 검 끝 효과를 한 번 재생합니다.
+        /// [EN] Plays a blade effect for a living attacker bound to the current run.
+        /// </summary>
+        public void ShowStrike(Guid runId)
+        {
+            if (!_isBound || IsDead || runId != _runId)
+                return;
+
+            var position = _hand != null ? _hand.position : ImpactPosition;
+            _effects.ShowStrike(position + _model.forward * StrikeForwardOffsetWorldUnits, _model.forward);
         }
 
         /// <summary>
@@ -425,7 +400,7 @@ namespace UnityCombatLab.Presentation.Units
             _runId = runId;
             _isBound = true;
             IsDead = false;
-            Play("Idle");
+            Play(IdleState);
         }
 
         /// <summary>
@@ -444,18 +419,44 @@ namespace UnityCombatLab.Presentation.Units
             StopMotion();
             _attackRemaining = _attackSeconds;
             _animator.SetFloat(_attackSpeed, _attackClipSeconds / _attackSeconds);
-            Play("Attack");
+            Play(AttackState);
             var direction = targetPosition - _motionRoot.position;
             direction.y = 0;
-            if (direction.sqrMagnitude > MinimumDirectionSqrMagnitude)
+            if (direction.sqrMagnitude > Define.MinimumDirectionSqrMagnitude)
             {
                 _model.rotation = Quaternion.LookRotation(direction);
             }
 
             var generation = _generation;
             // 接近と姿勢の Tween を、他の演出と同じゲーム内時間で進める。
-            var sequence = DOTween.Sequence().SetUpdate(UpdateType.Normal, false);
+            var sequence = DOTween.Sequence().SetUpdate(UpdateType.Normal, false).SetRecyclable(false);
             _motion = sequence;
+            AppendAttackMotion(sequence, direction, isMelee, isSpecial, approachFraction);
+
+            // この戦闘と世代の終了だけを受け、旧 Tween が死亡や新しい攻撃を上書きしないようにする。
+            sequence.OnComplete(() =>
+            {
+                if (this == null || !_isBound || IsDead || generation != _generation || runId != _runId)
+                {
+                    return;
+                }
+
+                _motionRoot.localPosition = _homeMotionPosition;
+                _model.localScale = _homeScale;
+                _model.localRotation = _homeRotation;
+                _attackRemaining = 0;
+                _motion = null;
+                Play(IdleState);
+            });
+        }
+
+        /// <summary>
+        /// 近接なら間合いまで往復し、遠距離なら姿勢を拡縮する動きを攻撃Sequenceへ追加します。
+        /// [KO] 근접이면 사거리까지 왕복하고 원거리면 자세를 확대·축소하는 움직임을 공격 Sequence에 추가합니다.
+        /// [EN] Appends a melee approach-and-return or ranged scale motion to the attack sequence.
+        /// </summary>
+        private void AppendAttackMotion(Sequence sequence, Vector3 direction, bool isMelee, bool isSpecial, float approachFraction)
+        {
             if (isMelee)
             {
                 // 前列の距離 3.6 なら、武器の間合い 1.35 を残す移動 2.25 を双方で半分ずつ使う。
@@ -477,104 +478,6 @@ namespace UnityCombatLab.Presentation.Units
                 sequence.Append(_model.DOScale(_homeScale, _attackSeconds - ReleaseDelay));
             }
 
-            // この戦闘と世代の終了だけを受け、旧 Tween が死亡や新しい攻撃を上書きしないようにする。
-            sequence.OnComplete(() =>
-            {
-                if (this == null || !_isBound || IsDead || generation != _generation || runId != _runId)
-                {
-                    return;
-                }
-
-                _motionRoot.localPosition = _homeMotionPosition;
-                _model.localScale = _homeScale;
-                _model.localRotation = _homeRotation;
-                _attackRemaining = 0;
-                _motion = null;
-                Play("Idle");
-            });
-        }
-
-        /// <summary>
-        /// 発射から到着まで、同じ対象の現在位置へ矢・魔法弾を進めます。
-        /// [KO] 발사부터 도착까지 같은 대상의 현재 위치로 화살·마법탄을 이동합니다.
-        /// [EN] Advances an arrow or bolt toward the current position of its target.
-        /// </summary>
-        public void PresentProjectile(int slot, Vector3 targetPosition, float progress)
-        {
-            if (!_isBound || _projectiles[slot] == null)
-            {
-                return;
-            }
-
-            var projectile = _projectiles[slot];
-            var start = _projectileStarts[slot];
-            if (!projectile.IsEmitting)
-            {
-                start = _hand != null ? _hand.position : ImpactPosition;
-                _projectileStarts[slot] = start;
-                // 飛行方向を +Z に向けて再生する。発射位置を変える前に前回の尾を消す。
-                projectile.Play(start, targetPosition - start);
-            }
-
-            projectile.transform.position = Vector3.Lerp(start, targetPosition, progress) +
-                                            Vector3.up *
-                                            (Mathf.Sin(progress * Mathf.PI) * ProjectileArcHeightWorldUnits);
-            var direction = targetPosition - start;
-            if (direction.sqrMagnitude > MinimumDirectionSqrMagnitude)
-            {
-                projectile.transform.rotation = Quaternion.LookRotation(direction);
-            }
-        }
-
-        /// <summary>
-        /// 到着した先端を止め、尾の粒子は残り寿命だけ再生します。戦闘解除なら全て消します。
-        /// [KO] 도착한 선두를 멈추고 꼬리 입자는 남은 수명만 재생하며 전투 해제라면 모두 지웁니다.
-        /// [EN] Stops arrived heads while tails finish their remaining lifetime, clearing everything on battle release.
-        /// </summary>
-        public void HideProjectiles(bool clear = false)
-        {
-            foreach (var projectile in _projectiles)
-            {
-                if (projectile != null)
-                {
-                    if (clear)
-                    {
-                        projectile.Clear();
-                    }
-                    else
-                    {
-                        projectile.StopFlight();
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Presenter が命中時に呼び、この攻撃者の効果を対象の胴体位置に再生します。
-        /// [KO] Presenter가 명중 때 호출해 이 공격자의 효과를 대상 몸통 위치에 재생합니다.
-        /// [EN] Called by the presenter at impact to play this attacker's effect at the target's torso.
-        /// </summary>
-        public void ShowImpact(Guid runId, int slot, Vector3 position)
-        {
-            // slot は一攻撃の被害列の 0〜2。編成のスロット番号ではなく、広域攻撃の三表示を分ける。
-            if (_isBound && runId == _runId && _impacts[slot] != null)
-            {
-                _impacts[slot].Play(position, Vector3.forward);
-            }
-        }
-
-        /// <summary>
-        /// Presenter が一攻撃につき一度、斬撃の命中時に剣先効果を開始します。
-        /// [KO] Presenter가 공격당 한 번 베기 명중 때 검 끝 효과를 시작합니다.
-        /// [EN] Called once per attack by the presenter to start a blade effect at melee impact.
-        /// </summary>
-        public void ShowStrike(Guid runId)
-        {
-            if (_isBound && !IsDead && runId == _runId && _strike != null)
-            {
-                var position = _hand != null ? _hand.position : ImpactPosition;
-                _strike.Play(position + _model.forward * StrikeForwardOffsetWorldUnits, _model.forward);
-            }
         }
 
         /// <summary>
@@ -584,8 +487,11 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         public void ShowHit(Guid runId, Vector3 sourcePosition)
         {
-            if (!_isBound || IsDead || runId != _runId) return;
-            if (!IsAttacking) Play("Hit");
+            if (!_isBound || IsDead || runId != _runId)
+                return;
+
+            if (!IsAttacking)
+                Play(HitState);
             _hitReaction.Play(sourcePosition);
         }
 
@@ -617,12 +523,8 @@ namespace UnityCombatLab.Presentation.Units
             StopMotion(false);
             _hitReaction.Freeze();
             IsDead = true;
-            Play("Death");
-            if (_death != null)
-            {
-                _death.Play(_model.position + Vector3.up * (DeathHeightPerUnitScale * transform.lossyScale.y),
-                    Vector3.forward);
-            }
+            Play(DeathState);
+            _effects.ShowDeath(_model.position + Vector3.up * (DeathHeightPerUnitScale * transform.lossyScale.y));
         }
 
         /// <summary>
@@ -635,7 +537,7 @@ namespace UnityCombatLab.Presentation.Units
             if (_isBound && !IsDead)
             {
                 StopMotion();
-                Play("Idle");
+                Play(IdleState);
             }
         }
 
@@ -648,18 +550,10 @@ namespace UnityCombatLab.Presentation.Units
         {
             _isBound = false;
             StopMotion();
-            HideProjectiles(true);
-            if (_hitReaction != null) _hitReaction.Clear();
-            foreach (var impact in _impacts)
-            {
-                if (impact != null)
-                {
-                    impact.Clear();
-                }
-            }
-
-            if (_strike != null) _strike.Clear();
-            if (_death != null) _death.Clear();
+            if (_effects != null)
+                _effects.Clear();
+            if (_hitReaction != null)
+                _hitReaction.Clear();
         }
 
         /// <summary>
@@ -673,14 +567,19 @@ namespace UnityCombatLab.Presentation.Units
             _motion?.Kill();
             _motion = null;
             _attackRemaining = 0;
-            if (_model == null || !restorePose)
+            if (!_hasHomePose || !restorePose)
             {
                 return;
             }
 
-            _motionRoot.localPosition = _homeMotionPosition;
-            _model.localScale = _homeScale;
-            _model.localRotation = _homeRotation;
+            if (_motionRoot != null)
+
+                _motionRoot.localPosition = _homeMotionPosition;
+            if (_model != null)
+            {
+                _model.localScale = _homeScale;
+                _model.localRotation = _homeRotation;
+            }
         }
 
         /// <summary>
@@ -699,6 +598,7 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] 비활성화 시에도 소유 연출을 해제합니다.
         /// [EN] Releases owned effects when disabled.
         /// </summary>
-        private void OnDisable() => Release();
+        private void OnDisable()
+            => Release();
     }
 }

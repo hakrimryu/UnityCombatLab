@@ -131,7 +131,7 @@ namespace UnityCombatLab.Tests.PlayMode
 
             Assert.That(runner.Result, Is.EqualTo(Define.BattleResult.Victory));
             Assert.That(entry.Hud.ResultText, Is.EqualTo("戦闘中"));
-            entry.Presenter.Advance(3);
+            entry.Presenter.Advance(100);
             entry.Presenter.Advance(1);
             Assert.That(entry.Hud.ResultText, Is.EqualTo("勝利"));
             Assert.That(lastEventCount, Is.EqualTo(1));
@@ -270,6 +270,38 @@ namespace UnityCombatLab.Tests.PlayMode
             entry.Presenter.Advance(0.2);
             Assert.That(entry.Hud.Units[1].DisplayedHealth, Is.EqualTo(288));
             Assert.That(entry.Presentation.Units[1].Health.CurrentValue, Is.EqualTo(288));
+            yield return null;
+        }
+
+        /// <summary>
+        /// 計算が複数攻撃を先に確定しても、同じ弓使いのモーションと投射物を順番に使います。
+        /// [KO] 계산이 여러 공격을 먼저 확정해도 같은 궁수의 모션과 투사체를 순서대로 사용합니다.
+        /// [EN] Uses one ranger's motion and projectile in order even when simulation commits several attacks ahead.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CatchUpKeepsSameActorMotionUntilQueuedAttackStarts()
+        {
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var ranger = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None)
+                .Single(view => view.name == "Unit_Ranger");
+            var motionField = typeof(UnitView).GetField("_motion", BindingFlags.Instance | BindingFlags.NonPublic);
+            entry.Runner.Advance(0.5);
+            var firstMotion = motionField.GetValue(ranger);
+            Assert.That(firstMotion, Is.Not.Null);
+            // 表示時計を進めずに次の三回分の計算を届け、同じユニットに待機予約を作る。
+            for (var index = 0; index < 3; index++)
+                entry.Runner.Advance(0.4);
+            Assert.That(motionField.GetValue(ranger), Is.SameAs(firstMotion));
+            entry.Presenter.Advance(0.3);
+            var projectile = ranger.transform.Find("VFX_Projectile0").GetComponent<BattleEffectView>();
+            Assert.That(projectile.IsEmitting, Is.True);
+            entry.Presenter.Advance(0.13);
+            Assert.That(projectile.IsEmitting, Is.False);
+            Assert.That(motionField.GetValue(ranger), Is.SameAs(firstMotion));
+            entry.Presenter.Advance(0.24);
+            Assert.That(motionField.GetValue(ranger), Is.Not.SameAs(firstMotion));
+            entry.Presenter.Advance(0.25);
+            Assert.That(projectile.IsEmitting, Is.True);
             yield return null;
         }
 

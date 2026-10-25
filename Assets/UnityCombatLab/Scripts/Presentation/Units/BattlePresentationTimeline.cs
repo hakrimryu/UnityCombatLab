@@ -69,9 +69,30 @@ namespace UnityCombatLab.Presentation.Units
             public int Tick { get; }
 
             /// <summary>
-            /// この攻撃を受け取った表示時計の秒数。
-            /// [KO] 이 공격을 받은 표시 시계의 초 단위 시각입니다.
-            /// [EN] Presentation-clock time in seconds when this attack arrived.
+            /// 単体攻撃の対象番号。全体攻撃では対象を固定せず -1 を使います。
+            /// [KO] 단일 공격 대상 번호이며 광역 공격은 대상을 고정하지 않고 -1을 사용합니다.
+            /// [EN] Single-target view index, or -1 for an area attack without one fixed target.
+            /// </summary>
+            public int Target { get; }
+
+            /// <summary>
+            /// 攻撃イベントを受けた時点で確定した、強攻撃モーションの指定。
+            /// [KO] 공격 이벤트를 받은 시점에 확정한 특수 공격 모션 지정입니다.
+            /// [EN] Special-motion choice captured when the attack event was received.
+            /// </summary>
+            public bool IsSpecial { get; }
+
+            /// <summary>
+            /// 待機中の攻撃モーションを一度だけ開始するための状態。
+            /// [KO] 대기 중인 공격 모션을 한 번만 시작하기 위한 상태입니다.
+            /// [EN] State ensuring a queued attack's motion starts only once.
+            /// </summary>
+            internal bool HasStartedMotion { get; set; }
+
+            /// <summary>
+            /// 同じ攻撃者の前の演出が終わり、この攻撃を開始できる表示時計の秒数。
+            /// [KO] 같은 공격자의 이전 연출이 끝나 이번 공격을 시작할 수 있는 표시 시계의 초 단위 시각입니다.
+            /// [EN] Presentation-clock time when this attack may start after the same actor's preceding cue finishes.
             /// </summary>
             internal double Started { get; }
 
@@ -116,10 +137,12 @@ namespace UnityCombatLab.Presentation.Units
             /// [EN] Created only by the timeline at attack start to capture presentation time and timing settings.
             /// </summary>
             internal AttackCue(int actor, int tick, double started, float duration, float releaseDelay,
-                float impactDelay)
+                float impactDelay, int target, bool isSpecial)
             {
                 Actor = actor;
                 Tick = tick;
+                Target = target;
+                IsSpecial = isSpecial;
                 Started = started;
                 Duration = duration;
                 ReleaseDelay = releaseDelay;
@@ -132,7 +155,8 @@ namespace UnityCombatLab.Presentation.Units
             /// [KO] Timeline이 같은 actor와 tick의 확정 피해를 값으로 추가합니다.
             /// [EN] Timeline appends committed damage with the same actor and tick as a value copy.
             /// </summary>
-            internal void AddDamage(BattleEvent damage) => _damage.Add(damage);
+            internal void AddDamage(BattleEvent damage)
+                => _damage.Add(damage);
         }
 
         /// <summary>
@@ -169,7 +193,8 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] Presenter마다 하나 생성하고 예약 목록을 한 번만 읽기 전용으로 공개합니다.
         /// [EN] Created once per presenter, exposing a read-only cue list once.
         /// </summary>
-        public BattlePresentationTimeline() => Attacks = _attacks.AsReadOnly();
+        public BattlePresentationTimeline()
+            => Attacks = _attacks.AsReadOnly();
 
         /// <summary>
         /// Presenter が渡した経過秒を、演出の時刻に加算します。
@@ -180,18 +205,67 @@ namespace UnityCombatLab.Presentation.Units
         {
             if (double.IsNaN(scaledDeltaSeconds) || double.IsInfinity(scaledDeltaSeconds) || scaledDeltaSeconds < 0)
                 throw new ArgumentOutOfRangeException(nameof(scaledDeltaSeconds));
+
             Time += scaledDeltaSeconds;
         }
 
         /// <summary>
-        /// 表示設定を秒で受け取り、他の攻撃とは独立した予約を開始します。
-        /// [KO] 표시 설정을 초 단위로 받아 다른 공격과 독립적인 예약을 시작합니다.
-        /// [EN] Starts an independent attack cue from presentation settings expressed in seconds.
+        /// 表示設定を秒で受け取り、同じ攻撃者の前の演出が終わる時刻以降へ予約します。
+        /// [KO] 표시 설정을 초 단위로 받아 같은 공격자의 이전 연출이 끝나는 시각 이후로 예약합니다.
+        /// [EN] Schedules an attack from timing settings in seconds after the same actor's preceding presentation finishes.
         /// </summary>
-        public void BeginAttack(int actor, int tick, float duration, float releaseDelay, float impactDelay)
+        /// <param name="actor">
+        /// Presenter の攻撃者番号。
+        /// [KO] Presenter의 공격자 번호입니다.
+        /// [EN] Attacker index in the presenter.
+        /// </param>
+        /// <param name="tick">
+        /// 被害イベントと対応付ける Domain tick。
+        /// [KO] 피해 이벤트와 대응시킬 Domain 틱입니다.
+        /// [EN] Domain tick used to match damage events.
+        /// </param>
+        /// <param name="duration">
+        /// 元の姿勢へ戻るまでのモーション秒数。
+        /// [KO] 원래 자세로 돌아올 때까지의 모션 시간(초)입니다.
+        /// [EN] Motion duration in seconds, including return to the home pose.
+        /// </param>
+        /// <param name="releaseDelay">
+        /// モーション開始から発射までの秒数。
+        /// [KO] 모션 시작부터 발사까지의 시간(초)입니다.
+        /// [EN] Seconds from motion start to projectile release.
+        /// </param>
+        /// <param name="impactDelay">
+        /// モーション開始から命中までの秒数。
+        /// [KO] 모션 시작부터 명중까지의 시간(초)입니다.
+        /// [EN] Seconds from motion start to impact.
+        /// </param>
+        /// <param name="target">
+        /// Presenter の対象番号。全体攻撃では -1。
+        /// [KO] Presenter의 대상 번호이며 광역 공격은 -1입니다.
+        /// [EN] Presenter target index, or -1 for an area attack.
+        /// </param>
+        /// <param name="isSpecial">
+        /// 攻撃受信時に確定した強攻撃モーションの指定。
+        /// [KO] 공격 수신 때 확정한 특수 공격 모션 지정입니다.
+        /// [EN] Special-motion choice captured when the attack was received.
+        /// </param>
+        /// <returns>
+        /// 今回追加した予約の番号。予約一覧を変更する前に使用します。
+        /// [KO] 이번에 추가한 예약 번호이며 예약 목록을 변경하기 전에 사용합니다.
+        /// [EN] Index of the new cue, valid until the cue list is modified.
+        /// </returns>
+        public int BeginAttack(int actor, int tick, float duration, float releaseDelay, float impactDelay,
+            int target = -1, bool isSpecial = false)
         {
-            if (actor < 0) throw new ArgumentOutOfRangeException(nameof(actor));
-            if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
+            if (actor < 0)
+                throw new ArgumentOutOfRangeException(nameof(actor));
+
+            if (tick < 0)
+                throw new ArgumentOutOfRangeException(nameof(tick));
+
+            if (target < -1)
+                throw new ArgumentOutOfRangeException(nameof(target));
+
             if (float.IsNaN(duration) || float.IsInfinity(duration) || duration <= 0)
                 throw new ArgumentOutOfRangeException(nameof(duration),
                     "Attack duration must be positive finite seconds.");
@@ -202,7 +276,34 @@ namespace UnityCombatLab.Presentation.Units
             if (float.IsNaN(impactDelay) || float.IsInfinity(impactDelay) || impactDelay < releaseDelay)
                 throw new ArgumentOutOfRangeException(nameof(impactDelay),
                     "Impact delay must be finite seconds at or after release.");
-            _attacks.Add(new AttackCue(actor, tick, Time, duration, releaseDelay, impactDelay));
+            var started = Time;
+            for (var index = _attacks.Count - 1; index >= 0; index--)
+            {
+                var previous = _attacks[index];
+                if (previous.Actor != actor)
+                    continue;
+
+                // 同じユニットのモーションと三つの効果枠は、前の命中と帰還を終えてから再使用する。
+                started = Math.Max(started, previous.Started + Math.Max(previous.Duration, previous.ImpactDelay));
+                break;
+            }
+            _attacks.Add(new AttackCue(actor, tick, started, duration, releaseDelay, impactDelay, target, isSpecial));
+            return _attacks.Count - 1;
+        }
+
+        /// <summary>
+        /// 開始予定時刻に達した攻撃だけに、モーションの開始を一度許可します。
+        /// [KO] 시작 예정 시각에 도달한 공격에만 모션 시작을 한 번 허용합니다.
+        /// [EN] Allows motion to start once for an attack whose scheduled start time has arrived.
+        /// </summary>
+        public bool TryStartMotion(int index)
+        {
+            var cue = _attacks[index];
+            if (cue.HasStartedMotion || Time < cue.Started)
+                return false;
+
+            cue.HasStartedMotion = true;
+            return true;
         }
 
         /// <summary>
@@ -215,7 +316,9 @@ namespace UnityCombatLab.Presentation.Units
             for (var index = _attacks.Count - 1; index >= 0; index--)
             {
                 var cue = _attacks[index];
-                if (cue.Actor != actor || cue.Tick != damage.Tick) continue;
+                if (cue.Actor != actor || cue.Tick != damage.Tick)
+                    continue;
+
                 cue.AddDamage(damage);
                 return;
             }
@@ -233,7 +336,9 @@ namespace UnityCombatLab.Presentation.Units
             var cue = _attacks[index];
             var elapsed = Time - cue.Started;
             progress = 0;
-            if (cue.HasImpacted || elapsed < cue.ReleaseDelay || cue.ImpactDelay <= cue.ReleaseDelay) return false;
+            if (cue.HasImpacted || elapsed < cue.ReleaseDelay || cue.ImpactDelay <= cue.ReleaseDelay)
+                return false;
+
             progress = (float)Math.Min(1, (elapsed - cue.ReleaseDelay) / (cue.ImpactDelay - cue.ReleaseDelay));
             return true;
         }
@@ -246,7 +351,9 @@ namespace UnityCombatLab.Presentation.Units
         public bool TryImpact(int index)
         {
             var cue = _attacks[index];
-            if (cue.HasImpacted || Time - cue.Started + ImpactToleranceSeconds < cue.ImpactDelay) return false;
+            if (cue.HasImpacted || Time - cue.Started + ImpactToleranceSeconds < cue.ImpactDelay)
+                return false;
+
             cue.HasImpacted = true;
             return true;
         }
@@ -259,7 +366,9 @@ namespace UnityCombatLab.Presentation.Units
         public bool RemoveIfFinished(int index)
         {
             var cue = _attacks[index];
-            if (!cue.HasImpacted || Time - cue.Started < Math.Max(cue.Duration, cue.ImpactDelay)) return false;
+            if (!cue.HasImpacted || Time - cue.Started < Math.Max(cue.Duration, cue.ImpactDelay))
+                return false;
+
             _attacks.RemoveAt(index);
             return true;
         }
@@ -271,10 +380,13 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         public bool CanPresentDeath(int actor, int displayedHealth, bool isDead)
         {
-            if (displayedHealth != 0 || isDead) return false;
+            if (displayedHealth != 0 || isDead)
+                return false;
+
             foreach (var cue in _attacks)
                 if (cue.Actor == actor && !cue.HasImpacted)
                     return false;
+
             return true;
         }
 
@@ -283,20 +395,23 @@ namespace UnityCombatLab.Presentation.Units
         /// [KO] Presenter가 실제 사망 표시를 시작한 직후 그 시각을 기록합니다.
         /// [EN] Records the time immediately after the presenter actually starts a death presentation.
         /// </summary>
-        public void RecordDeath() => _lastDeathTime = Time;
+        public void RecordDeath()
+            => _lastDeathTime = Time;
 
         /// <summary>
         /// Runner で確定した勝敗を、演出終了後に公開するため保存します。
         /// [KO] Runner에서 확정한 승패를 연출 종료 후 공개하도록 저장합니다.
         /// [EN] Stores the runner's committed outcome for publication after effects finish.
         /// </summary>
-        public void CommitResult(Define.BattleResult result) => Result = result;
+        public void CommitResult(Define.BattleResult result)
+            => Result = result;
 
         /// <summary>
         /// Presenter の終了時に、残っている攻撃を全て取り除きます。
         /// [KO] Presenter 종료 시 남은 공격을 모두 제거합니다.
         /// [EN] Removes all remaining attacks when the presenter ends.
         /// </summary>
-        public void Clear() => _attacks.Clear();
+        public void Clear()
+            => _attacks.Clear();
     }
 }

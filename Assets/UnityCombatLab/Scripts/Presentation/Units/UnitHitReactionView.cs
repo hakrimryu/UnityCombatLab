@@ -219,7 +219,7 @@ namespace UnityCombatLab.Presentation.Units
                 throw new InvalidOperationException("Apply the hit palette before playing a reaction.");
             var direction = _visualRoot.position - sourcePosition;
             direction.y = 0;
-            if (direction.sqrMagnitude < 0.001f) direction = -_visualRoot.forward;
+            if (direction.sqrMagnitude < Define.MinimumDirectionSqrMagnitude) direction = -_visualRoot.forward;
             // 例: 距離0.14を親の縮尺で換算し、モデルの大きさによらず同じ幅だけ動かす。
             _recoilStart = transform.localPosition;
             _recoilTarget = _homePosition +

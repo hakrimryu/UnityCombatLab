@@ -94,6 +94,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7457469331468571117}
   - component: {fileID: 8384091490968913045}
+  - component: {fileID: 6752986353726873447}
   m_Layer: 0
   m_Name: Unit_Mage
   m_TagString: Untagged
@@ -137,8 +138,21 @@ MonoBehaviour:
   _releaseNormalized: 0.45
   _flightSeconds: 0.22
   _attackClipSeconds: 0.6666667
-  _projectilePrefab: {fileID: 1168598569580198385, guid: 9ad377a2a8225d446b7aa4832ba92559, type: 3}
   _usesLeftHand: 0
+  _effects: {fileID: 6752986353726873447}
+--- !u!114 &6752986353726873447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7947836107350547006}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe58a467c3d166247b2f69cdfc929916, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityCombatLab.Presentation::UnityCombatLab.Presentation.Units.UnitEffectsView
+  _projectilePrefab: {fileID: 1168598569580198385, guid: 9ad377a2a8225d446b7aa4832ba92559, type: 3}
   _impactPrefab: {fileID: 8997898255259450850, guid: fed0c6fa60e73d94ca5428f7fd55b017, type: 3}
   _strikePrefab: {fileID: 0}
   _deathPrefab: {fileID: 6156465146768680735, guid: a46a44f0859ead34687745d82b52a389, type: 3}

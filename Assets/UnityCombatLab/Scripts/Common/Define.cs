@@ -10,6 +10,13 @@ namespace UnityCombatLab.Common
         #region Presentation
 
         /// <summary>
+        /// ほぼ同じ世界位置から向きを計算しないための距離二乗の下限。
+        /// [KO] 거의 같은 월드 위치에서 방향을 계산하지 않기 위한 제곱 거리 하한입니다.
+        /// [EN] Minimum squared distance for calculating a direction between world positions.
+        /// </summary>
+        public const float MinimumDirectionSqrMagnitude = 0.001f;
+
+        /// <summary>
         /// Inspector の UI 部品を共通パレットの色へ結び付ける固定キー。値はアセットに保存するため番号を維持します。
         /// [KO] Inspector의 UI 요소를 공통 팔레트 색에 연결하는 고정 키입니다. 에셋에 저장되므로 번호를 유지합니다.
         /// [EN] Stable keys connecting Inspector UI graphics to shared palette colors; keep their serialized numeric values.
