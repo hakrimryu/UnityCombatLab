@@ -6,7 +6,8 @@
         "UnityCombatLab.Domain",
         "UnityCombatLab.Application",
         "UnityEngine.UI",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
     ],
     "noEngineReferences": false
 }
