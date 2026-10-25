@@ -18,6 +18,44 @@ namespace UnityCombatLab.Tests.EditMode
     public sealed class RunFlowCoordinatorTests
     {
         /// <summary>
+        /// Frontend資産の準備が終わるまで遷移を完了せず、出発も受け付けません。
+        /// [KO] Frontend 자산 준비가 끝날 때까지 전환을 완료하지 않고 출발도 받지 않습니다.
+        /// [EN] Keeps the transition pending and rejects departure until Frontend assets are ready.
+        /// </summary>
+        [Test]
+        public void FrontendWaitsForAsyncAssetPreparation()
+        {
+            var rig = new FlowRig { FrontendPreparation = new UniTaskCompletionSource() };
+            using var flow = rig.Create();
+            var start = flow.StartFrontendAsync();
+            Assert.That(start.Status, Is.EqualTo(UniTaskStatus.Pending));
+            Assert.That(flow.IsBusy, Is.True);
+            flow.StartRunAsync(RunConfiguration.CreateDefault()).GetAwaiter().GetResult();
+            Assert.That(flow.ActiveSession, Is.Null);
+            rig.FrontendPreparation.TrySetResult();
+            Assert.That(start.GetAwaiter().GetResult(), Is.True);
+            Assert.That(flow.IsBusy, Is.False);
+        }
+
+        /// <summary>
+        /// Frontendの素材読込が失敗した場合は、使用できない画面を成功として返しません。
+        /// [KO] Frontend 소재 로딩 실패 시 사용할 수 없는 화면을 성공으로 반환하지 않습니다.
+        /// [EN] Does not report an unusable screen as ready when Frontend asset loading fails.
+        /// </summary>
+        [Test]
+        public void FrontendAssetFailureUsesRecoveryMessage()
+        {
+            var rig = new FlowRig { FrontendPreparation = new UniTaskCompletionSource() };
+            using var flow = rig.Create();
+            var start = flow.StartFrontendAsync();
+            rig.FrontendPreparation.TrySetException(new InvalidOperationException("frontend assets"));
+            Assert.That(start.GetAwaiter().GetResult(), Is.False);
+            Assert.That(flow.Failure, Is.EqualTo(Define.RunFailure.Frontend));
+            Assert.That(flow.CanRetry, Is.False);
+            Assert.That(flow.IsBusy, Is.False);
+        }
+
+        /// <summary>
         /// 終了時にView、次フレーム、資産、Frontendの順序を維持します。
         /// [KO] 종료 시 View·다음 프레임·자산·Frontend 순서를 유지하는지 확인합니다.
         /// [EN] Checks cleanup order: battle views, next frame, resources, then Frontend.
@@ -279,6 +317,7 @@ namespace UnityCombatLab.Tests.EditMode
             public bool ShouldFailDisposal;
             public UniTaskCompletionSource Preparation;
             public UniTaskCompletionSource FrontendLoad;
+            public UniTaskCompletionSource FrontendPreparation;
             private RunFlowCoordinator _flow;
             /// <summary>
             /// 記録用の依存先を接続したRun調整役を作ります。
@@ -335,6 +374,17 @@ namespace UnityCombatLab.Tests.EditMode
             {
                 if (FrontendLoad != null)
                     await FrontendLoad.Task;
+
+                if (FrontendPreparation != null)
+                {
+                    _flow.RegisterFrontendPreparation(async token =>
+                    {
+                        await FrontendPreparation.Task;
+                        token.ThrowIfCancellationRequested();
+                        _flow.MarkFrontendReady();
+                    });
+                    return;
+                }
 
                 if (!ShouldSkipFrontendReady)
                     _flow.MarkFrontendReady();

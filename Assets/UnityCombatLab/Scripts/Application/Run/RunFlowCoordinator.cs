@@ -79,6 +79,13 @@ namespace UnityCombatLab.Application.Run
         /// [EN] Records whether the loaded Frontend completed input setup and its first render.
         /// </summary>
         private bool _isFrontendReady;
+
+        /// <summary>
+        /// 読込先のEntryPointが登録する非同期UI準備。シーン読込後に一度だけ実行します。
+        /// [KO] 로드 대상 EntryPoint가 등록할 비동기 UI 준비이며 씬 로드 후 한 번만 실행합니다.
+        /// [EN] Async UI preparation registered by the destination entry point and run once after scene loading.
+        /// </summary>
+        private Func<CancellationToken, UniTask> _prepareFrontend;
         /// <summary>
         /// 画面入力が利用する純粋な状態遷移規則。
         /// [KO] 화면 입력에서 사용하는 순수 상태 전이 규칙입니다.
@@ -219,17 +226,40 @@ namespace UnityCombatLab.Application.Run
         }
 
         /// <summary>
-        /// シーン読込と次フレームの EntryPoint 開始を待ち、利用可能な画面だけを成功とします。
-        /// [KO] 씬 로드와 다음 프레임의 EntryPoint 시작을 기다리고 사용 가능한 화면만 성공으로 판단합니다.
-        /// [EN] Waits for scene loading and next-frame entry point startup and accepts only a usable screen.
+        /// FrontendのEntryPointから資産読込と初回描画を受け取り、共通ローディングの待機対象にします。
+        /// [KO] Frontend EntryPoint의 자산 로딩·첫 표시를 받아 공통 로딩이 기다리도록 합니다.
+        /// [EN] Accepts asset loading and initial rendering from Frontend so the shared transition waits for them.
+        /// </summary>
+        public void RegisterFrontendPreparation(Func<CancellationToken, UniTask> prepare)
+        {
+            if (_isDisposed)
+                throw new ObjectDisposedException(nameof(RunFlowCoordinator));
+
+            if (!_isTransitioning || _prepareFrontend != null || _isFrontendReady)
+                throw new InvalidOperationException("Frontend preparation must be registered once during scene loading.");
+
+            _prepareFrontend = prepare ?? throw new ArgumentNullException(nameof(prepare));
+        }
+
+        /// <summary>
+        /// シーン・EntryPointの開始・非同期UI準備を待ち、利用可能な画面だけを成功とします。
+        /// [KO] 씬·EntryPoint 시작·비동기 UI 준비를 기다리고 사용 가능한 화면만 성공으로 판단합니다.
+        /// [EN] Waits for the scene, entry point and async UI preparation and accepts only a usable screen.
         /// </summary>
         private async UniTask LoadFrontendAsync(CancellationToken cancellationToken = default)
         {
             _isFrontendReady = false;
+            _prepareFrontend = null;
             await _scenes.LoadSceneAsync(Define.SceneType.Frontend, cancellationToken);
             await _nextFrame();
             cancellationToken.ThrowIfCancellationRequested();
 
+            var prepare = _prepareFrontend;
+            _prepareFrontend = null;
+            if (!_isDisposed && prepare != null)
+                await prepare(cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
             if (!_isDisposed && !_isFrontendReady)
                 throw new InvalidOperationException("Frontend did not finish input setup and its initial render.");
         }
@@ -437,6 +467,7 @@ namespace UnityCombatLab.Application.Run
                 return;
 
             _isDisposed = true;
+            _prepareFrontend = null;
             var session = ActiveSession;
             ActiveSession = null;
             session?.Cancel();
