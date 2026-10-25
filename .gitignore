@@ -143,3 +143,7 @@ Thumbs.db
 # Verified Epic Toon FX originals imported by the asset owner.
 /Assets/Epic Toon FX/
 /Assets/Epic Toon FX.meta
+
+# Editor crash-recovery scenes stay local and must not be published.
+/Assets/_Recovery/
+/Assets/_Recovery.meta
