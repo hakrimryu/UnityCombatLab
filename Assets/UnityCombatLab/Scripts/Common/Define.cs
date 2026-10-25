@@ -174,6 +174,13 @@ namespace UnityCombatLab.Common
         public const uint DefaultRunSeed = 20261024u;
 
         /// <summary>
+        /// やさしい難易度で敵のHPと攻撃力に掛ける百分率。
+        /// [KO] 쉬움 난이도에서 적 HP와 공격력에 곱할 백분율입니다.
+        /// [EN] Percentage applied to enemy health and attack on easy difficulty.
+        /// </summary>
+        public const int EasyEnemyStatPercent = 80;
+
+        /// <summary>
         /// 一回の挑戦で許可する処理段階。
         /// [KO] 한 번의 도전에서 허용할 처리 단계입니다.
         /// [EN] Processing phases permitted during one run.
