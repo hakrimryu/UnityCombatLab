@@ -38,11 +38,32 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private RectTransform _safeArea;
 
         /// <summary>
-        /// 終了時に広げる見出しの背景。文字の長い敗北理由も一行で収めます。
-        /// [KO] 종료 시 넓히는 제목 배경입니다. 긴 패배 이유도 한 줄에 담습니다.
-        /// [EN] Header background expanded at battle end to fit longer defeat messages on one line.
+        /// 戦闘中に表示する見出しの背景。
+        /// [KO] 전투 중 표시할 제목 배경입니다.
+        /// [EN] Heading background displayed during combat.
         /// </summary>
         [SerializeField] private RectTransform _resultPanel;
+
+        /// <summary>
+        /// 勝利時に表示するイラストとリボン。
+        /// [KO] 승리 시 표시할 일러스트와 리본입니다.
+        /// [EN] Illustration and ribbon displayed on victory.
+        /// </summary>
+        [SerializeField] private GameObject _victoryResult;
+
+        /// <summary>
+        /// 敗北・時間切れに表示するイラストと終了理由。
+        /// [KO] 패배·시간 초과 시 표시할 일러스트와 종료 이유입니다.
+        /// [EN] Illustration and reason displayed on defeat or timeout.
+        /// </summary>
+        [SerializeField] private GameObject _defeatResult;
+
+        /// <summary>
+        /// Presenter が渡す敗北・時間切れの理由を表示する文字。
+        /// [KO] Presenter가 전달한 패배·시간 초과 이유를 표시할 글자입니다.
+        /// [EN] Text displaying the defeat or timeout reason supplied by the presenter.
+        /// </summary>
+        [SerializeField] private TMP_Text _defeatReason;
 
         /// <summary>
         /// 状態パネルの底を置く頭上の高さ。Unity ワールド単位で、拡大した隊長にはその倍率を適用します。
@@ -130,6 +151,7 @@ namespace UnityCombatLab.Presentation.UI
         {
             if (_units == null || _units.Length != unitCount || _units.Any(unit => unit == null) ||
                 _result == null || _safeArea == null || _resultPanel == null || _damageMaterialSource == null ||
+                _victoryResult == null || _defeatResult == null || _defeatReason == null ||
                 _paletteBindings == null || _paletteBindings.Length == 0 ||
                 _paletteBindings.Any(binding => binding == null))
             {
@@ -138,15 +160,17 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 戦闘状況の文字列を設定し、終了時は見出しの背景を広げます。
-        /// [KO] 전투 상황 문자열을 설정하고 종료 시 제목 배경을 넓힙니다.
-        /// [EN] Sets battle-status text and expands the heading background when finished.
+        /// 戦闘中は見出し、終了時は勝敗に対応する結果パネルを表示します。
+        /// [KO] 전투 중에는 제목을, 종료 시에는 승패에 맞는 결과 패널을 표시합니다.
+        /// [EN] Shows the combat heading while ongoing and the matching result panel when finished.
         /// </summary>
-        public void SetResult(string text, bool isFinished)
+        public void SetResult(string text, Define.BattleResult result)
         {
             _result.text = text;
-            _result.fontSize = isFinished ? 38 : 28;
-            _resultPanel.sizeDelta = new Vector2(isFinished ? 660 : 240, isFinished ? 76 : 56);
+            _resultPanel.gameObject.SetActive(result == Define.BattleResult.Ongoing);
+            _victoryResult.SetActive(result == Define.BattleResult.Victory);
+            _defeatResult.SetActive(result == Define.BattleResult.Defeat || result == Define.BattleResult.Timeout);
+            _defeatReason.text = text;
         }
 
         /// <summary>

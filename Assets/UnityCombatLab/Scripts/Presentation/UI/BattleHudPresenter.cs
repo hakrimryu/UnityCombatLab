@@ -83,7 +83,7 @@ namespace UnityCombatLab.Presentation.UI
                     }).AddTo(_subscriptions);
                 }
 
-                // 演出終了後に公開された勝敗で見出しを更新する。
+                // 演出終了後に公開された勝敗で結果表示を切り替える。
                 model.Result.Subscribe(HandleResultChanged).AddTo(_subscriptions);
             }
             catch
@@ -113,9 +113,9 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 通知された勝敗に応じて、HUD の見出しを更新します。
-        /// [KO] 알림으로 받은 승패에 따라 HUD 제목을 갱신합니다.
-        /// [EN] Updates the HUD heading for the notified battle outcome.
+        /// 通知された勝敗に応じて、HUD の結果表示を切り替えます。
+        /// [KO] 알림으로 받은 승패에 따라 HUD 결과 표시를 전환합니다.
+        /// [EN] Switches the HUD result display for the notified battle outcome.
         /// </summary>
         private void HandleResultChanged(Define.BattleResult result)
         {
@@ -131,7 +131,7 @@ namespace UnityCombatLab.Presentation.UI
                 Define.BattleResult.Defeat => "パーティが全滅しました。",
                 Define.BattleResult.Timeout => "制限時間に達しました。",
                 _ => throw new ArgumentOutOfRangeException(nameof(result))
-            }, result != Define.BattleResult.Ongoing);
+            }, result);
         }
 
         /// <summary>
