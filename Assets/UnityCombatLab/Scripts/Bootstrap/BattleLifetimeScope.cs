@@ -2,9 +2,7 @@ using UnityCombatLab.Infrastructure.Assets;
 using UnityCombatLab.Application.Run;
 using System;
 using System.Linq;
-using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Common;
-using UnityCombatLab.Domain.Run;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
@@ -95,29 +93,23 @@ namespace UnityCombatLab.Bootstrap
             if (hudPrefab == null)
                 throw new InvalidOperationException("Run HUD must finish loading before Dungeon.");
 
-            // 既存の戦闘契約に合わせ、0/1は味方/敵の前列、2/3は後列上、4/5は後列下の原型を渡す。
-            var roles = new[] { Define.UnitRole.Knight, Define.UnitRole.SkeletonMelee,
-                Define.UnitRole.Ranger, Define.UnitRole.SkeletonRanged, Define.UnitRole.Mage, Define.UnitRole.SkeletonCaptain };
-            var originals = roles.Select((role, index) => resources.GetUnit(role).Definition.CreateInput(index + 1,
-                (Define.BattleTeam)(index % Define.BattleTeamCount),
-                (Define.BattleSlot)(index / Define.BattleTeamCount))).ToArray();
-            var setup = new RunBattleSetup(session.InitialState.Configuration, originals);
+            var flow = Parent.Container.Resolve<RunFlowCoordinator>();
+            if (resources.GameData == null || resources.RunBattlePrefab == null)
+                throw new InvalidOperationException("Run data and controls must finish loading before Dungeon.");
 
-            var runId = session.InitialState.Id;
+            flow.Controller.PrepareProgress(session.InitialState.Id, resources.GameData);
             // 全接続ができても、読込側が許可するまでは EntryPoint.Start/Tick を進めない。
             builder.RegisterEntryPoint(resolver =>
             {
-                var battle = new BattleEntryPoint
-                (new BattleRunner(runId, Define.InitialWave, setup.Units),
-                    runId,
-                    Define.InitialWave,
-                    () => BattleUnitFactory.Create(setup.Units, resources, _spawnPoints, _unitsRoot),
-                    hudPrefab,
+                var battle = new RunBattleEntryPoint
+                (flow,
+                    session,
+                    resources,
+                    _spawnPoints,
+                    _unitsRoot,
                     _hudCanvas.transform,
                     _battleCamera,
-                    resolver.Resolve<GameColorPalette>(),
-                    resources.Icons,
-                    session);
+                    resolver.Resolve<GameColorPalette>());
                 session.AttachBattle(battle);
                 return battle;
             }, Lifetime.Scoped).AsSelf();

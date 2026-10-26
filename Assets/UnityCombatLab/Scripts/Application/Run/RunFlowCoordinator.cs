@@ -122,6 +122,13 @@ namespace UnityCombatLab.Application.Run
         /// [EN] Volume retained until app shutdown.
         /// </summary>
         public float Volume { get; private set; } = 0.7f;
+
+        /// <summary>
+        /// 最後に完了した Run の開発用再現記録。
+        /// [KO] 마지막으로 완료한 Run의 개발용 재현 기록입니다.
+        /// [EN] Development replay record of the most recently completed run.
+        /// </summary>
+        public RunReplayRecord LastReplay { get; private set; }
         /// <summary>
         /// Frontend の所有者へ、画面と入力可否の変化を通知します。
         /// [KO] Frontend 소유자에게 화면과 입력 가능 상태의 변경을 알립니다.
@@ -347,9 +354,24 @@ namespace UnityCombatLab.Application.Run
         }
 
         /// <summary>
-        /// 確定結果をコピーし、通知・View・handle・Dungeon の順で片付けて Frontend へ戻します。
-        /// [KO] 확정 결과를 복사하고 알림·View·handle·Dungeon 순으로 정리한 뒤 Frontend로 돌아갑니다.
-        /// [EN] Copies the result, clears notifications, views, handles and Dungeon, then returns to Frontend.
+        /// 一時停止中の終了確認を受け、勝敗を作らずタイトルへ戻します。
+        /// [KO] 일시정지 중 종료 확인을 받아 승패를 만들지 않고 타이틀로 돌아갑니다.
+        /// [EN] Accepts exit confirmation from pause and returns to Title without recording an outcome.
+        /// </summary>
+        public void RequestExitToTitle(Guid runId)
+        {
+            if (_isDisposed || _isTransitioning || ActiveSession?.InitialState.Id != runId ||
+                !Controller.IsPaused || !Controller.IsExitConfirmationOpen)
+                return;
+
+            ActiveSession.ShouldReturnToTitle = true;
+            EndRunAsync(ActiveSession).Forget();
+        }
+
+        /// <summary>
+        /// Run を停止し、表示破棄の次フレームに資産を解放して Frontend へ戻ります。
+        /// [KO] Run을 정지하고 표시 파괴 다음 프레임에 자산을 해제하여 Frontend로 돌아갑니다.
+        /// [EN] Stops the run, releases assets the frame after destroying views and returns to Frontend.
         /// </summary>
         private async UniTask EndRunAsync(RunSession session, Exception failure = null)
         {
@@ -358,11 +380,22 @@ namespace UnityCombatLab.Application.Run
 
             _isTransitioning = true;
             var result = failure == null ? session.PendingResult : null;
-            var failedDuringBattle = failure != null && Controller.Current?.Phase == Define.RunPhase.Battle;
+            var failedDuringBattle = failure != null && Controller.Current?.Phase != Define.RunPhase.Loading;
             var returned = false;
             try
             {
-                Controller.TryBeginCleanup(session.InitialState.Id, result?.Outcome ?? Define.BattleResult.Ongoing, result?.Ticks ?? 0);
+                if (!Controller.TryBeginCleanup(session.InitialState.Id, result?.Outcome ?? Define.BattleResult.Ongoing, result?.Ticks ?? 0))
+                {
+                    failure = new InvalidOperationException("The queued result does not match the active run completion.");
+                    _reportFailure(failure);
+                    result = null;
+                    failedDuringBattle = true;
+                    Controller.TryBeginCleanup(session.InitialState.Id);
+                }
+
+                if (result != null)
+                    LastReplay = session.Replay;
+
                 session.Cancel();
                 ShowTransitionSafely(Define.RunTransitionPhase.CleaningUp);
                 session.Battle?.Dispose();
@@ -372,7 +405,8 @@ namespace UnityCombatLab.Application.Run
                     return;
 
                 session.Resources.Dispose();
-                Page = failure != null ? Define.FrontendPage.Error : result != null ? Define.FrontendPage.Results : Define.FrontendPage.Formation;
+                Page = failure != null ? Define.FrontendPage.Error : result != null ? Define.FrontendPage.Results :
+                    session.ShouldReturnToTitle ? Define.FrontendPage.Title : Define.FrontendPage.Formation;
                 CanRetry = !failedDuringBattle;
                 Failure = failure == null ? Define.RunFailure.None : failedDuringBattle
                     ? Define.RunFailure.Battle

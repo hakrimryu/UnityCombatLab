@@ -70,6 +70,20 @@ namespace UnityCombatLab.Application.Run
         public RunResult PendingResult { get; private set; }
 
         /// <summary>
+        /// 終了時にコピーした再現記録。Unity 資産参照は持ちません。
+        /// [KO] 종료 시 복사한 재현 기록이며 Unity 자산 참조가 없습니다.
+        /// [EN] Replay record copied at completion without Unity asset references.
+        /// </summary>
+        public RunReplayRecord Replay { get; private set; }
+
+        /// <summary>
+        /// 明示終了後の復帰先をタイトルにする要求。
+        /// [KO] 명시 종료 후 복귀 위치를 타이틀로 지정하는 요청입니다.
+        /// [EN] Request to return to Title after explicit exit.
+        /// </summary>
+        public bool ShouldReturnToTitle { get; internal set; }
+
+        /// <summary>
         /// 戦闘更新の失敗を終了処理へ渡します。
         /// [KO] 전투 갱신 실패를 종료 처리에 전달합니다.
         /// [EN] Combat-update failure queued for cleanup.
@@ -122,9 +136,26 @@ namespace UnityCombatLab.Application.Run
         }
 
         /// <summary>
-        /// 発生した例外を一度保存し、次のフレームで終了処理へ渡します。
-        /// [KO] 발생한 예외를 한 번 저장하고 다음 프레임에 종료 처리로 전달합니다.
-        /// [EN] Records a failure once for cleanup on a following frame.
+        /// 全ウェーブ集計済みの結果と再現記録を一度だけ受け取ります。
+        /// [KO] 모든 웨이브를 집계한 결과·재현 기록을 한 번만 받습니다.
+        /// [EN] Accepts the fully aggregated result and replay record once.
+        /// </summary>
+        public void QueueResult(RunResult result, RunReplayRecord replay)
+        {
+            if (_isDisposed || !IsBattleAllowed || PendingResult != null || Failure != null)
+                return;
+
+            if (result == null || replay == null || result.RunId != InitialState.Id || replay.Result != result)
+                throw new ArgumentException("Result and replay must belong to this run.");
+
+            PendingResult = result;
+            Replay = replay;
+        }
+
+        /// <summary>
+        /// 継続できない失敗を Run の終了処理へ通知します。
+        /// [KO] 진행할 수 없는 실패를 Run 종료 처리에 알립니다.
+        /// [EN] Reports an unrecoverable failure to run cleanup.
         /// </summary>
         public void QueueFailure(Exception exception)
         {

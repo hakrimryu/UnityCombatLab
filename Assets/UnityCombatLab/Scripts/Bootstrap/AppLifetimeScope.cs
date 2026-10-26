@@ -4,6 +4,7 @@ using UnityCombatLab.Application.Run;
 using UnityCombatLab.Infrastructure.Scenes;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.UI;
+using UnityCombatLab.Infrastructure.Balance;
 using UnityEngine;
 using VContainer;
 using VContainer.Unity;
@@ -51,6 +52,13 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Local unit reference catalog shared by formation and battle.
         /// </summary>
         [SerializeField] private UnitAssetCatalog _unitAssets;
+
+        /// <summary>
+        /// 各 Run の開始時に固定する五ウェーブ・六強化の設定。
+        /// [KO] 각 Run 시작 시 고정하는 다섯 웨이브·여섯 강화 설정입니다.
+        /// [EN] Five-wave and six-upgrade settings frozen at each run start.
+        /// </summary>
+        [SerializeField] private RunDefinition _runDefinition;
 
         /// <summary>
         /// 共通ルートだけをシーンの寿命から分離してから DI を起動します。
@@ -121,11 +129,12 @@ namespace UnityCombatLab.Bootstrap
             // Boot で指定した色アセットを App Scope と子の Dungeon Scope で共有する。
             builder.RegisterInstance(_colors);
             builder.Register<SceneTransitionManager>(Lifetime.Singleton);
-            if (_loadingPrefab == null || _uiAssets == null || _unitAssets == null)
+            if (_loadingPrefab == null || _uiAssets == null || _unitAssets == null || _runDefinition == null)
                 throw new System.InvalidOperationException("Boot requires the shared loading prefab and UI/unit asset catalogs.");
 
             builder.RegisterInstance(_uiAssets);
             builder.RegisterInstance(_unitAssets);
+            builder.RegisterInstance(_runDefinition);
             builder.Register<AddressableAssetManager>(Lifetime.Singleton);
 
             // 共通調整役だけを App に置き、画面とユニットは各シーンに残す。
@@ -135,7 +144,7 @@ namespace UnityCombatLab.Bootstrap
             builder.Register(resolver => new RunFlowCoordinator
             (resolver.Resolve<SceneTransitionManager>(),
                 loading,
-                () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets),
+                () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition),
                 () => UniTask.NextFrame(),
                 Debug.LogException,
                 value => AudioListener.volume = value), Lifetime.Singleton);

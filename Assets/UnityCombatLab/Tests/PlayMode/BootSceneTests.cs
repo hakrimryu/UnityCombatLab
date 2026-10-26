@@ -1,6 +1,7 @@
 using UnityCombatLab.Application.Ports;
 using UnityCombatLab.Infrastructure.Assets;
 using UnityCombatLab.Application.Run;
+using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Common;
 using UnityCombatLab.Infrastructure.Scenes;
 using System;
@@ -165,7 +166,7 @@ namespace UnityCombatLab.Tests.PlayMode
 
             Assert.That(flow.Controller.Current?.Phase, Is.EqualTo(Define.RunPhase.Battle));
             var battleScope = Object.FindFirstObjectByType<BattleLifetimeScope>();
-            var battle = battleScope.Container.Resolve<BattleEntryPoint>();
+            var battle = battleScope.Container.Resolve<RunBattleEntryPoint>().Battle;
             var assets = (RunAssetScope)flow.ActiveSession.Resources;
             var views = ReadField<UnitView[]>(battle, "_unitViews");
             var points = ReadField<Transform[]>(battleScope, "_spawnPoints");
@@ -215,7 +216,7 @@ namespace UnityCombatLab.Tests.PlayMode
             {
                 var app = Object.FindFirstObjectByType<AppLifetimeScope>();
                 using var assets = new RunAssetScope(app.Container.Resolve<AddressableAssetManager>(),
-                    app.Container.Resolve<UiAssetCatalog>(), app.Container.Resolve<UnitAssetCatalog>());
+                    app.Container.Resolve<UiAssetCatalog>(), app.Container.Resolve<UnitAssetCatalog>(), app.Container.Resolve<RunDefinition>());
                 await assets.PrepareAsync(CancellationToken.None);
                 var root = new GameObject("PartialCreationTest");
                 var pointsRoot = new GameObject("SpawnPoints");
@@ -550,7 +551,7 @@ namespace UnityCombatLab.Tests.PlayMode
             {
                 // 複製したカタログだけを壊し、HUDと先の二職業をロードした後の復帰経路を通す。
                 address.SetValue(flow, (Func<IRunResources>)(() => failedAssets = new RunAssetScope(
-                    app.Container.Resolve<AddressableAssetManager>(), app.Container.Resolve<UiAssetCatalog>(), catalog)));
+                    app.Container.Resolve<AddressableAssetManager>(), app.Container.Resolve<UiAssetCatalog>(), catalog, app.Container.Resolve<RunDefinition>())));
                 LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("Unit definition does not match catalog role Mage"));
                 yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
                 Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Error));

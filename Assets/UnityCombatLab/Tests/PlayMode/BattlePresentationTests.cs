@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityCombatLab.Application.Battle;
 using UnityCombatLab.Bootstrap;
 using UnityCombatLab.Common;
+using UnityCombatLab.Domain.Run;
 using UnityCombatLab.Infrastructure.Balance;
 using UnityCombatLab.Infrastructure.Assets;
 using UnityCombatLab.Presentation.UI;
@@ -65,12 +66,26 @@ namespace UnityCombatLab.Tests.PlayMode
                 yield return null;
             }
             var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
-            yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
+            // 表示の境界検証では六役割を同時に使う。複製した配置だけを一時変更し、保存せずに戻す。
+            var definition = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunDefinition>();
+            var wave = ((WaveDefinition[])typeof(RunDefinition).GetField("_waves", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(definition))[0];
+            var snapshot = JsonUtility.ToJson(wave);
+            try
+            {
+                JsonUtility.FromJsonOverwrite("{\"_enemies\":[1,2,3]}", wave);
+                yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
+            }
+            finally
+            {
+                JsonUtility.FromJsonOverwrite(snapshot, wave);
+            }
+
             var deadline = Time.realtimeSinceStartup + 10f;
             while (Time.realtimeSinceStartup < deadline)
             {
                 var scope = Object.FindFirstObjectByType<BattleLifetimeScope>();
-                if (scope != null && scope.Container != null && scope.Container.Resolve<BattleEntryPoint>().Hud != null)
+                if (scope != null && scope.Container != null && scope.Container.Resolve<RunBattleEntryPoint>().Battle.Hud != null &&
+                    flow.Controller.Current?.Phase == Define.RunPhase.Battle)
                 {
                     yield break;
                 }
@@ -111,7 +126,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator SixViewsMatchCoreThroughFinalEvent()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var runner = entry.Runner;
             var views = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
             Assert.That(views.Length, Is.EqualTo(6));
@@ -192,7 +207,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator HealthGaugePreviewsLerpsAndTrailsConsecutiveDamage()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var hud = Object.Instantiate(entry.Hud);
             try
             {
@@ -266,7 +281,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator ConcurrentAttacksPresentDamageAtTheirOwnImpact()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             entry.Runner.Advance(0.5);
             Assert.That(entry.Presenter.PendingAttackCount, Is.EqualTo(6));
             var views = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
@@ -299,6 +314,131 @@ namespace UnityCombatLab.Tests.PlayMode
         }
 
         /// <summary>
+        /// 魔法使いを前列へ移して計算順と命中順を逆転させ、HP と数字を同じ時点で確認します。
+        /// [KO] 마법사를 전열로 옮겨 계산·명중 순서를 뒤집고 HP와 숫자를 같은 시점에 확인합니다.
+        /// [EN] Moves the mage to the front to reverse computation and impact order, checking health and numbers together.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator MageInFrontKeepsHealthAndDamageNumbersTogether()
+        {
+            var app = Object.FindFirstObjectByType<AppLifetimeScope>();
+            var flow = app.Container.Resolve<RunFlowCoordinator>();
+            var scope = Object.FindFirstObjectByType<BattleLifetimeScope>();
+            var resources = (RunAssetScope)flow.ActiveSession.Resources;
+            var configuration = flow.Controller.LastConfiguration.Swap(Define.UnitRole.Mage, Define.BattleSlot.Front);
+            var inputs = resources.GameData.CreateUnits(configuration, 1, RunRewards.Empty);
+            var spawnPoints = (Transform[])typeof(BattleLifetimeScope)
+                .GetField("_spawnPoints", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(scope);
+            var camera = (Camera)typeof(BattleLifetimeScope)
+                .GetField("_battleCamera", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(scope);
+            var root = new GameObject("UI_TestBattleRoot");
+            var runId = Guid.NewGuid();
+            using var entry = new BattleEntryPoint
+            (new BattleRunner(runId, 1, inputs),
+                runId,
+                1,
+                () => BattleUnitFactory.Create(inputs, resources, spawnPoints, root.transform),
+                resources.HudPrefab.GetComponent<BattleHudView>(),
+                scope.Container.Resolve<RunBattleEntryPoint>().Battle.Hud.transform.parent,
+                camera,
+                app.Container.Resolve<GameColorPalette>(),
+                resources.Icons,
+                showResult: false);
+            try
+            {
+                entry.Start();
+                // 一回の上限8 tickを超えない二回の入力で、初撃の10 tickまで進める。
+                entry.Runner.Advance(0.4);
+                entry.Runner.Advance(0.1);
+                var status = entry.Hud.Units[1];
+                entry.Presenter.Advance(0.34);
+                Assert.That(status.DisplayedHealth, Is.EqualTo(380));
+                Assert.That(status.transform.Find("UI_DamageSlot0/Damage").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("-40"));
+                entry.Presenter.Advance(0.09);
+                Assert.That(status.DisplayedHealth, Is.EqualTo(346));
+                Assert.That(status.transform.Find("UI_DamageSlot1/UI_Damage1").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("-34"));
+                entry.Presenter.Advance(0.2);
+                Assert.That(status.DisplayedHealth, Is.EqualTo(288));
+                Assert.That(status.transform.Find("UI_DamageSlot2/UI_Damage2").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("-58"));
+            }
+            finally
+            {
+                Object.Destroy(root);
+            }
+
+            yield break;
+        }
+
+        /// <summary>
+        /// フォーカス喪失と OS 中断が二倍速を止め、明示再開まで進まず復帰 delta を捨てることを確認します。
+        /// [KO] 포커스 이탈·OS 중단이 2배속을 멈추고 명시 재개까지 대기하며 복귀 delta를 버리는지 확인합니다.
+        /// [EN] Checks that focus loss and OS suspension pause double speed until manual resume and discard the return delta.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator FocusAndAppPauseRequireManualResumeAtTheSelectedSpeed()
+        {
+            var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>();
+            var view = Object.FindFirstObjectByType<RunBattleView>();
+            var animator = Object.FindFirstObjectByType<UnitView>().GetComponentInChildren<Animator>();
+            var id = flow.Controller.Current.Id;
+            view.SendMessage("OnApplicationFocus", true);
+            view.SendMessage("OnApplicationPause", false);
+            if (flow.Controller.IsPaused)
+                flow.Controller.TryResume(id);
+
+            Assert.That(flow.Controller.TryToggleSpeed(id), Is.True);
+            Assert.That(animator.speed, Is.EqualTo(2));
+            foreach (var message in new[] { "OnApplicationFocus", "OnApplicationPause" })
+            {
+                view.SendMessage(message, message == "OnApplicationPause");
+                Assert.That(flow.Controller.IsPaused, Is.True);
+                Assert.That(animator.speed, Is.Zero);
+                var tick = entry.Battle.Runner.CurrentTick;
+                entry.Tick();
+                Assert.That(entry.Battle.Runner.CurrentTick, Is.EqualTo(tick));
+                view.SendMessage(message, message != "OnApplicationPause");
+                Assert.That(flow.Controller.IsPaused, Is.True);
+                Assert.That(flow.Controller.TryResume(id), Is.True);
+                Assert.That(animator.speed, Is.EqualTo(2));
+                entry.Tick();
+                Assert.That(entry.Battle.Runner.CurrentTick, Is.EqualTo(tick));
+            }
+
+            yield break;
+        }
+
+        /// <summary>
+        /// 候補数ごとに不要なカードを隠し、残ったカードを中央へ寄せて、ゼロ件だけ続行を表示します。
+        /// [KO] 후보 수마다 불필요한 카드를 숨기고 남은 카드를 중앙에 배치하며 0개일 때만 계속 버튼을 표시합니다.
+        /// [EN] Hides unused cards, centers the remaining choices and shows continue only for zero offers.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RewardCountsKeepOnlyAvailableChoicesCentered()
+        {
+            var view = Object.FindFirstObjectByType<RunBattleView>();
+            var continueButton = (ActionButtonView)typeof(RunBattleView)
+                .GetField("_continue", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
+            for (var count = 0; count <= 3; count++)
+            {
+                view.ShowOfferCount(count);
+                Assert.That(view.Cards.Count(card => card.gameObject.activeSelf), Is.EqualTo(count));
+                Assert.That(continueButton.gameObject.activeSelf, Is.EqualTo(count == 0));
+                var positions = view.Cards.Where(card => card.gameObject.activeSelf)
+                    .Select(card => ((RectTransform)card.transform).anchoredPosition.x).ToArray();
+                Assert.That(positions.Sum(), Is.EqualTo(0).Within(0.001f));
+                for (var index = 1; index < positions.Length; index++)
+                    Assert.That(positions[index] - positions[index - 1], Is.GreaterThanOrEqualTo(
+                        ((RectTransform)view.Cards[index].transform).rect.width));
+            }
+
+            yield break;
+        }
+
+        /// <summary>
         /// 計算が複数攻撃を先に確定しても、同じ弓使いのモーションと投射物を順番に使います。
         /// [KO] 계산이 여러 공격을 먼저 확정해도 같은 궁수의 모션과 투사체를 순서대로 사용합니다.
         /// [EN] Uses one ranger's motion and projectile in order even when simulation commits several attacks ahead.
@@ -306,7 +446,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator CatchUpKeepsSameActorMotionUntilQueuedAttackStarts()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var ranger = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None)
                 .Single(view => view.name == "Unit_Ranger");
             var motionField = typeof(UnitView).GetField("_motion", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -338,7 +478,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator ArrivalOrderAndDisposedCuesCannotRestoreOrChangeHealth()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             using (var state = new UnitPresentationReadModel(entry.Runner.ReadModel.Units[0].Input))
             {
                 state.ReserveDamage(40);
@@ -423,7 +563,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator HitProtectsAttackAndDamageNumbersRemainSeparate()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var view = GameObject.Find("Unit_Knight").GetComponent<UnitView>();
             var runId = Guid.NewGuid();
             view.Bind(runId);
@@ -455,7 +595,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator HealthGaugeResetsForHealingDeathDisableAndRebind()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var hud = Object.Instantiate(entry.Hud);
             try
             {
@@ -518,7 +658,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator HudSubscriptionIsReleasedAndCanRebind()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var hud = Object.Instantiate(entry.Hud);
             var inputs = entry.Runner.ReadModel.Units.Select(unit => unit.Input).ToArray();
             using var runner = new BattleRunner(Guid.NewGuid(), 1, inputs);
@@ -593,7 +733,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator OldDamageCallbackCannotClearNewLabel()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var view = entry.Hud.Units[0];
             const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
             var numbers = view.GetComponent<DamageNumberView>();
@@ -627,7 +767,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator DamagePoolGrowsWithoutInterruptingAndReusesReturnedSlots()
         {
-            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var status = entry.Hud.Units[0];
             var numbers = status.GetComponent<DamageNumberView>();
             const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -711,7 +851,7 @@ namespace UnityCombatLab.Tests.PlayMode
         [UnityTest]
         public IEnumerator PanelsFitInsetSafeAreaWithoutOverlap()
         {
-            var hud = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>().Hud;
+            var hud = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle.Hud;
             var safe = (RectTransform)hud.transform.Find("SafeArea");
             var size = new Vector2Int(Screen.width, Screen.height);
             var inset = new Rect(size.x * 0.08f, size.y * 0.04f, size.x * 0.84f, size.y * 0.92f);
@@ -761,14 +901,11 @@ namespace UnityCombatLab.Tests.PlayMode
         public IEnumerator RestartDisposesOldBattleLifetime()
         {
             var app = Object.FindFirstObjectByType<AppLifetimeScope>();
-            var previous = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var previous = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var oldHud = previous.Hud;
             var oldUnits = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
             var flow = app.Container.Resolve<RunFlowCoordinator>();
-            while (previous.Runner.Result == Define.BattleResult.Ongoing) previous.Runner.Advance(0.4);
-            previous.Presenter.Advance(100);
-            previous.Presenter.Advance(2);
-            previous.Tick();
+            yield return FinishRun(flow);
             var deadline = Time.realtimeSinceStartup + 10f;
             while (flow.IsBusy && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(flow.IsBusy, Is.False);
@@ -785,7 +922,7 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(previous.Runner.CurrentTick, Is.EqualTo(tick));
             Assert.That(Object.FindFirstObjectByType<AppLifetimeScope>(), Is.SameAs(app));
             Assert.That(Object.FindObjectsByType<BattleHudView>(FindObjectsSortMode.None).Length, Is.EqualTo(1));
-            Assert.That(Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None).Length, Is.EqualTo(6));
+            Assert.That(Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None).Length, Is.EqualTo(5));
         }
         /// <summary>
         /// 実際の戦闘が敗北を確定し、最後の演出後にFrontendの敗北画面へ戻ることを確認します。
@@ -806,6 +943,36 @@ namespace UnityCombatLab.Tests.PlayMode
             => VerifyActualOutcome(Define.BattleResult.Timeout);
 
         /// <summary>
+        /// 生存期間の検証用に現在 Run の五ウェーブと実際の報酬選択を進めます。
+        /// [KO] 수명 검증을 위해 현재 Run의 다섯 웨이브와 실제 보상 선택을 진행합니다.
+        /// [EN] Advances the current run's five waves and actual reward selections for lifetime checks.
+        /// </summary>
+        private static IEnumerator FinishRun(RunFlowCoordinator flow)
+        {
+            var deadline = Time.realtimeSinceStartup + 30f;
+            while (flow.IsBusy && Time.realtimeSinceStartup < deadline)
+            {
+                var state = flow.Controller.Current;
+                if (state?.Phase == Define.RunPhase.Battle)
+                {
+                    var battle = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
+                    battle.Runner.Advance(0.4);
+                    battle.Presenter.Advance(0.4);
+                }
+                else if (state?.Phase == Define.RunPhase.RewardSelection)
+                {
+                    var progress = flow.Controller.Progress;
+                    var offers = progress.GetOffers();
+                    flow.Controller.TrySelectReward(state.Id, progress.Wave, offers.Count == 0 ? null : offers[0]);
+                }
+
+                yield return null;
+            }
+
+            Assert.That(flow.IsBusy, Is.False, "The complete run did not return to Frontend.");
+        }
+
+        /// <summary>
         /// 能力値をメモリ内だけで一時変更し、出発時のコピー後に必ず戻して終了経路を検証します。
         /// [KO] 능력치를 메모리 안에서만 잠시 바꾸고 출발 시 복사 후 반드시 복원하여 종료 경로를 검증합니다.
         /// [EN] Temporarily changes in-memory stats, restores them after departure copies them, and verifies the resulting completion path.
@@ -814,21 +981,16 @@ namespace UnityCombatLab.Tests.PlayMode
         {
             var app = Object.FindFirstObjectByType<AppLifetimeScope>();
             var flow = app.Container.Resolve<RunFlowCoordinator>();
-            var scope = Object.FindFirstObjectByType<BattleLifetimeScope>();
             // Run終了後も一時変更する能力設定を保持し、復元前にアンロードされないようにする。
             using var assets = app.Container.Resolve<AddressableAssetManager>().CreateScope();
             var catalog = app.Container.Resolve<UnitAssetCatalog>();
             var definitions = new UnitDefinition[Define.MaxBattleUnitCount];
-            foreach (Define.UnitRole role in System.Enum.GetValues(typeof(Define.UnitRole)))
+            foreach (Define.UnitRole role in Enum.GetValues(typeof(Define.UnitRole)))
                 yield return assets.LoadAsync(catalog.Get(role).Definition).ToCoroutine(resultHandler: value => definitions[(int)role] = value);
 
             var unique = definitions.Distinct().ToArray();
             var snapshots = unique.Select(JsonUtility.ToJson).ToArray();
-            var previous = scope.Container.Resolve<BattleEntryPoint>();
-            while (previous.Runner.Result == Define.BattleResult.Ongoing) previous.Runner.Advance(0.4);
-            previous.Presenter.Advance(100);
-            previous.Presenter.Advance(2);
-            previous.Tick();
+            yield return FinishRun(flow);
             var deadline = Time.realtimeSinceStartup + 10;
             while (flow.IsBusy && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(flow.IsBusy, Is.False);
@@ -850,7 +1012,7 @@ namespace UnityCombatLab.Tests.PlayMode
                 for (var index = 0; index < unique.Length; index++)
                     JsonUtility.FromJsonOverwrite(snapshots[index], unique[index]);
             }
-            var battle = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<BattleEntryPoint>();
+            var battle = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
             var originalTimeScale = Time.timeScale;
             try
             {
@@ -870,7 +1032,7 @@ namespace UnityCombatLab.Tests.PlayMode
                 Assert.That(battle.Runner.CurrentTick, Is.EqualTo(1800));
             battle.Presenter.Advance(100);
             battle.Presenter.Advance(2);
-            battle.Tick();
+            Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Tick();
             deadline = Time.realtimeSinceStartup + 10;
             while (flow.IsBusy && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(flow.IsBusy, Is.False);

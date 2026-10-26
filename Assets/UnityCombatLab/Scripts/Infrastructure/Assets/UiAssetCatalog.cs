@@ -68,6 +68,20 @@ namespace UnityCombatLab.Infrastructure.Assets
         public AssetReferenceGameObject BattleHud => _battleHud;
 
         /// <summary>
+        /// Dungeon が所有する報酬・速度・停止 UI の参照。
+        /// [KO] Dungeon이 소유하는 보상·속도·정지 UI 참조입니다.
+        /// [EN] Reference to reward, speed and pause UI owned by Dungeon.
+        /// </summary>
+        [SerializeField] private AssetReferenceGameObject _runBattle;
+
+        /// <summary>
+        /// Run 開始前にロードする操作画面。
+        /// [KO] Run 시작 전에 로드하는 조작 화면입니다.
+        /// [EN] Run controls loaded before starting combat.
+        /// </summary>
+        public AssetReferenceGameObject RunBattle => _runBattle;
+
+        /// <summary>
         /// 職業に対応する画像参照と色を返します。
         /// [KO] 직업에 대응하는 이미지 참조와 색상을 반환합니다.
         /// [EN] Returns image reference and tint for the given role.

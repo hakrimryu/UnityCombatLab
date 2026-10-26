@@ -5,6 +5,9 @@ using Cysharp.Threading.Tasks;
 using UnityCombatLab.Application.Ports;
 using UnityCombatLab.Common;
 using UnityEngine;
+using UnityCombatLab.Domain.Run;
+using UnityCombatLab.Domain.Battle;
+using UnityCombatLab.Infrastructure.Balance;
 
 namespace UnityCombatLab.Infrastructure.Assets
 {
@@ -34,6 +37,27 @@ namespace UnityCombatLab.Infrastructure.Assets
         /// [EN] Role-specific stat and visual references shared with formation.
         /// </summary>
         private readonly UnitAssetCatalog _unitCatalog;
+
+        /// <summary>
+        /// Run 開始時にコピーするウェーブと強化の設定。
+        /// [KO] Run 시작 시 복사할 웨이브·강화 설정입니다.
+        /// [EN] Wave and upgrade settings copied at run start.
+        /// </summary>
+        private readonly RunDefinition _runDefinition;
+
+        /// <summary>
+        /// この Run の五ウェーブに共通する検査済み入力。
+        /// [KO] 이 Run의 다섯 웨이브가 공유하는 검사된 입력입니다.
+        /// [EN] Validated input shared across this run's five waves.
+        /// </summary>
+        public RunGameData GameData { get; private set; }
+
+        /// <summary>
+        /// この Run が所有する操作 UI のロード済み prefab。
+        /// [KO] 이 Run이 소유하는 조작 UI의 로드한 prefab입니다.
+        /// [EN] Loaded controls prefab owned by this run.
+        /// </summary>
+        public GameObject RunBattlePrefab { get; private set; }
 
         /// <summary>
         /// このRunが保持し、Dungeonの生成処理へ貸すロード済み資産。
@@ -81,11 +105,12 @@ namespace UnityCombatLab.Infrastructure.Assets
         /// [KO] App Scope의 공통 서비스에서 이번 Run만의 소유 범위를 만듭니다.
         /// [EN] Creates this run's ownership scope from the app's shared service.
         /// </summary>
-        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog, UnitAssetCatalog unitCatalog)
+        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog, UnitAssetCatalog unitCatalog, RunDefinition runDefinition)
         {
             _scope = (assets ?? throw new ArgumentNullException(nameof(assets))).CreateScope();
             _catalog = catalog;
             _unitCatalog = unitCatalog;
+            _runDefinition = runDefinition;
         }
 
         /// <summary>
@@ -111,6 +136,7 @@ namespace UnityCombatLab.Infrastructure.Assets
                     throw new InvalidOperationException("Run requires a unit asset catalog.");
 
                 var hud = await _scope.LoadAsync(_catalog.BattleHud, cancellationToken);
+                var runBattle = await _scope.LoadAsync(_catalog.RunBattle, cancellationToken);
                 foreach (Define.UnitRole role in Enum.GetValues(typeof(Define.UnitRole)))
                 {
                     _icons.Add(role, await _scope.LoadAsync(_catalog.GetBattleIcon(role), cancellationToken));
@@ -125,6 +151,20 @@ namespace UnityCombatLab.Infrastructure.Assets
                 }
 
                 HudPrefab = hud;
+                RunBattlePrefab = runBattle;
+                if (_runDefinition == null)
+                    throw new InvalidOperationException("Run requires wave and upgrade definitions.");
+
+                var roles = new BattleUnitInput[6];
+                for (var index = 0; index < roles.Length; index++)
+                {
+                    var role = (Define.UnitRole)index;
+                    roles[index] = _units[role].Definition.CreateInput(index + 1,
+                        index < Define.SlotsPerTeam ? Define.BattleTeam.Ally : Define.BattleTeam.Enemy,
+                        (Define.BattleSlot)(index % Define.SlotsPerTeam));
+                }
+
+                GameData = _runDefinition.CreateSnapshot(roles);
             }
             catch
             {
@@ -161,6 +201,8 @@ namespace UnityCombatLab.Infrastructure.Assets
 
             _isDisposed = true;
             HudPrefab = null;
+            RunBattlePrefab = null;
+            GameData = null;
             _icons.Clear();
             _units.Clear();
             _scope.Dispose();
