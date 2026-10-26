@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 3141448305034962585}
   - component: {fileID: 5153247213275023624}
   m_Layer: 5
-  m_Name: UI_LoadingCanvas
+  m_Name: UI_LoadingView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

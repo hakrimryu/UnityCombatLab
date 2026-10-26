@@ -130,7 +130,7 @@ namespace UnityCombatLab.Bootstrap
 
             // 共通調整役だけを App に置き、画面とユニットは各シーンに残す。
             var loading = Instantiate(_loadingPrefab, transform);
-            loading.name = "UI_LoadingCanvas";
+            loading.name = "UI_LoadingView";
             loading.Validate();
             builder.Register(resolver => new RunFlowCoordinator
             (resolver.Resolve<SceneTransitionManager>(),

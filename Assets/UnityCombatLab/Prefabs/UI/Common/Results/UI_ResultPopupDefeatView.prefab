@@ -87,7 +87,7 @@ GameObject:
   - component: {fileID: 833768326453493422}
   - component: {fileID: 6403848897634624993}
   m_Layer: 0
-  m_Name: UI_BattleDefeat
+  m_Name: UI_ResultPopupDefeatView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -141,7 +141,7 @@ namespace UnityCombatLab.Tests.PlayMode
             var app = Object.FindFirstObjectByType<AppLifetimeScope>();
             var flow = app.Container.Resolve<RunFlowCoordinator>();
             var frontend = Object.FindFirstObjectByType<FrontendView>();
-            ReadField<UnityEngine.UI.Button>(frontend, "_titleStart").onClick.Invoke();
+            ReadField<ActionButtonView>(frontend, "_titleStart").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Formation));
             var cards = ReadField<HeroCardView[]>(frontend, "_heroCards");
             var slots = ReadField<FormationSlotView[]>(frontend, "_slots");
@@ -155,10 +155,10 @@ namespace UnityCombatLab.Tests.PlayMode
             Assert.That(flow.Controller.LastConfiguration.GetRole(Define.BattleSlot.Front), Is.EqualTo(Define.UnitRole.Mage));
             Assert.That(ReadField<TMPro.TMP_Text>(slots[0], "_text").text, Does.Contain(GameText.RoleName(Define.UnitRole.Mage)));
             ReadField<UnityEngine.UI.Button>(cards[1], "_button").onClick.Invoke();
-            ReadField<UnityEngine.UI.Button>(frontend, "_formationBack").onClick.Invoke();
-            ReadField<UnityEngine.UI.Button>(frontend, "_titleStart").onClick.Invoke();
+            ReadField<ActionButtonView>(frontend, "_formationBack").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            ReadField<ActionButtonView>(frontend, "_titleStart").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             AssertSelection(cards, null);
-            ReadField<UnityEngine.UI.Button>(frontend, "_depart").onClick.Invoke();
+            ReadField<ActionButtonView>(frontend, "_depart").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             var deadline = Time.realtimeSinceStartup + 15f;
             while (flow.Controller.Current?.Phase != Define.RunPhase.Battle && Time.realtimeSinceStartup < deadline)
                 yield return null;
@@ -283,7 +283,17 @@ namespace UnityCombatLab.Tests.PlayMode
         /// [EN] Inspects created views and references without adding public product APIs.
         /// </summary>
         private static T ReadField<T>(object target, string name)
-            => (T)target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
+        {
+            // Button の共通参照は Base にあるため、宣言元まで親クラスを順に確認する。
+            for (var type = target.GetType(); type != null; type = type.BaseType)
+            {
+                var field = type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (field != null)
+                    return (T)field.GetValue(target);
+            }
+
+            throw new MissingFieldException(target.GetType().FullName, name);
+        }
 
         /// <summary>
         /// Boot を再読込しても共通ルートが重複せず、Boot 専用 Canvas が作られないことを検証します。

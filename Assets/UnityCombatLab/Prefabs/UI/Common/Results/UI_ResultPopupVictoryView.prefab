@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 5316036516574831347}
   - component: {fileID: 546716044392580385}
   m_Layer: 0
-  m_Name: UI_BattleVictory
+  m_Name: UI_ResultPopupVictoryView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -558,7 +558,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1922559097945619186, guid: 2f82fa182de58754fb7ec967cbc85877, type: 3}
       propertyPath: m_Name
-      value: VFX_UIConfetti
+      value: VFX_UiConfettiView
       objectReference: {fileID: 0}
     - target: {fileID: 2070033608167564766, guid: 2f82fa182de58754fb7ec967cbc85877, type: 3}
       propertyPath: m_Pivot.x

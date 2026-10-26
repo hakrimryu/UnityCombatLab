@@ -447,7 +447,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5803631822340426143, guid: f6e9f13a54c428f4c807a46451f70af8, type: 3}
       propertyPath: m_Name
-      value: UI_Frontend
+      value: UI_FrontendView
       objectReference: {fileID: 0}
     - target: {fileID: 5904112080725341301, guid: f6e9f13a54c428f4c807a46451f70af8, type: 3}
       propertyPath: m_IsActive

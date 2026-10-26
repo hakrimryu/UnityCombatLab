@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 3989810754264506958}
   - component: {fileID: 3885365389638305802}
   m_Layer: 0
-  m_Name: VFX_UIConfetti
+  m_Name: VFX_UiConfettiView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

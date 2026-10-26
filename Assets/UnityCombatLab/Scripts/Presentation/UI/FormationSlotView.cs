@@ -3,7 +3,6 @@ using TMPro;
 using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace UnityCombatLab.Presentation.UI
 {
@@ -12,14 +11,8 @@ namespace UnityCombatLab.Presentation.UI
     /// [KO] 공통 배치 슬롯에 현재 영웅을 표시하고 설정된 이동 위치를 알립니다.
     /// [EN] Shows the current hero in a shared slot and emits its assigned destination.
     /// </summary>
-    public sealed class FormationSlotView : MonoBehaviour
+    public sealed class FormationSlotView : CommonButtonViewBase
     {
-        /// <summary>
-        /// 共通prefab内の配置ボタンと表示文字。
-        /// [KO] 공통 prefab 내부 배치 버튼과 표시 글자입니다.
-        /// [EN] Formation button and text within the shared prefab.
-        /// </summary>
-        [SerializeField] private Button _button;
         /// <summary>
         /// 現在の配置名と英雄名の表示先。
         /// [KO] 현재 배치 이름과 영웅 이름의 표시 대상입니다.
@@ -28,18 +21,11 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private TMP_Text _text;
 
         /// <summary>
-        /// この枠に割り当てた配置先と入力接続状態。
-        /// [KO] 이 슬롯에 할당한 배치 위치와 입력 연결 상태입니다.
-        /// [EN] Destination assigned to this slot and input connection state.
+        /// この枠に割り当てた配置先。
+        /// [KO] 이 슬롯에 할당한 배치 위치입니다.
+        /// [EN] Destination assigned to this slot.
         /// </summary>
         private Define.BattleSlot _slot;
-        /// <summary>
-        /// 再設定時の入力接続重複を防ぎます。
-        /// [KO] 재설정 시 입력 연결 중복을 막습니다.
-        /// [EN] Prevents duplicate input connections on rebinding.
-        /// </summary>
-        private bool _isInitialized;
-
         /// <summary>
         /// Presenterへ転送する配置先の選択。
         /// [KO] Presenter로 전달할 배치 위치 선택입니다.
@@ -57,16 +43,12 @@ namespace UnityCombatLab.Presentation.UI
             if ((int)slot < 0 || (int)slot >= Define.SlotsPerTeam)
                 throw new ArgumentOutOfRangeException(nameof(slot));
 
-            if (colors == null || _button == null || _text == null)
-                throw new InvalidOperationException("FormationSlot requires a palette, button and text.");
+            if (colors == null || _text == null)
+                throw new InvalidOperationException("FormationSlot requires a palette and text.");
 
+            InitializeButton();
             _slot = slot;
             _text.color = colors.GetColor(Define.PaletteColor.OnAccent);
-            if (_isInitialized)
-                return;
-
-            _button.onClick.AddListener(HandleClicked);
-            _isInitialized = true;
         }
 
         /// <summary>
@@ -82,7 +64,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 입력한 배치 위치를 알립니다.
         /// [EN] Emits the clicked destination.
         /// </summary>
-        private void HandleClicked()
+        protected override void HandleClicked()
             => Selected?.Invoke(_slot);
 
         /// <summary>
@@ -90,11 +72,9 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 슬롯 파괴 시 입력과 외부 알림을 해제합니다.
         /// [EN] Disconnects input and external notifications on destruction.
         /// </summary>
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            if (_button != null && _isInitialized)
-                _button.onClick.RemoveListener(HandleClicked);
-
+            base.OnDestroy();
             Selected = null;
         }
     }

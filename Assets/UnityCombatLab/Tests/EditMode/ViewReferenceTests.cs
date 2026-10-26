@@ -31,7 +31,7 @@ namespace UnityCombatLab.Tests.EditMode
             try
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
-                    "Assets/UnityCombatLab/Prefabs/UI/Frontend/UI_Frontend.prefab");
+                    "Assets/UnityCombatLab/Prefabs/UI/Frontend/UI_FrontendView.prefab");
                 var view = Object.Instantiate(prefab, owner.transform).GetComponent<FrontendView>();
                 using var serialized = new SerializedObject(view);
                 var property = serialized.FindProperty(propertyPath);
@@ -62,7 +62,7 @@ namespace UnityCombatLab.Tests.EditMode
             try
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
-                    "Assets/UnityCombatLab/Prefabs/UI/Common/UI_LoadingCanvas.prefab");
+                    "Assets/UnityCombatLab/Prefabs/UI/Common/UI_LoadingView.prefab");
                 var view = Object.Instantiate(prefab, owner.transform).GetComponent<LoadingView>();
                 view.gameObject.SetActive(false);
                 using var serialized = new SerializedObject(view);

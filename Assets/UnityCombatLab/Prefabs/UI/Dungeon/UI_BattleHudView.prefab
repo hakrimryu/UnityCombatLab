@@ -360,7 +360,7 @@ GameObject:
   - component: {fileID: 5863633811784698890}
   - component: {fileID: 8108488504045292738}
   m_Layer: 0
-  m_Name: UI_BattleHud
+  m_Name: UI_BattleHudView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1487,7 +1487,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 5249821563352985049, guid: b7623ea67e584404080b89efca5bc3c8, type: 3}
       propertyPath: m_Name
-      value: UI_BattleDefeat
+      value: UI_ResultPopupDefeatView
       objectReference: {fileID: 0}
     - target: {fileID: 5249821563352985049, guid: b7623ea67e584404080b89efca5bc3c8, type: 3}
       propertyPath: m_IsActive
@@ -2007,7 +2007,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2354674618117003914, guid: 72e8a2dfe68a40f41bbf075ef7f88e54, type: 3}
       propertyPath: m_Name
-      value: UI_BattleVictory
+      value: UI_ResultPopupVictoryView
       objectReference: {fileID: 0}
     - target: {fileID: 2354674618117003914, guid: 72e8a2dfe68a40f41bbf075ef7f88e54, type: 3}
       propertyPath: m_IsActive

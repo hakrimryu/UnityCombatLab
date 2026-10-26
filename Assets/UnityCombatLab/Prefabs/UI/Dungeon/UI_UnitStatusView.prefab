@@ -90,7 +90,7 @@ GameObject:
   - component: {fileID: 4142364590092561592}
   - component: {fileID: 2025953733060843517}
   m_Layer: 0
-  m_Name: UI_UnitStatus
+  m_Name: UI_UnitStatusView
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

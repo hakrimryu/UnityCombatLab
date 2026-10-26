@@ -13,14 +13,8 @@ namespace UnityCombatLab.Presentation.UI
     /// [KO] 공통 prefab에 영웅 데이터와 선택 표시를 적용하고 선택한 직업만 알립니다.
     /// [EN] Applies hero data and selection visuals to a shared prefab and emits the selected role.
     /// </summary>
-    public sealed class HeroCardView : MonoBehaviour
+    public sealed class HeroCardView : CommonButtonViewBase
     {
-        /// <summary>
-        /// カードの入力と表示部品。共通prefab内の子だけを参照します。
-        /// [KO] 카드의 입력과 표시 부품이며 공통 prefab 내부 자식만 참조합니다.
-        /// [EN] Card input and graphics, referencing only children of the shared prefab.
-        /// </summary>
-        [SerializeField] private Button _button;
         /// <summary>
         /// データから職業名と能力を表示する文字。
         /// [KO] 데이터로 직업 이름과 능력을 표시할 글자입니다.
@@ -53,18 +47,11 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private Color _selectedColor;
 
         /// <summary>
-        /// 現在のクリックが選ぶ職業と、一度だけ接続する入力の状態。
-        /// [KO] 현재 클릭이 선택할 직업과 한 번만 연결할 입력 상태입니다.
-        /// [EN] Role selected by the current click and one-time input setup state.
+        /// 現在のクリックが選ぶ職業。
+        /// [KO] 현재 클릭이 선택할 직업입니다.
+        /// [EN] Role selected by the current click.
         /// </summary>
         private Define.UnitRole _role;
-        /// <summary>
-        /// 再設定時の入力接続重複を防ぎます。
-        /// [KO] 재설정 시 입력 연결 중복을 막습니다.
-        /// [EN] Prevents duplicate input connections on rebinding.
-        /// </summary>
-        private bool _isInitialized;
-
         /// <summary>
         /// Presenterへ転送する職業選択。
         /// [KO] Presenter로 전달할 직업 선택입니다.
@@ -82,20 +69,16 @@ namespace UnityCombatLab.Presentation.UI
             if (data == null || colors == null)
                 throw new ArgumentNullException(data == null ? nameof(data) : nameof(colors));
 
-            if (_button == null || _description == null || _icon == null || _background == null || _selectionBadge == null)
-                throw new InvalidOperationException("HeroCard requires its button, description, icon, background and selection badge.");
+            if (_description == null || _icon == null || _background == null || _selectionBadge == null)
+                throw new InvalidOperationException("HeroCard requires its description, icon, background and selection badge.");
 
+            InitializeButton();
             _role = data.Role;
             _description.text = data.Description;
             _description.color = colors.GetColor(Define.PaletteColor.Text);
             _icon.sprite = data.Icon;
             _icon.color = data.IconTint;
             Show(data.Description, false);
-            if (_isInitialized)
-                return;
-
-            _button.onClick.AddListener(HandleClicked);
-            _isInitialized = true;
         }
 
         /// <summary>
@@ -115,7 +98,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 입력한 카드에 설정된 직업을 알립니다.
         /// [EN] Emits the role assigned to the clicked card.
         /// </summary>
-        private void HandleClicked()
+        protected override void HandleClicked()
             => Selected?.Invoke(_role);
 
         /// <summary>
@@ -123,11 +106,9 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 카드 종료 시 입력과 외부 알림을 해제합니다.
         /// [EN] Disconnects input and external notifications when the card ends.
         /// </summary>
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            if (_button != null && _isInitialized)
-                _button.onClick.RemoveListener(HandleClicked);
-
+            base.OnDestroy();
             Selected = null;
         }
     }

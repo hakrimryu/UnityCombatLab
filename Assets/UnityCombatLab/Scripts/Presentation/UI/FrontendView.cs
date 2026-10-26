@@ -49,42 +49,42 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 타이틀에서 편성으로 가는 버튼입니다.
         /// [EN] Button opening formation from title.
         /// </summary>
-        [SerializeField] private Button _titleStart;
+        [SerializeField] private ActionButtonView _titleStart;
 
         /// <summary>
         /// 編成からタイトルへ戻るボタン。
         /// [KO] 편성에서 타이틀로 돌아가는 버튼입니다.
         /// [EN] Button returning to title from formation.
         /// </summary>
-        [SerializeField] private Button _formationBack;
+        [SerializeField] private ActionButtonView _formationBack;
 
         /// <summary>
         /// 結果から再編成へ進むボタン。
         /// [KO] 결과에서 재편성으로 가는 버튼입니다.
         /// [EN] Button opening formation after results.
         /// </summary>
-        [SerializeField] private Button _reform;
+        [SerializeField] private ActionButtonView _reform;
 
         /// <summary>
         /// 結果からタイトルへ戻るボタン。
         /// [KO] 결과에서 타이틀로 돌아가는 버튼입니다.
         /// [EN] Button returning to title from results.
         /// </summary>
-        [SerializeField] private Button _resultTitle;
+        [SerializeField] private ActionButtonView _resultTitle;
 
         /// <summary>
         /// 失敗した出発を再試行するボタン。
         /// [KO] 실패한 출발을 재시도하는 버튼입니다.
         /// [EN] Button retrying a failed departure.
         /// </summary>
-        [SerializeField] private Button _retry;
+        [SerializeField] private ActionButtonView _retry;
 
         /// <summary>
         /// 失敗画面からタイトルへ戻るボタン。
         /// [KO] 실패 화면에서 타이틀로 돌아가는 버튼입니다.
         /// [EN] Button returning to title from the error page.
         /// </summary>
-        [SerializeField] private Button _errorTitle;
+        [SerializeField] private ActionButtonView _errorTitle;
 
         /// <summary>
         /// 騎士・弓使い・魔法使いのカードを生成する配置先。
@@ -117,7 +117,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 표준·쉬움 선택 버튼입니다.
         /// [EN] Standard and easy difficulty buttons.
         /// </summary>
-        [SerializeField] private Button[] _difficultyButtons;
+        [SerializeField] private ActionButtonView[] _difficultyButtons;
         /// <summary>
         /// 難易度の選択印と説明。
         /// [KO] 난이도 선택 표시와 설명입니다.
@@ -129,7 +129,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 편성을 확정하고 출발할 버튼입니다.
         /// [EN] Button committing formation and departing.
         /// </summary>
-        [SerializeField] private Button _depart;
+        [SerializeField] private ActionButtonView _depart;
         /// <summary>
         /// Scene 全体の操作を終了処理中に停止する Group。
         /// [KO] 종료 처리 중 씬 전체 조작을 멈출 Group입니다.
@@ -260,15 +260,15 @@ namespace UnityCombatLab.Presentation.UI
                 return;
 
             Validate();
-            _titleStart.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Formation));
-            _formationBack.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Title));
-            _reform.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Formation));
-            _resultTitle.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Title));
-            _retry.onClick.AddListener(() => RetryRequested?.Invoke());
-            _errorTitle.onClick.AddListener(() => PageRequested?.Invoke(Define.FrontendPage.Title));
-            _difficultyButtons[0].onClick.AddListener(() => DifficultySelected?.Invoke(Define.Difficulty.Standard));
-            _difficultyButtons[1].onClick.AddListener(() => DifficultySelected?.Invoke(Define.Difficulty.Easy));
-            _depart.onClick.AddListener(() => DepartureRequested?.Invoke());
+            _titleStart.SetClickHandler(() => PageRequested?.Invoke(Define.FrontendPage.Formation));
+            _formationBack.SetClickHandler(() => PageRequested?.Invoke(Define.FrontendPage.Title));
+            _reform.SetClickHandler(() => PageRequested?.Invoke(Define.FrontendPage.Formation));
+            _resultTitle.SetClickHandler(() => PageRequested?.Invoke(Define.FrontendPage.Title));
+            _retry.SetClickHandler(() => RetryRequested?.Invoke());
+            _errorTitle.SetClickHandler(() => PageRequested?.Invoke(Define.FrontendPage.Title));
+            _difficultyButtons[0].SetClickHandler(() => DifficultySelected?.Invoke(Define.Difficulty.Standard));
+            _difficultyButtons[1].SetClickHandler(() => DifficultySelected?.Invoke(Define.Difficulty.Easy));
+            _depart.SetClickHandler(() => DepartureRequested?.Invoke());
             _volume.onValueChanged.AddListener(value => VolumeRequested?.Invoke(value));
             _isInitialized = true;
         }

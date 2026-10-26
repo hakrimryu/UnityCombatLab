@@ -184,7 +184,7 @@ namespace UnityCombatLab.Bootstrap
             {
                 _unitViews = _createUnits();
                 Hud = UnityEngine.Object.Instantiate(_hudPrefab, _hudParent);
-                Hud.name = "UI_BattleHud";
+                Hud.name = "UI_BattleHudView";
                 // スロット位置だけを記録するので、攻撃中のモデルの踏み込みにパネルは追従しない。
                 Hud.BindLayout(_battleCamera, _unitViews);
                 _battleCamera.backgroundColor = _colors.GetColor(Define.PaletteColor.Background);
