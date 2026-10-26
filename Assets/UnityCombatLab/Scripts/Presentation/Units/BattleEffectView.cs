@@ -26,6 +26,20 @@ namespace UnityCombatLab.Presentation.Units
         private ParticleSystem[] _systems;
 
         /// <summary>
+        /// 購入設定を保持した各 ParticleSystem の基準速度。
+        /// [KO] 구매 설정을 유지한 각 ParticleSystem의 기준 속도입니다.
+        /// [EN] Authored base speed of each particle system.
+        /// </summary>
+        private float[] _baseSpeeds;
+
+        /// <summary>
+        /// この効果だけへ適用する停止または再生速度。
+        /// [KO] 이 효과에만 적용하는 정지·재생 속도입니다.
+        /// [EN] Pause or playback speed applied only to this effect.
+        /// </summary>
+        private float _playbackSpeed = 1f;
+
+        /// <summary>
         /// 先端が飛行中かを示します。命中後に残る尾は含みません。
         /// [KO] 선두가 비행 중인지 나타내며 명중 후 남은 꼬리는 포함하지 않습니다.
         /// [EN] Whether the projectile head is in flight, excluding trails remaining after impact.
@@ -46,6 +60,13 @@ namespace UnityCombatLab.Presentation.Units
             }
 
             _root = _systems[0];
+            _baseSpeeds = new float[_systems.Length];
+            for (var index = 0; index < _systems.Length; index++)
+            {
+                var main = _systems[index].main;
+                _baseSpeeds[index] = main.simulationSpeed;
+                main.useUnscaledTime = true;
+            }
         }
 
         /// <summary>
@@ -61,6 +82,26 @@ namespace UnityCombatLab.Presentation.Units
                 forward.sqrMagnitude > Define.MinimumDirectionSqrMagnitude ? Quaternion.LookRotation(forward) : Quaternion.identity);
             IsEmitting = true;
             _root.Play(true);
+            SetPlaybackSpeed(_playbackSpeed);
+        }
+
+        /// <summary>
+        /// 自分の ParticleSystem だけを止め、再開時には粒子位置を保持します。
+        /// [KO] 자신의 ParticleSystem만 멈추고 재개 시 입자 위치를 유지합니다.
+        /// [EN] Pauses only owned particle systems and retains particle positions on resume.
+        /// </summary>
+        public void SetPlaybackSpeed(float speed)
+        {
+            _playbackSpeed = speed;
+            if (_systems == null)
+                return;
+
+            for (var index = 0; index < _systems.Length; index++)
+            {
+                var system = _systems[index];
+                var main = system.main;
+                main.simulationSpeed = _baseSpeeds[index] * speed;
+            }
         }
 
         /// <summary>

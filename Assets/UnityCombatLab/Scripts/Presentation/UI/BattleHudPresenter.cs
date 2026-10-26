@@ -114,12 +114,15 @@ namespace UnityCombatLab.Presentation.UI
         /// </summary>
         private void HandleResultChanged(Define.BattleResult result)
         {
-            if (_isDisposed || _view == null || (!_showResult && result != Define.BattleResult.Ongoing))
+            if (_isDisposed || _view == null)
             {
                 return;
             }
 
-            _view.SetResult(GameText.BattleHeading(result), result);
+            if (_showResult)
+                _view.SetResult(GameText.BattleHeading(result), result);
+            else
+                _view.HideResult();
         }
 
         /// <summary>

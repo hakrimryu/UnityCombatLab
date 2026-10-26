@@ -141,6 +141,20 @@ namespace UnityCombatLab.Bootstrap
         private readonly RunSession _session;
 
         /// <summary>
+        /// 独立した一戦で結果装飾を表示するか。Run では上位画面が結果を扱います。
+        /// [KO] 독립 전투에서 결과 장식을 표시할지이며 Run에서는 상위 화면이 결과를 처리합니다.
+        /// [EN] Whether standalone result decoration is shown; the run screen handles run results.
+        /// </summary>
+        private readonly bool _showResult;
+
+        /// <summary>
+        /// 前回適用した速度。同じ値で全粒子を毎フレーム再設定しないために保持します。
+        /// [KO] 이전 적용 속도이며 같은 값으로 모든 입자를 매 프레임 재설정하지 않도록 보관합니다.
+        /// [EN] Previously applied speed, avoiding repeated writes to all particles every frame.
+        /// </summary>
+        private int _playbackSpeed = -1;
+
+        /// <summary>
         /// 重複破棄を拒否します。
         /// [KO] 중복 해제를 거부합니다.
         /// [EN] Prevents repeated disposal.
@@ -154,7 +168,7 @@ namespace UnityCombatLab.Bootstrap
         /// </summary>
         public BattleEntryPoint(BattleRunner runner, Guid runId, int wave, Func<UnitView[]> createUnits,
             BattleHudView hudPrefab, Transform hudParent, Camera battleCamera, GameColorPalette colors,
-            IReadOnlyDictionary<Define.UnitRole, Sprite> icons, RunSession session = null)
+            IReadOnlyDictionary<Define.UnitRole, Sprite> icons, RunSession session = null, bool showResult = true)
         {
             Runner = runner;
             _runId = runId;
@@ -166,6 +180,7 @@ namespace UnityCombatLab.Bootstrap
             _battleCamera = battleCamera;
             _colors = colors;
             _session = session;
+            _showResult = showResult;
         }
 
         /// <summary>
@@ -186,18 +201,20 @@ namespace UnityCombatLab.Bootstrap
                 Hud = UnityEngine.Object.Instantiate(_hudPrefab, _hudParent);
                 Hud.name = "UI_BattleHudView";
                 // スロット位置だけを記録するので、攻撃中のモデルの踏み込みにパネルは追従しない。
-                Hud.BindLayout(_battleCamera, _unitViews);
+                Hud.BindLayout(_battleCamera, _unitViews, Runner.ReadModel.Units.Select(unit => unit.Input).ToArray());
                 _battleCamera.backgroundColor = _colors.GetColor(Define.PaletteColor.Background);
                 // 先に R3 の HP 通知を接続して初期値を表示し、その後に攻撃・被弾・死亡イベントを接続する。
                 Presentation = new BattlePresentationReadModel(Runner.ReadModel.Units.Select(unit => unit.Input));
-                foreach (var unit in _unitViews)
+                for (var index = 0; index < _unitViews.Length; index++)
                 {
+                    var unit = _unitViews[index];
                     unit.ApplyPalette(_colors);
                     // 接続前に各ユニットのエフェクトを準備する。
                     unit.PrepareEffects();
+                    unit.ConfigureAttackInterval(Runner.ReadModel.Units[index].Input.IntervalTicks);
                 }
 
-                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors, _icons, _session == null);
+                _hudPresenter = new BattleHudPresenter(Presentation, Hud, _colors, _icons, _session == null && _showResult);
                 _presenter = new BattlePresenter(Runner, _runId, _wave, _unitViews, Hud, Presentation);
                 // 接続途中に Tick が来ても進まないよう、すべて成功した後で開始済みにする。
                 _isStarted = true;
@@ -215,6 +232,14 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Called each frame by VContainer to advance simulation with unscaled seconds, then presentation with scaled seconds.
         /// </summary>
         public void Tick()
+            => Advance(Time.unscaledDeltaTime);
+
+        /// <summary>
+        /// Run が選んだ戦闘経過秒を、計算と演出へ同じ値で渡します。
+        /// [KO] Run이 선택한 전투 경과 초를 계산·연출에 같은 값으로 전달합니다.
+        /// [EN] Passes the same run-selected combat delta to simulation and presentation.
+        /// </summary>
+        public void Advance(float combatDeltaSeconds)
         {
             if (!_isStarted || IsDisposed)
             {
@@ -223,12 +248,9 @@ namespace UnityCombatLab.Bootstrap
 
             try
             {
-                // 計算は実経過秒を20Hzへ換算する。表示時計の遅れを計算へ戻さない。
-                var simulationDeltaSeconds = Time.unscaledDeltaTime;
-                Runner.Advance(simulationDeltaSeconds);
-                // 命中予約・View.Update・Normal Tween は scaled 秒を使う。Domain 終了後も最後の表示を進める。
-                var presentationDeltaSeconds = Time.deltaTime;
-                _presenter.Advance(presentationDeltaSeconds);
+                // Domain 終了後も最後の命中・死亡表示は同じ戦闘時計で完了させる。
+                Runner.Advance(combatDeltaSeconds);
+                _presenter.Advance(combatDeltaSeconds);
                 if (_session != null && _presenter.IsComplete)
                     _session.QueueResult(Runner.Result, Runner.CurrentTick);
             }
@@ -245,9 +267,30 @@ namespace UnityCombatLab.Bootstrap
         }
 
         /// <summary>
-        /// Dungeonの終了または開始・進行失敗で呼び、通知を止めてからデータ・HUD・キャラクターを解放します。
-        /// [KO] Dungeon 종료 또는 시작·진행 실패 시 호출하여 알림을 끊은 뒤 데이터·HUD·캐릭터를 해제합니다.
-        /// [EN] Called on Dungeon exit or startup/tick failure to detach notifications before releasing data, HUD and characters.
+        /// ユニット・HP ゲージ・数字へ同じ戦闘速度を反映します。
+        /// [KO] 유닛·HP 게이지·숫자에 같은 전투 속도를 반영합니다.
+        /// [EN] Applies the same combat speed to units, health gauges and numbers.
+        /// </summary>
+        public void SetPlaybackSpeed(int speed)
+        {
+            if (speed < 0 || speed > 2)
+                throw new ArgumentOutOfRangeException(nameof(speed));
+
+            if (_unitViews == null || _playbackSpeed == speed)
+                return;
+
+            _playbackSpeed = speed;
+            foreach (var view in _unitViews)
+                view.SetPlaybackSpeed(speed);
+
+            foreach (var status in Hud.Units)
+                status.SetPlaybackSpeed(speed);
+        }
+
+        /// <summary>
+        /// 購読・表示・Runner・生成物を所有順に解放します。
+        /// [KO] 구독·표시·Runner·생성물을 소유 순서대로 해제합니다.
+        /// [EN] Releases subscriptions, presentation, runner and spawned objects in ownership order.
         /// </summary>
         public void Dispose()
         {

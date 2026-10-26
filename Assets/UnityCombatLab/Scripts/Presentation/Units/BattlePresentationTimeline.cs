@@ -55,6 +55,20 @@ namespace UnityCombatLab.Presentation.Units
             private readonly List<BattleEvent> _damage = new(Define.SlotsPerTeam);
 
             /// <summary>
+            /// 同じ攻撃の全被害後に表示する回復イベント。
+            /// [KO] 같은 공격의 모든 피해 후 표시할 회복 이벤트입니다.
+            /// [EN] Healing events presented after all damage from this attack.
+            /// </summary>
+            private readonly List<BattleEvent> _healing = new();
+
+            /// <summary>
+            /// 命中後に対象モデルへ渡す回復一覧。
+            /// [KO] 명중 후 대상 모델에 전달할 회복 목록입니다.
+            /// [EN] Healing passed to target models after impact.
+            /// </summary>
+            public IReadOnlyList<BattleEvent> Healing => _healing;
+
+            /// <summary>
             /// Presenter の固定配列で攻撃者を指す番号。
             /// [KO] Presenter의 고정 배열에서 공격자를 가리키는 번호입니다.
             /// [EN] Index identifying the attacker in the presenter's fixed arrays.
@@ -157,6 +171,14 @@ namespace UnityCombatLab.Presentation.Units
             /// </summary>
             internal void AddDamage(BattleEvent damage)
                 => _damage.Add(damage);
+
+            /// <summary>
+            /// 原因の攻撃に回復イベントを値として追加します。
+            /// [KO] 원인 공격에 회복 이벤트를 값으로 추가합니다.
+            /// [EN] Adds a healing event by value to its source attack.
+            /// </summary>
+            internal void AddHealing(BattleEvent healing)
+                => _healing.Add(healing);
         }
 
         /// <summary>
@@ -324,6 +346,25 @@ namespace UnityCombatLab.Presentation.Units
             }
 
             throw new InvalidOperationException("Committed damage requires its attack cue.");
+        }
+
+        /// <summary>
+        /// 撃破回復を原因の攻撃へ結び、被害表示の後まで待たせます。
+        /// [KO] 처치 회복을 원인 공격에 연결하고 피해 표시 후까지 대기시킵니다.
+        /// [EN] Associates kill healing with its source attack and waits until damage presentation.
+        /// </summary>
+        public void ReserveHealing(int actor, BattleEvent item)
+        {
+            for (var index = _attacks.Count - 1; index >= 0; index--)
+            {
+                if (_attacks[index].Actor != actor || _attacks[index].Tick != item.Tick)
+                    continue;
+
+                _attacks[index].AddHealing(item);
+                return;
+            }
+
+            throw new InvalidOperationException("Healing requires its source attack cue.");
         }
 
         /// <summary>

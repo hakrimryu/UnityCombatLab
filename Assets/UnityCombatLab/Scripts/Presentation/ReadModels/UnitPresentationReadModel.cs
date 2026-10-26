@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using R3;
+using UnityCombatLab.Common;
 using UnityCombatLab.Domain.Battle;
 
 namespace UnityCombatLab.Presentation.ReadModels
@@ -38,6 +40,27 @@ namespace UnityCombatLab.Presentation.ReadModels
         /// [EN] Total health loss reserved by the presenter and removed as hits are presented.
         /// </summary>
         private int _pendingHealthDamage;
+
+        /// <summary>
+        /// 未表示の回復量。後続被害の予約可能 HP に含めます。
+        /// [KO] 미표시 회복량이며 후속 피해의 예약 가능 HP에 포함합니다.
+        /// [EN] Pending healing included in health available for subsequent damage reservations.
+        /// </summary>
+        private int _pendingHealing;
+
+        /// <summary>
+        /// 対象一人の予約を保持し、回復の前後だけは確定順を守って表示します。
+        /// [KO] 대상 한 명의 예약을 보관하고 회복 전후에만 확정 순서를 지켜 표시합니다.
+        /// [EN] Holds one target's reservations, preserving committed order across healing boundaries.
+        /// </summary>
+        private readonly List<(BattleEvent Event, bool IsReady)> _changes = new();
+
+        /// <summary>
+        /// HP と盾へ反映したイベントを Presenter に渡し、数字と被弾も同じ時点で表示します。
+        /// [KO] HP·방어막에 반영한 이벤트를 Presenter에 전달해 숫자·피격도 같은 시점에 표시합니다.
+        /// [EN] Reports the applied health or shield event so the presenter displays numbers and hits at the same time.
+        /// </summary>
+        public event Action<BattleEvent> ChangePresented;
 
         /// <summary>
         /// 同じユニットの名前・最大 HP を表示するための不変入力。
@@ -87,13 +110,13 @@ namespace UnityCombatLab.Presentation.ReadModels
         /// </summary>
         public void ReserveDamage(int healthDamage)
         {
-            if (healthDamage < 0 || healthDamage > _health.Value - _pendingHealthDamage)
+            if (healthDamage < 0 || healthDamage > _health.Value - _pendingHealthDamage + _pendingHealing)
             {
                 throw new ArgumentOutOfRangeException(nameof(healthDamage));
             }
 
             _pendingHealthDamage += healthDamage;
-            _previewHealth.Value = _health.Value - _pendingHealthDamage;
+            RefreshPreview();
         }
 
         /// <summary>
@@ -103,7 +126,7 @@ namespace UnityCombatLab.Presentation.ReadModels
         /// </summary>
         public void ApplyDamage(int healthDamage, int shieldDamage)
         {
-            if (healthDamage < 0 || healthDamage > _pendingHealthDamage || shieldDamage < 0 ||
+            if (healthDamage < 0 || healthDamage > _pendingHealthDamage || healthDamage > _health.Value || shieldDamage < 0 ||
                 shieldDamage > _shield.Value)
             {
                 throw new ArgumentOutOfRangeException(nameof(healthDamage));
@@ -112,8 +135,93 @@ namespace UnityCombatLab.Presentation.ReadModels
             _pendingHealthDamage -= healthDamage;
             _shield.Value -= shieldDamage;
             _health.Value -= healthDamage;
-            _previewHealth.Value = _health.Value - _pendingHealthDamage;
+            RefreshPreview();
         }
+
+        /// <summary>
+        /// 被害または回復を確定順に予約し、後の表示順序を記録します。
+        /// [KO] 피해·회복을 확정 순서로 예약하고 이후 표시 순서를 기록합니다.
+        /// [EN] Reserves damage or healing in committed order for later presentation.
+        /// </summary>
+        public void ReserveChange(BattleEvent item)
+        {
+            if (item.TargetId != Input.Id ||
+                (item.Kind != Define.BattleEventKind.DamageApplied && item.Kind != Define.BattleEventKind.HealthRestored))
+            {
+                throw new ArgumentException("Health change must target this unit.", nameof(item));
+            }
+
+            if (item.Kind == Define.BattleEventKind.DamageApplied)
+                ReserveDamage(item.HealthDamage);
+            else
+            {
+                var projected = _health.Value - _pendingHealthDamage + _pendingHealing;
+                if (item.HealthRestored <= 0 || projected <= 0 || item.HealthRestored > Input.MaxHealth - projected)
+                    throw new ArgumentException("Healing exceeds living target health limits.", nameof(item));
+
+                _pendingHealing += item.HealthRestored;
+                RefreshPreview();
+            }
+
+            _changes.Add((item, false));
+        }
+
+        /// <summary>
+        /// 命中した被害は到着順に反映し、回復は前の被害を待ち、後の被害はその回復を待ちます。
+        /// [KO] 명중 피해는 도착 순서로 반영하되 회복은 앞 피해를, 뒤 피해는 그 회복을 기다립니다.
+        /// [EN] Applies damage in arrival order, while healing waits for prior damage and later damage waits for that healing.
+        /// </summary>
+        public void PresentChange(int sequence)
+        {
+            var found = false;
+            for (var index = 0; index < _changes.Count; index++)
+            {
+                if (_changes[index].Event.Sequence != sequence)
+                    continue;
+
+                _changes[index] = (_changes[index].Event, true);
+                found = true;
+                break;
+            }
+
+            if (!found)
+                throw new InvalidOperationException("The presented health change has not been reserved.");
+
+            for (var index = 0; index < _changes.Count;)
+            {
+                var change = _changes[index];
+                var item = change.Event;
+                // 被害同士は加算なので先着を表示できる。回復を追い越すと HP の負値や上限超過が生じる。
+                if (item.Kind == Define.BattleEventKind.HealthRestored && (index != 0 || !change.IsReady))
+                    break;
+
+                if (!change.IsReady)
+                {
+                    index++;
+                    continue;
+                }
+
+                _changes.RemoveAt(index);
+                if (item.Kind == Define.BattleEventKind.DamageApplied)
+                    ApplyDamage(item.HealthDamage, item.ShieldDamage);
+                else
+                {
+                    _pendingHealing -= item.HealthRestored;
+                    _health.Value += item.HealthRestored;
+                    RefreshPreview();
+                }
+
+                ChangePresented?.Invoke(item);
+            }
+        }
+
+        /// <summary>
+        /// 予約済みの被害と回復から、現在 HP 以下の被害予告を再計算します。
+        /// [KO] 예약 피해·회복으로 현재 HP 이하의 피해 예고를 다시 계산합니다.
+        /// [EN] Recomputes damage preview from pending damage and healing, capped at current health.
+        /// </summary>
+        private void RefreshPreview()
+            => _previewHealth.Value = Math.Min(_health.Value, _health.Value - _pendingHealthDamage + _pendingHealing);
 
         /// <summary>
         /// HUD 購読を外した後で通知元を解放します。
@@ -122,6 +230,8 @@ namespace UnityCombatLab.Presentation.ReadModels
         /// </summary>
         public void Dispose()
         {
+            ChangePresented = null;
+            _changes.Clear();
             _health.Dispose();
             _shield.Dispose();
             _previewHealth.Dispose();

@@ -274,11 +274,51 @@ namespace UnityCombatLab.Presentation.Units
         public bool IsAttacking => _attackRemaining > 0f;
 
         /// <summary>
+        /// 自分の Animator・Tween・効果だけに適用する戦闘速度。
+        /// [KO] 자신의 Animator·Tween·효과에만 적용할 전투 속도입니다.
+        /// [EN] Combat speed applied only to this unit's animator, tweens and effects.
+        /// </summary>
+        private float _playbackSpeed = 1f;
+
+        /// <summary>
+        /// 戦闘停止と速度変更を自分の表示へ反映します。
+        /// [KO] 전투 정지·속도 변경을 자신의 표시에 반영합니다.
+        /// [EN] Applies pause and speed changes to this unit's presentation.
+        /// </summary>
+        public void SetPlaybackSpeed(float speed)
+        {
+            if (!float.IsFinite(speed) || speed < 0 || speed > 2)
+                throw new ArgumentOutOfRangeException(nameof(speed));
+
+            _playbackSpeed = speed;
+            _animator.updateMode = AnimatorUpdateMode.UnscaledTime;
+            _animator.speed = speed;
+            if (_motion != null && _motion.IsActive())
+                _motion.timeScale = speed;
+
+            _effects.SetPlaybackSpeed(speed);
+        }
+
+        /// <summary>
         /// Presenter が攻撃終了の判定に使う秒数。
         /// [KO] Presenter가 공격 종료 판정에 사용할 시간입니다.
         /// [EN] Attack duration used by the presenter to determine completion.
         /// </summary>
         public float AttackDuration => _attackSeconds;
+
+        /// <summary>
+        /// 強化後の攻撃間隔内にモーションを収め、同じ人物の演出待ちが増え続けることを防ぎます。
+        /// [KO] 강화 후 공격 간격 안에 모션을 맞춰 같은 유닛의 연출 대기가 계속 쌓이지 않게 합니다.
+        /// [EN] Fits motion within the upgraded interval so one actor's presentation backlog does not keep growing.
+        /// </summary>
+        public void ConfigureAttackInterval(int intervalTicks)
+        {
+            if (intervalTicks < Define.MinimumAttackIntervalTicks || intervalTicks > Define.BattleTickLimit)
+                throw new ArgumentOutOfRangeException(nameof(intervalTicks));
+
+            _attackSeconds = Mathf.Min(_attackSeconds, (float)intervalTicks / Define.TicksPerSecond);
+            _flightSeconds = Mathf.Min(_flightSeconds, _attackSeconds - ReleaseDelay);
+        }
 
         /// <summary>
         /// 攻撃開始から斬撃・発射までの秒数。
@@ -429,7 +469,8 @@ namespace UnityCombatLab.Presentation.Units
 
             var generation = _generation;
             // 接近と姿勢の Tween を、他の演出と同じゲーム内時間で進める。
-            var sequence = DOTween.Sequence().SetUpdate(UpdateType.Normal, false).SetRecyclable(false);
+            var sequence = DOTween.Sequence().SetUpdate(true).SetRecyclable(false);
+            sequence.timeScale = _playbackSpeed;
             _motion = sequence;
             AppendAttackMotion(sequence, direction, isMelee, isSpecial, approachFraction);
 
@@ -503,7 +544,7 @@ namespace UnityCombatLab.Presentation.Units
         private void Update()
         {
             // 攻撃モーションの残り時間と被弾反応を、ゲーム内の経過秒で進める。
-            var presentationDeltaSeconds = Time.deltaTime;
+            var presentationDeltaSeconds = Time.unscaledDeltaTime * _playbackSpeed;
             _attackRemaining = Mathf.Max(0, _attackRemaining - presentationDeltaSeconds);
             _hitReaction.Advance(presentationDeltaSeconds);
         }

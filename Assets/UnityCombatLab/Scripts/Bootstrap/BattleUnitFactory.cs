@@ -23,24 +23,30 @@ namespace UnityCombatLab.Bootstrap
         public static UnitView[] Create(IReadOnlyList<BattleUnitInput> inputs, RunAssetScope resources,
             Transform[] spawnPoints, Transform parent)
         {
-            if (inputs == null || inputs.Count != Define.MaxBattleUnitCount || resources == null ||
-                spawnPoints == null || spawnPoints.Length != inputs.Count || parent == null)
+            if (inputs == null || inputs.Count < 1 || inputs.Count > Define.MaxBattleUnitCount || resources == null ||
+                spawnPoints == null || spawnPoints.Length != Define.MaxBattleUnitCount || parent == null)
             {
-                throw new ArgumentException("Battle creation requires six inputs, spawn points, loaded assets and a parent.");
+                throw new ArgumentException("Battle creation requires one to six inputs, six spawn points, loaded assets and a parent.");
             }
 
             var views = new UnitView[inputs.Count];
+            var occupiedSlots = 0;
             try
             {
                 for (var index = 0; index < views.Length; index++)
                 {
                     var input = inputs[index];
-                    // 0/1は味方/敵の前列、2/3は後列上、4/5は後列下。能力と表示は同じ入力の職業を使う。
-                    if (input == null || input.Team != (Define.BattleTeam)(index % Define.BattleTeamCount) ||
-                        input.Slot != (Define.BattleSlot)(index / Define.BattleTeamCount) || spawnPoints[index] == null)
+                    // 配列内の順番ではなく陣営と枠で配置する。例えば味方後列下は、敵の空き枠があっても生成位置4を使う。
+                    if (input == null)
+                        throw new InvalidOperationException("A spawned unit requires an input.");
+
+                    var spawnIndex = (int)input.Slot * Define.BattleTeamCount + (int)input.Team;
+                    if (spawnPoints[spawnIndex] == null || (occupiedSlots & (1 << spawnIndex)) != 0)
                     {
-                        throw new InvalidOperationException("Battle inputs and spawn points must follow team/slot order.");
+                        throw new InvalidOperationException("Each unit requires a unique team/slot and an assigned spawn point.");
                     }
+
+                    occupiedSlots |= 1 << spawnIndex;
 
                     var prefab = resources.GetUnit(input.Role).Prefab.GetComponent<UnitView>();
                     if (prefab == null)
@@ -49,7 +55,7 @@ namespace UnityCombatLab.Bootstrap
                     var view = UnityEngine.Object.Instantiate(prefab, parent);
                     views[index] = view;
                     view.name = prefab.name;
-                    view.transform.SetPositionAndRotation(spawnPoints[index].position, spawnPoints[index].rotation);
+                    view.transform.SetPositionAndRotation(spawnPoints[spawnIndex].position, spawnPoints[spawnIndex].rotation);
                 }
 
                 return views;

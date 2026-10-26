@@ -5,6 +5,7 @@ using TMPro;
 using UnityCombatLab.Common;
 using UnityCombatLab.Presentation.Styling;
 using UnityCombatLab.Presentation.Units;
+using UnityCombatLab.Domain.Battle;
 using UnityEngine;
 
 namespace UnityCombatLab.Presentation.UI
@@ -140,7 +141,14 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 표시 대상의 읽기 전용 목록.
         /// [EN] Read-only collection of display targets.
         /// </summary>
-        public IReadOnlyList<UnitStatusView> Units => _units;
+        private UnitStatusView[] _boundUnits;
+
+        /// <summary>
+        /// 生成されたユニット順に対応する使用中の状態パネル。
+        /// [KO] 생성 유닛 순서에 대응하는 사용 중 상태 패널입니다.
+        /// [EN] Active status panels ordered to match spawned units.
+        /// </summary>
+        public IReadOnlyList<UnitStatusView> Units => _boundUnits ?? _units;
 
         /// <summary>
         /// HUD に現在表示している戦闘状況の文字列。
@@ -156,7 +164,7 @@ namespace UnityCombatLab.Presentation.UI
         /// </summary>
         public void Validate(int unitCount)
         {
-            if (_units == null || _units.Length != unitCount || _units.Any(unit => unit == null) ||
+            if (_units == null || _units.Length != Define.MaxBattleUnitCount || unitCount < 1 || unitCount > _units.Length || _units.Any(unit => unit == null) ||
                 _result == null || _safeArea == null || _safeAreaFitter == null ||
                 _safeAreaFitter.transform != _safeArea || _resultPanel == null || _damageMaterialSource == null ||
                 _victoryResult == null || _defeatResult == null || _defeatReason == null ||
@@ -182,9 +190,21 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// Presenter が購読を始める前に呼び、共通設定を固定表示・各ユニット・被害材質へ適用します。
-        /// [KO] Presenter가 구독을 시작하기 전에 호출해 공통 설정을 고정 표시·유닛·피해 재질에 적용합니다.
-        /// [EN] Called before presenter subscriptions to apply shared colors to static graphics, units and the damage material.
+        /// Run の上位画面が進行を表示する場合、独立戦闘の結果装飾を隠します。
+        /// [KO] Run 상위 화면이 진행을 표시하면 독립 전투 결과 장식을 숨깁니다.
+        /// [EN] Hides standalone result decoration when the run screen displays progress.
+        /// </summary>
+        public void HideResult()
+        {
+            _resultPanel.gameObject.SetActive(false);
+            _victoryResult.SetActive(false);
+            _defeatResult.SetActive(false);
+        }
+
+        /// <summary>
+        /// 固定表示と数字へ共通パレットを反映します。
+        /// [KO] 고정 표시·숫자에 공통 팔레트를 반영합니다.
+        /// [EN] Applies the common palette to fixed graphics and numbers.
         /// </summary>
         public void ApplyPalette(GameColorPalette colors)
         {
@@ -230,7 +250,7 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] BattleEntryPoint가 시작 시 호출하여 같은 배열 순서의 캐릭터와 상태 패널 위치를 연결합니다.
         /// [EN] Called by BattleEntryPoint at startup to connect characters and status panels in matching array order.
         /// </summary>
-        public void BindLayout(Camera battleCamera, UnitView[] unitViews)
+        public void BindLayout(Camera battleCamera, UnitView[] unitViews, IReadOnlyList<BattleUnitInput> inputs = null)
         {
             if (battleCamera == null || unitViews == null || unitViews.Any(unit => unit == null))
             {
@@ -238,11 +258,26 @@ namespace UnityCombatLab.Presentation.UI
             }
 
             Validate(unitViews.Length);
+            if (inputs != null && inputs.Count != unitViews.Length)
+                throw new ArgumentException("HUD inputs must match the spawned units.", nameof(inputs));
+
+            _boundUnits = new UnitStatusView[unitViews.Length];
+            foreach (var unit in _units)
+                unit.gameObject.SetActive(false);
+
+            for (var index = 0; index < _boundUnits.Length; index++)
+            {
+                // 空き枠を除いた入力順から、元の六枠HUDの位置へ対応させる。
+                var slotIndex = inputs == null ? index : (int)inputs[index].Slot * Define.BattleTeamCount + (int)inputs[index].Team;
+                _boundUnits[index] = _units[slotIndex];
+                _boundUnits[index].gameObject.SetActive(true);
+            }
+
             _battleCamera = battleCamera;
             _panelPositions = unitViews.Select(unit => unit.transform.position +
                                                        Vector3.up * (_panelHeight * unit.transform.lossyScale.y))
                 .ToArray();
-            _panelRects = _units.Select(unit => (RectTransform)unit.transform).ToArray();
+            _panelRects = _boundUnits.Select(unit => (RectTransform)unit.transform).ToArray();
             UpdateLayout(Screen.safeArea, new Vector2Int(Screen.width, Screen.height));
         }
 

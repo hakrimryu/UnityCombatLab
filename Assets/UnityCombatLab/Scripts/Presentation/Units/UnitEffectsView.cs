@@ -82,6 +82,13 @@ namespace UnityCombatLab.Presentation.Units
         private BattleEffectView _death;
 
         /// <summary>
+        /// 生成済みと後続生成の効果が共有する戦闘速度。
+        /// [KO] 이미 생성했거나 이후 생성할 효과가 공유하는 전투 속도입니다.
+        /// [EN] Combat speed shared by existing and subsequently created effects.
+        /// </summary>
+        private float _playbackSpeed = 1f;
+
+        /// <summary>
         /// EntryPointからUnitView経由で接続前に呼び、効果を一度準備します。再呼出しでは既存効果を再利用します。
         /// [KO] EntryPoint가 UnitView를 거쳐 연결 전에 호출하여 효과를 한 번 준비하며 재호출 시 기존 효과를 재사용합니다.
         /// [EN] Called before binding by EntryPoint through UnitView to prepare effects once and reuse them on subsequent calls.
@@ -125,7 +132,31 @@ namespace UnityCombatLab.Presentation.Units
             var effect = Instantiate(prefab, transform);
             effect.name = effectName;
             effect.Clear();
+            effect.SetPlaybackSpeed(_playbackSpeed);
             return effect;
+        }
+
+        /// <summary>
+        /// このユニットが所有する全効果と後続生成へ戦闘速度を適用します。
+        /// [KO] 이 유닛이 소유하는 모든 효과와 후속 생성에 전투 속도를 적용합니다.
+        /// [EN] Applies combat speed to all effects owned by this unit and future instances.
+        /// </summary>
+        public void SetPlaybackSpeed(float speed)
+        {
+            _playbackSpeed = speed;
+            foreach (var effect in _projectiles)
+                if (effect != null)
+                    effect.SetPlaybackSpeed(speed);
+
+            foreach (var effect in _impacts)
+                if (effect != null)
+                    effect.SetPlaybackSpeed(speed);
+
+            if (_strike != null)
+                _strike.SetPlaybackSpeed(speed);
+
+            if (_death != null)
+                _death.SetPlaybackSpeed(speed);
         }
 
         /// <summary>
@@ -190,7 +221,7 @@ namespace UnityCombatLab.Presentation.Units
         /// </summary>
         public void ShowImpact(int slot, Vector3 position)
         {
-            // slot は一攻撃の被害列の 0〜2。編成のスロット番号ではなく、広域攻撃の三表示を分ける。
+            // 対象の前列0・後列上1・後列下2で効果を分け、広域攻撃でも別の対象の効果を消さない。
             if (_impacts[slot] != null)
             {
                 _impacts[slot].Play(position, Vector3.forward);

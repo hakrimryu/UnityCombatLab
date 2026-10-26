@@ -43,6 +43,13 @@ namespace UnityCombatLab.Presentation.UI
         [SerializeField] private List<DamageSlot> _slots = new();
 
         /// <summary>
+        /// 戦闘だけに適用する速度。UI ボタンの Tween には影響しません。
+        /// [KO] 전투에만 적용하는 속도이며 UI 버튼 Tween에는 영향을 주지 않습니다.
+        /// [EN] Speed applied only to combat, independent of UI button tweens.
+        /// </summary>
+        private float _playbackSpeed = 1f;
+
+        /// <summary>
         /// 一回の被害の数字二つ・盾アイコン・Tween と、古い callback を拒否する番号を保持します。
         /// [KO] 한 피해의 숫자 두 개·방패 아이콘·Tween과 이전 콜백을 거부할 번호를 보관합니다.
         /// [EN] Holds one hit's two labels, shield icon, tween and stale-callback version.
@@ -159,7 +166,7 @@ namespace UnityCombatLab.Presentation.UI
             /// [KO] 빈 슬롯을 초기화해 맨 앞으로 배치하고 완료 시 같은 사용 번호의 표시만 반환합니다.
             /// [EN] Resets a free slot, brings it forward and returns only the matching rental on completion.
             /// </summary>
-            public void Show(DamageNumberView owner, int healthDamage, int shieldDamage)
+            public void Show(DamageNumberView owner, int healthDamage, int shieldDamage, int healing = 0)
             {
                 Clear();
                 IsInUse = true;
@@ -167,7 +174,7 @@ namespace UnityCombatLab.Presentation.UI
                 var root = (RectTransform)_group.transform;
                 root.anchoredPosition = Vector2.down * owner._startBelowAnchor;
                 _group.alpha = 1f;
-                _healthDamage.text = healthDamage > 0 ? "-" + healthDamage : "";
+                _healthDamage.text = healing > 0 ? $"<color=#5DD9B5>+{healing}</color>" : healthDamage > 0 ? "-" + healthDamage : "";
                 _shieldDamage.text = shieldDamage > 0 ? "-" + shieldDamage : "";
                 _shieldIcon.gameObject.SetActive(shieldDamage > 0);
                 root.gameObject.SetActive(true);
@@ -181,7 +188,7 @@ namespace UnityCombatLab.Presentation.UI
                         .SetEase(Ease.OutQuad))
                     .Join(DOTween.To(() => _group.alpha, alpha => _group.alpha = alpha, 0f, owner._displaySeconds)
                         .SetEase(Ease.InQuad))
-                    .SetUpdate(UpdateType.Normal, false)
+                    .SetUpdate(true)
                     .OnComplete(() =>
                     {
                         // Clear は Kill より先に番号を変える。返却・再貸出後の古い完了通知は何も変更しない。
@@ -189,6 +196,18 @@ namespace UnityCombatLab.Presentation.UI
                         _animation = null;
                         Clear();
                     });
+                _animation.timeScale = owner._playbackSpeed;
+            }
+
+            /// <summary>
+            /// この数字の所有 Tween だけへ速度を設定します。
+            /// [KO] 이 숫자가 소유한 Tween에만 속도를 설정합니다.
+            /// [EN] Sets speed only on the tween owned by this number.
+            /// </summary>
+            public void SetPlaybackSpeed(float speed)
+            {
+                if (_animation != null && _animation.IsActive())
+                    _animation.timeScale = speed;
             }
 
             /// <summary>
@@ -293,6 +312,42 @@ namespace UnityCombatLab.Presentation.UI
         {
             if (_slots == null) return;
             foreach (var slot in _slots) slot?.Clear();
+        }
+
+        /// <summary>
+        /// 回復済み HP を同じ数字プールへ正符号付きで表示します。
+        /// [KO] 회복한 HP를 같은 숫자 풀에 양수 부호로 표시합니다.
+        /// [EN] Displays restored health with a positive sign using the same number pool.
+        /// </summary>
+        public void ShowHealing(int amount)
+        {
+            if (amount <= 0)
+                return;
+
+            foreach (var slot in _slots)
+            {
+                if (slot.IsInUse)
+                    continue;
+
+                slot.Show(this, 0, 0, amount);
+                return;
+            }
+
+            var extra = _slots[0].CreateCopy(_slots.Count);
+            _slots.Add(extra);
+            extra.Show(this, 0, 0, amount);
+        }
+
+        /// <summary>
+        /// 表示中と後から借りる数字に同じ戦闘速度を適用します。
+        /// [KO] 표시 중이거나 이후 빌릴 숫자에 같은 전투 속도를 적용합니다.
+        /// [EN] Applies the same combat speed to active and subsequently borrowed numbers.
+        /// </summary>
+        public void SetPlaybackSpeed(float speed)
+        {
+            _playbackSpeed = speed;
+            foreach (var slot in _slots)
+                slot.SetPlaybackSpeed(speed);
         }
 
         /// <summary>

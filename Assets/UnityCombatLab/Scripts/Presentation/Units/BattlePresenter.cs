@@ -124,6 +124,10 @@ namespace UnityCombatLab.Presentation.Units
                 view.Bind(runId);
             }
 
+            // HP 通知の直後に数字と被弾を表示する。Dispose で各ユニットから購読を外す。
+            foreach (var unit in _model.Units)
+                unit.ChangePresented += HandleChangePresented;
+
             _runner.EventOccurred += HandleEventOccurred;
         }
 
@@ -164,7 +168,12 @@ namespace UnityCombatLab.Presentation.Units
                 var actor = _indices[item.ActorId];
                 // 後の命中表示に使う被害の値を、この攻撃に保存する。
                 _timeline.ReserveDamage(actor, item);
-                _model.Units[_indices[item.TargetId]].ReserveDamage(item.HealthDamage);
+                _model.Units[_indices[item.TargetId]].ReserveChange(item);
+            }
+            else if (item.Kind == Define.BattleEventKind.HealthRestored)
+            {
+                _timeline.ReserveHealing(_indices[item.ActorId], item);
+                _model.Units[_indices[item.TargetId]].ReserveChange(item);
             }
         }
 
@@ -263,11 +272,34 @@ namespace UnityCombatLab.Presentation.Units
                 var damage = cue.Damage[hit];
                 var target = _indices[damage.TargetId];
                 // 命中した被害だけを表示 HP と盾から引く。
-                _model.Units[target].ApplyDamage(damage.HealthDamage, damage.ShieldDamage);
-                actor.ShowImpact(_runId, hit, _views[target].ImpactPosition);
-                _views[target].ShowHit(_runId, actor.ImpactPosition);
-                _hud.Units[target].ShowDamage(damage.HealthDamage, damage.ShieldDamage);
+                _model.Units[target].PresentChange(damage.Sequence);
             }
+
+            foreach (var healing in cue.Healing)
+                _model.Units[_indices[healing.TargetId]].PresentChange(healing.Sequence);
+        }
+
+        /// <summary>
+        /// 表示 HP に適用された被害・回復だけを数字と被弾効果へ渡します。
+        /// [KO] 표시 HP에 적용된 피해·회복만 숫자·피격 효과에 전달합니다.
+        /// [EN] Displays numbers and hit effects only for damage or healing applied to visible health.
+        /// </summary>
+        private void HandleChangePresented(BattleEvent item)
+        {
+            if (_isDisposed)
+                return;
+
+            var target = _indices[item.TargetId];
+            if (item.Kind == Define.BattleEventKind.HealthRestored)
+            {
+                _hud.Units[target].ShowHealing(item.HealthRestored);
+                return;
+            }
+
+            var actor = _views[_indices[item.ActorId]];
+            actor.ShowImpact(_runId, (int)_model.Units[target].Input.Slot, _views[target].ImpactPosition);
+            _views[target].ShowHit(_runId, actor.ImpactPosition);
+            _hud.Units[target].ShowDamage(item.HealthDamage, item.ShieldDamage);
         }
 
         /// <summary>
@@ -320,6 +352,9 @@ namespace UnityCombatLab.Presentation.Units
 
             _isDisposed = true;
             _runner.EventOccurred -= HandleEventOccurred;
+            foreach (var unit in _model.Units)
+                unit.ChangePresented -= HandleChangePresented;
+
             _timeline.Clear();
             foreach (var view in _views)
                 if (view != null)

@@ -15,9 +15,9 @@ namespace UnityCombatLab.Presentation.ReadModels
     public sealed class BattlePresentationReadModel : IDisposable
     {
         /// <summary>
-        /// 六つの固定スロットに対応する表示状態。
-        /// [KO] 고정 여섯 슬롯의 표시 상태입니다.
-        /// [EN] Presentation states for the six fixed slots.
+        /// 存在するユニットだけを開始入力と同じ順に保持する表示状態。
+        /// [KO] 존재하는 유닛만 시작 입력과 같은 순서로 보관하는 표시 상태입니다.
+        /// [EN] Presentation states for present units in starting-input order.
         /// </summary>
         private readonly UnitPresentationReadModel[] _units;
 

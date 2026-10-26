@@ -323,15 +323,22 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 進行中の HP ゲージのアニメーションを一フレーム進めます。
-        /// [KO] 진행 중인 HP 게이지 애니메이션을 한 프레임 진행합니다.
-        /// [EN] Advances active health-gauge animations by one frame.
+        /// HP ゲージと数字へ適用する戦闘速度。ゼロで途中の状態を保ちます。
+        /// [KO] HP 게이지·숫자에 적용하는 전투 속도이며 0이면 중간 상태를 유지합니다.
+        /// [EN] Combat speed for gauges and numbers, preserving their current state at zero.
+        /// </summary>
+        private float _playbackSpeed = 1f;
+
+        /// <summary>
+        /// このパネルの戦闘時計で HP ゲージを進めます。
+        /// [KO] 이 패널의 전투 시간으로 HP 게이지를 진행합니다.
+        /// [EN] Advances health gauges using this panel's combat clock.
         /// </summary>
         private void Update()
         {
             if (_isHealthAnimating)
             {
-                Advance(Time.deltaTime);
+                Advance(Time.unscaledDeltaTime * _playbackSpeed);
             }
         }
 
@@ -425,6 +432,25 @@ namespace UnityCombatLab.Presentation.UI
         /// [EN] Called by BattlePresenter at impact to briefly display health loss separately from shield absorption.
         /// </summary>
         public void ShowDamage(int healthDamage, int shieldDamage) => _damageNumbers.Show(healthDamage, shieldDamage);
+
+        /// <summary>
+        /// 確定順で表示した回復を数字プールへ渡します。
+        /// [KO] 확정 순서로 표시한 회복을 숫자 풀에 전달합니다.
+        /// [EN] Sends healing presented in committed order to the number pool.
+        /// </summary>
+        public void ShowHealing(int amount)
+            => _damageNumbers.ShowHealing(amount);
+
+        /// <summary>
+        /// ゲージと数字の戦闘速度を揃え、ゼロで途中の状態を保ちます。
+        /// [KO] 게이지·숫자의 전투 속도를 맞추고 0이면 중간 상태를 유지합니다.
+        /// [EN] Aligns gauge and number speed, preserving their current state at zero.
+        /// </summary>
+        public void SetPlaybackSpeed(float speed)
+        {
+            _playbackSpeed = speed;
+            _damageNumbers.SetPlaybackSpeed(speed);
+        }
 
         /// <summary>
         /// 被害数字を消し、HP ゲージの補間を止めて現在 HP に揃えます。
