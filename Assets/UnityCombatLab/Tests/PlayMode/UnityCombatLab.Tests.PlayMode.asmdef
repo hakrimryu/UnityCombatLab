@@ -5,6 +5,7 @@
     "UnityCombatLab.Bootstrap",
     "VContainer",
     "UnityEngine.UI",
+    "Unity.InputSystem",
     "UniTask",
     "Unity.Addressables",
     "Unity.ResourceManager",
