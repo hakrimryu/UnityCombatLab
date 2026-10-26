@@ -7,6 +7,7 @@
     "UnityEngine.UI",
     "UniTask",
     "Unity.Addressables",
+    "Unity.ResourceManager",
     "UnityCombatLab.Common",
     "UnityCombatLab.Infrastructure",
     "UnityCombatLab.Application",
