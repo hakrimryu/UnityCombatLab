@@ -184,11 +184,77 @@ namespace UnityCombatLab.Presentation.UI
                 throw new ArgumentNullException(nameof(result));
 
             var elapsed = TimeSpan.FromSeconds((double)result.Ticks / Define.TicksPerSecond);
-            var cleared = result.Outcome == Define.BattleResult.Victory ? Define.RunBattleCount : 0;
-
             return $"{Outcome(result.Outcome)}\n\n難易度：{DifficultyName(result.Configuration.Difficulty)}\n" +
-                   $"クリア数：{cleared} / {Define.RunBattleCount}\n到達ウェーブ：{Define.InitialWave}\n" +
-                   $"戦闘時間：{elapsed.Minutes:00}:{elapsed.Seconds:00}\n\n強化の獲得なし";
+                   $"クリア数：{result.ClearedWaves} / {Define.WavesPerRun}　到達ウェーブ：{result.ReachedWave}\n" +
+                   $"戦闘時間：{elapsed.Minutes:00}:{elapsed.Seconds:00}\n\n{RewardSummary(result.Rewards, true)}";
+        }
+
+        /// <summary>
+        /// basis point を余分なゼロのない百分率へ変換します。
+        /// [KO] basis point를 불필요한 0 없는 백분율로 변환합니다.
+        /// [EN] Formats basis points as a percentage without unnecessary zeroes.
+        /// </summary>
+        public static string Percent(int basisPoints)
+            => (basisPoints / 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+        /// <summary>
+        /// 強化 ID に対応する日本語名を返します。
+        /// [KO] 강화 ID에 대응하는 일본어 이름을 반환합니다.
+        /// [EN] Returns the Japanese name for an upgrade kind.
+        /// </summary>
+        public static string RewardName(Define.RewardKind kind)
+            => kind switch
+            {
+                Define.RewardKind.Power => "力の紋章",
+                Define.RewardKind.Vitality => "生命の紋章",
+                Define.RewardKind.Haste => "迅速の紋章",
+                Define.RewardKind.Barrier => "守護の紋章",
+                Define.RewardKind.Renewal => "再生の紋章",
+                Define.RewardKind.Ambush => "先制の紋章",
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+
+        /// <summary>
+        /// 実際に適用する増加量と効果の単位・期間を表示します。
+        /// [KO] 실제 적용할 증가량과 효과의 단위·기간을 표시합니다.
+        /// [EN] Describes actual increments with their effect units and duration.
+        /// </summary>
+        public static string RewardEffect(Define.RewardKind kind, int increaseBp)
+            => kind switch
+            {
+                Define.RewardKind.Power => $"攻撃力 +{Percent(increaseBp)}",
+                Define.RewardKind.Vitality => $"最大HP +{Percent(increaseBp)}",
+                Define.RewardKind.Haste => $"攻撃速度 +{Percent(increaseBp)}",
+                Define.RewardKind.Barrier => $"開始時の盾：最大HPの{Percent(increaseBp)}",
+                Define.RewardKind.Renewal => $"撃破ごとに最大HPの{Percent(increaseBp)}を回復",
+                Define.RewardKind.Ambush => $"開始6秒間 攻撃力 +{Percent(increaseBp)}",
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+
+        /// <summary>
+        /// 強化を種類ごとにまとめ、HUD は回数、結果は実効果まで表示します。
+        /// [KO] 강화를 종류별로 묶어 HUD에는 횟수, 결과에는 실제 효과까지 표시합니다.
+        /// [EN] Groups upgrades by kind, showing stacks in HUD and actual effects in results.
+        /// </summary>
+        public static string RewardSummary(RunRewards rewards, bool includesEffects)
+        {
+            var text = new System.Text.StringBuilder();
+            for (var index = 0; index < 6; index++)
+            {
+                var kind = (Define.RewardKind)index;
+                var stacks = rewards.GetStacks(kind);
+                if (stacks == 0)
+                    continue;
+
+                if (text.Length > 0)
+                    text.Append(includesEffects ? "\n" : "　");
+
+                text.Append(RewardName(kind)).Append(" ×").Append(stacks);
+                if (includesEffects)
+                    text.Append("　").Append(RewardEffect(kind, rewards.GetEffect(kind)));
+            }
+
+            return text.Length == 0 ? "強化の獲得なし" : text.ToString();
         }
     }
 }

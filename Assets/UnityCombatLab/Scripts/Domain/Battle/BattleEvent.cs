@@ -74,6 +74,13 @@ namespace UnityCombatLab.Domain.Battle
         public int ShieldDamage { get; }
 
         /// <summary>
+        /// 最大 HP と生存条件を適用した実際の回復量。
+        /// [KO] 최대 HP·생존 조건을 적용한 실제 회복량입니다.
+        /// [EN] Actual healing after maximum-health and survival constraints.
+        /// </summary>
+        public int HealthRestored { get; }
+
+        /// <summary>
         /// 発生時の戦闘結果。
         /// [KO] 발생 시 전투 결과.
         /// [EN] Battle result at emission.
@@ -86,7 +93,7 @@ namespace UnityCombatLab.Domain.Battle
         /// [EN] Stores ordering and damage as values.
         /// </summary>
         internal BattleEvent(Guid runId, int wave, int tick, int sequence, int actorId, int targetId,
-            Define.BattleEventKind kind, int healthDamage, int shieldDamage, Define.BattleResult result)
+            Define.BattleEventKind kind, int healthDamage, int shieldDamage, Define.BattleResult result, int healthRestored = 0)
         {
             RunId = runId;
             Wave = wave;
@@ -97,6 +104,7 @@ namespace UnityCombatLab.Domain.Battle
             Kind = kind;
             HealthDamage = healthDamage;
             ShieldDamage = shieldDamage;
+            HealthRestored = healthRestored;
             Result = result;
         }
     }

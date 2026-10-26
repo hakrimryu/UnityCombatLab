@@ -60,14 +60,14 @@ namespace UnityCombatLab.Application.ReadModels
         /// </summary>
         internal void Apply(BattleEvent battleEvent)
         {
-            if (battleEvent.Kind == Define.BattleEventKind.DamageApplied)
+            if (battleEvent.Kind == Define.BattleEventKind.DamageApplied || battleEvent.Kind == Define.BattleEventKind.HealthRestored)
             {
                 // イベントの対象 ID に一致するユニットの HP と盾を更新する。
                 foreach (var unit in _unitReadModels)
                 {
                     if (unit.Input.Id == battleEvent.TargetId)
                     {
-                        unit.ApplyDamage(battleEvent);
+                        unit.ApplyChange(battleEvent);
                         return;
                     }
                 }

@@ -63,10 +63,10 @@ namespace UnityCombatLab.Application.ReadModels
         /// [KO] 피해 이벤트의 HP 손실과 방어막 흡수를 현재 값에서 뺍니다.
         /// [EN] Subtracts the event's health loss and shield absorption from current values.
         /// </summary>
-        internal void ApplyDamage(BattleEvent battleEvent)
+        internal void ApplyChange(BattleEvent battleEvent)
         {
             _shield.Value -= battleEvent.ShieldDamage;
-            _health.Value -= battleEvent.HealthDamage;
+            _health.Value += battleEvent.HealthRestored - battleEvent.HealthDamage;
         }
 
         /// <summary>

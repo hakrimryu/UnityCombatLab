@@ -39,11 +39,33 @@ namespace UnityCombatLab.Domain.Run
         public int Ticks { get; }
 
         /// <summary>
+        /// 勝利したウェーブ数。
+        /// [KO] 승리한 웨이브 수입니다.
+        /// [EN] Number of victorious waves.
+        /// </summary>
+        public int ClearedWaves { get; }
+
+        /// <summary>
+        /// 最後に挑戦したウェーブ番号。
+        /// [KO] 마지막으로 도전한 웨이브 번호입니다.
+        /// [EN] Last wave attempted.
+        /// </summary>
+        public int ReachedWave { get; }
+
+        /// <summary>
+        /// 終了時点の強化。Run 解放後も値を保持します。
+        /// [KO] 종료 시점의 강화이며 Run 해제 후에도 값을 유지합니다.
+        /// [EN] Final upgrades retained after run resources are released.
+        /// </summary>
+        public RunRewards Rewards { get; }
+
+        /// <summary>
         /// 確定モデルからコピーした結果だけを受け付けます。
         /// [KO] 확정 모델에서 복사한 결과만 받습니다.
         /// [EN] Accepts only a completed outcome copied from committed combat state.
         /// </summary>
-        public RunResult(Guid runId, RunConfiguration configuration, Define.BattleResult outcome, int ticks)
+        public RunResult(Guid runId, RunConfiguration configuration, Define.BattleResult outcome, int ticks,
+            int clearedWaves = -1, int reachedWave = 1, RunRewards rewards = null)
         {
             if (runId == Guid.Empty)
                 throw new ArgumentException("Run ID must not be empty.", nameof(runId));
@@ -54,10 +76,25 @@ namespace UnityCombatLab.Domain.Run
             if (ticks < 0)
                 throw new ArgumentOutOfRangeException(nameof(ticks));
 
+            if (clearedWaves == -1)
+                clearedWaves = outcome == Define.BattleResult.Victory ? 1 : 0;
+
+            if (reachedWave < 1 || reachedWave > Define.WavesPerRun || clearedWaves < 0 || clearedWaves > reachedWave ||
+                (outcome == Define.BattleResult.Victory ? clearedWaves != reachedWave : clearedWaves != reachedWave - 1))
+            {
+                throw new ArgumentOutOfRangeException(nameof(clearedWaves));
+            }
+
+            if (ticks > reachedWave * Define.BattleTickLimit)
+                throw new ArgumentOutOfRangeException(nameof(ticks));
+
             RunId = runId;
             Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             Outcome = outcome;
             Ticks = ticks;
+            ClearedWaves = clearedWaves;
+            ReachedWave = reachedWave;
+            Rewards = rewards ?? RunRewards.Empty;
         }
     }
 }

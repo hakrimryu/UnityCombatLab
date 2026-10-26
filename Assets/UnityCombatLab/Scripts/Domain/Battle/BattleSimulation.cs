@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityCombatLab.Common;
+using UnityCombatLab.Domain.Run;
 
 namespace UnityCombatLab.Domain.Battle
 {
@@ -13,12 +14,26 @@ namespace UnityCombatLab.Domain.Battle
     public sealed class BattleSimulation
     {
         /// <summary>
-        /// 各行動の攻撃と最大対象数の被害、各ユニットの死亡一回、戦闘終了一回を確保します。
-        /// [KO] 행동별 공격·최대 대상 수의 피해, 유닛별 사망 한 번과 전투 종료 한 번의 공간을 확보합니다.
-        /// [EN] Reserves each action and its maximum damage targets, one death per unit, and one battle end.
+        /// 各行動に攻撃1・被害と死亡各3・撃破回復9件、最後に終了1件の領域を確保します。
+        /// [KO] 행동마다 공격 1·피해와 사망 각 3·처치 회복 9건, 마지막 종료 1건의 공간을 확보합니다.
+        /// [EN] Reserves one attack, three damage and death events each and nine heals per action, plus one battle end.
         /// </summary>
         private const int EventBufferCapacity =
-            Define.MaxBattleUnitCount * (1 + Define.SlotsPerTeam) + Define.MaxBattleUnitCount + 1;
+            Define.MaxBattleUnitCount * (1 + Define.SlotsPerTeam * (2 + Define.SlotsPerTeam)) + 1;
+
+        /// <summary>
+        /// 開始6秒間に使う攻撃倍率の増加量。
+        /// [KO] 시작 6초간 사용하는 공격 배율 증가량입니다.
+        /// [EN] Attack multiplier increase used during the first six seconds.
+        /// </summary>
+        private readonly int _ambushBp;
+
+        /// <summary>
+        /// 一体撃破ごとに生存味方を回復する最大 HP 比率。
+        /// [KO] 한 명 처치마다 생존 아군을 회복하는 최대 HP 비율입니다.
+        /// [EN] Maximum-health healing ratio applied to living allies per kill.
+        /// </summary>
+        private readonly int _renewalBp;
 
         /// <summary>
         /// 全ユニットの現在の HP・盾・攻撃回数を保持する配列。
@@ -81,7 +96,7 @@ namespace UnityCombatLab.Domain.Battle
         /// [KO] 시작 데이터를 팀·슬롯 순서로 배치하고 중복을 검사하며 빈 팀의 승패는 첫 Step에서 판정합니다.
         /// [EN] Orders starting data by team and slot and checks duplicates; the first Step resolves empty teams.
         /// </summary>
-        public BattleSimulation(Guid runId, int wave, IReadOnlyList<BattleUnitInput> units)
+        public BattleSimulation(Guid runId, int wave, IReadOnlyList<BattleUnitInput> units, RunRewards rewards = null)
         {
             if (runId == Guid.Empty)
             {
@@ -105,9 +120,17 @@ namespace UnityCombatLab.Domain.Battle
 
             _runId = runId;
             _wave = wave;
+            _ambushBp = rewards?.GetEffect(Define.RewardKind.Ambush) ?? 0;
+            _renewalBp = rewards?.GetEffect(Define.RewardKind.Renewal) ?? 0;
             foreach (var input in units)
             {
                 var unit = input ?? throw new ArgumentException("Unit must not be null.", nameof(units));
+                if (unit.Team == Define.BattleTeam.Ally &&
+                    (long)unit.Attack * (Define.BasisPoints + _ambushBp) / Define.BasisPoints > BattleCalculation.MaxAttackPower)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(units), "Ambush damage exceeds the supported integer range.");
+                }
+
                 var index = Index(unit.Team, unit.Slot);
                 if (_states[index].Input != null)
                 {
@@ -188,6 +211,7 @@ namespace UnityCombatLab.Domain.Battle
                 var attackCount = state.AttackCount + 1;
                 var role = state.Input.Role;
                 var isArea = BattleCalculation.IsAreaAttack(role, attackCount);
+                var kills = 0;
 
                 Emit(Define.BattleEventKind.AttackExecuted, state.Input.Id, isArea ? 0 : _states[target].Input.Id);
                 if (isArea)
@@ -197,17 +221,22 @@ namespace UnityCombatLab.Domain.Battle
                         var areaTarget = GetOpponentIndex(actor, slot);
                         if (_states[areaTarget].IsAlive)
                         {
-                            ApplyDamage(actor, areaTarget, attackCount);
+                            if (ApplyDamage(actor, areaTarget, attackCount))
+                                kills++;
                         }
                     }
                 }
                 else
                 {
-                    ApplyDamage(actor, target, attackCount);
+                    if (ApplyDamage(actor, target, attackCount))
+                        kills++;
                 }
 
                 _states[actor] = new BattleUnitSnapshot(state.Input, state.Health, state.Shield,
                     attackCount, CurrentTick + state.Input.IntervalTicks);
+                if (state.Input.Team == Define.BattleTeam.Ally && _renewalBp > 0)
+                    ApplyRenewal(state.Input.Id, kills);
+
                 if (TryEnd())
                 {
                     return;
@@ -282,11 +311,13 @@ namespace UnityCombatLab.Domain.Battle
         /// [KO] 계산한 피해를 방어막·HP·사망에 즉시 적용합니다.
         /// [EN] Immediately applies calculated damage to shield, health, and death.
         /// </summary>
-        private void ApplyDamage(int actor, int target, int attackCount)
+        private bool ApplyDamage(int actor, int target, int attackCount)
         {
             var state = _states[target];
             var attacker = _states[actor].Input;
-            var finalDamage = BattleCalculation.CalculateDamage(attacker, attackCount, state.Input.Role);
+            // tick120 は6秒ちょうどなので先制効果の対象外。敵には味方の強化を適用しない。
+            var ambush = attacker.Team == Define.BattleTeam.Ally && CurrentTick < 6 * Define.TicksPerSecond ? _ambushBp : 0;
+            var finalDamage = BattleCalculation.CalculateDamage(attacker, attackCount, state.Input.Role, ambush);
             var shieldDamage = Math.Min(state.Shield, finalDamage);
             var healthDamage = Math.Min(state.Health, finalDamage - shieldDamage);
             _states[target] = new BattleUnitSnapshot(state.Input, state.Health - healthDamage,
@@ -295,6 +326,39 @@ namespace UnityCombatLab.Domain.Battle
             if (!_states[target].IsAlive)
             {
                 Emit(Define.BattleEventKind.UnitDied, attacker.Id, state.Input.Id);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 一攻撃の全被害を終えてから、撃破数だけ生存味方の HP を回復します。
+        /// [KO] 한 공격의 모든 피해가 끝난 뒤 처치 수만큼 생존 아군 HP를 회복합니다.
+        /// [EN] Heals living allies once per kill after all damage from an attack has finished.
+        /// </summary>
+        private void ApplyRenewal(int actorId, int kills)
+        {
+            // 一行動の最大は攻撃1・被害/死亡各3・回復9件。固定バッファは全6行動分と終了1件を確保する。
+            for (var kill = 0; kill < kills; kill++)
+            {
+                for (var slot = 0; slot < Define.SlotsPerTeam; slot++)
+                {
+                    var index = slot * Define.BattleTeamCount;
+                    var state = _states[index];
+                    if (!state.IsAlive)
+                        continue;
+
+                    var amount = (int)Math.Min(state.Input.MaxHealth - state.Health,
+                        (long)state.Input.MaxHealth * _renewalBp / Define.BasisPoints);
+                    if (amount <= 0)
+                        continue;
+
+                    _states[index] = new BattleUnitSnapshot(state.Input, state.Health + amount, state.Shield,
+                        state.AttackCount, state.NextAttackTick);
+                    _events[EventCount++] = new BattleEvent(_runId, _wave, CurrentTick, ++_sequence, actorId,
+                        state.Input.Id, Define.BattleEventKind.HealthRestored, 0, 0, Result, amount);
+                }
             }
         }
 

@@ -199,7 +199,7 @@ namespace UnityCombatLab.Common
         /// [KO] 한 번의 도전에서 실행하고 결과 화면에 표시하는 전투 수입니다.
         /// [EN] Number of battles executed in one run and shown on its results screen.
         /// </summary>
-        public const int RunBattleCount = 1;
+        public const int RunBattleCount = WavesPerRun;
 
         /// <summary>
         /// やさしい難易度で敵のHPと攻撃力に掛ける百分率。
@@ -217,7 +217,38 @@ namespace UnityCombatLab.Common
         {
             Loading,
             Battle,
-            CleaningUp
+            CleaningUp,
+            WaveIntro,
+            WaveClear,
+            RewardSelection
+        }
+
+        /// <summary>
+        /// 味方全員へ適用する六種類の強化。
+        /// [KO] 아군 전체에 적용하는 여섯 강화 종류입니다.
+        /// [EN] Six upgrade kinds applied to the whole party.
+        /// </summary>
+        public enum RewardKind
+        {
+            Power,
+            Vitality,
+            Haste,
+            Barrier,
+            Renewal,
+            Ambush
+        }
+
+        /// <summary>
+        /// ウェーブ設定の各敵枠。Empty は空き枠を表します。
+        /// [KO] 웨이브 설정의 적 슬롯이며 Empty는 빈 슬롯입니다.
+        /// [EN] Enemy slot content in wave settings; Empty denotes an unused slot.
+        /// </summary>
+        public enum WaveEnemy
+        {
+            Empty,
+            Melee,
+            Ranged,
+            Captain
         }
 
         /// <summary>
@@ -426,7 +457,8 @@ namespace UnityCombatLab.Common
             AttackExecuted,
             DamageApplied,
             UnitDied,
-            BattleEnded
+            BattleEnded,
+            HealthRestored
         }
 
         /// <summary>

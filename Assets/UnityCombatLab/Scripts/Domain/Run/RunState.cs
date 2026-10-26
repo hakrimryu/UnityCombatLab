@@ -41,7 +41,7 @@ namespace UnityCombatLab.Domain.Run
             if (id == Guid.Empty)
                 throw new ArgumentException("Run ID must not be empty.", nameof(id));
 
-            if ((uint)phase > (uint)Define.RunPhase.CleaningUp)
+            if ((uint)phase > (uint)Define.RunPhase.RewardSelection)
                 throw new ArgumentOutOfRangeException(nameof(phase));
 
             Id = id;

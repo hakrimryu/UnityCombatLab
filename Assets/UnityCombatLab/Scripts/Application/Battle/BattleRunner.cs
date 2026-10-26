@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityCombatLab.Application.ReadModels;
 using UnityCombatLab.Common;
 using UnityCombatLab.Domain.Battle;
+using UnityCombatLab.Domain.Run;
 
 namespace UnityCombatLab.Application.Battle
 {
@@ -88,9 +89,9 @@ namespace UnityCombatLab.Application.Battle
         /// [KO] 시작 데이터로 전투를 만들고 초기 HP와 방어막을 ReadModel에 설정합니다.
         /// [EN] Creates combat from starting data and initializes ReadModel health and shields.
         /// </summary>
-        public BattleRunner(Guid runId, int wave, IReadOnlyList<BattleUnitInput> inputs)
+        public BattleRunner(Guid runId, int wave, IReadOnlyList<BattleUnitInput> inputs, RunRewards rewards = null)
         {
-            _simulation = new BattleSimulation(runId, wave, inputs);
+            _simulation = new BattleSimulation(runId, wave, inputs, rewards);
             ReadModel = new BattleReadModel(inputs);
         }
 

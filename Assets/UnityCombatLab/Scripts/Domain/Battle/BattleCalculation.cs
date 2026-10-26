@@ -52,17 +52,19 @@ namespace UnityCombatLab.Domain.Battle
         /// [KO] 공격자의 주기 계수와 대상의 경감을 순서대로 내림하고 최소 피해 1을 보장합니다.
         /// [EN] Floors attack scaling and target mitigation separately, then enforces minimum damage.
         /// </summary>
-        internal static int CalculateDamage(BattleUnitInput attacker, int attackCount, Define.UnitRole targetRole)
+        internal static int CalculateDamage(BattleUnitInput attacker, int attackCount, Define.UnitRole targetRole, int ambushBp = 0)
         {
             var damagePercent = GetDamagePercent(attacker.Role, attackCount);
-            var damage = (long)attacker.Attack * ToBasisPoints(damagePercent) / Define.BasisPoints;
+            // power 適用済み攻撃力→開始6秒の倍率→固有攻撃係数の順に、それぞれ整数化する。
+            var damage = (long)attacker.Attack * (Define.BasisPoints + ambushBp) / Define.BasisPoints;
+            damage = damage * ToBasisPoints(damagePercent) / Define.BasisPoints;
             if (targetRole == Define.UnitRole.Knight)
             {
                 var receivedDamagePercent = Define.PercentScale - Define.KnightDamageReductionPercent;
                 damage = damage * ToBasisPoints(receivedDamagePercent) / Define.BasisPoints;
             }
 
-            return (int)Math.Max(Define.MinimumDamage, damage);
+            return checked((int)Math.Max(Define.MinimumDamage, damage));
         }
 
         /// <summary>
