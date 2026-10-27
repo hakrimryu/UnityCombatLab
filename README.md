@@ -39,6 +39,8 @@
 
 ## ゲーム構成
 
+https://github.com/user-attachments/assets/15fbbef9-a48c-4ae0-be49-c97b5fea7cce
+
 [プレイ動画全編 (MP4 · 62 s · 1.9 MB)](Docs/Videos/gameplay-demo.mp4)
 
 - **編成：** 騎士・弓使い・魔法使いを前列、後列上段、後列下段に配置します。カードとスロットを選んで配置を入れ替えます。

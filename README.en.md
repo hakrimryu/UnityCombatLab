@@ -39,6 +39,8 @@ Development tools: Rider **2026.2.3.1** / Unity Rider Editor **3.0.39**, and Uni
 
 ## Game structure
 
+https://github.com/user-attachments/assets/15fbbef9-a48c-4ae0-be49-c97b5fea7cce
+
 [Full gameplay video (MP4 · 62 s · 1.9 MB)](Docs/Videos/gameplay-demo.mp4)
 
 - **Formation:** Place the Knight, Ranger, and Mage in the front slot and the two back slots (upper and lower). Select cards and slots to swap positions.

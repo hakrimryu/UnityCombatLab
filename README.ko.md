@@ -39,6 +39,8 @@
 
 ## 게임 구성
 
+https://github.com/user-attachments/assets/15fbbef9-a48c-4ae0-be49-c97b5fea7cce
+
 [전체 플레이 영상 (MP4 · 62 s · 1.9 MB)](Docs/Videos/gameplay-demo.mp4)
 
 - **편성:** 기사·궁수·마법사를 전열, 위쪽 후열, 아래쪽 후열에 배치합니다. 카드와 슬롯을 선택해 위치를 교환합니다.
