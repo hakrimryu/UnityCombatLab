@@ -19,7 +19,7 @@ namespace UnityCombatLab.Bootstrap
     /// [KO] 전투 시작·매 프레임 진행·종료 시 정리를 담당합니다.
     /// [EN] Handles battle startup, per-frame advancement and cleanup.
     /// </summary>
-    public sealed class BattleEntryPoint : IStartable, ITickable, IRunBattle
+    public sealed class BattleEntryPoint : IStartable, ITickable, IWaveBattle
     {
         /// <summary>
         /// この戦闘の計算とイベント通知を進める Runner。
@@ -118,6 +118,13 @@ namespace UnityCombatLab.Bootstrap
         /// [EN] Presenter advancing this battle's concurrent effects.
         /// </summary>
         public BattlePresenter Presenter => _presenter;
+
+        /// <summary>
+        /// 最後の命中・死亡表示が終わったことを、Run の進行処理へ返します。
+        /// [KO] 마지막 명중·사망 표시가 끝났음을 Run 진행 처리에 반환합니다.
+        /// [EN] Reports completion of final impact and death presentation to run progression.
+        /// </summary>
+        public bool IsPresentationComplete => _presenter != null && _presenter.IsComplete;
 
         /// <summary>
         /// Dungeon の Canvas 下に生成し、この戦闘の終了時に解放する HUD。

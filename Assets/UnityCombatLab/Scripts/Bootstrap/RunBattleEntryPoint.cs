@@ -15,45 +15,30 @@ using VContainer.Unity;
 namespace UnityCombatLab.Bootstrap
 {
     /// <summary>
-    /// Dungeon 内で五つの戦闘と報酬画面を進め、Run 資産を終了まで保持します。
-    /// [KO] Dungeon 안에서 다섯 전투·보상 화면을 진행하고 Run 자산을 종료까지 유지합니다.
-    /// [EN] Advances five battles and rewards inside Dungeon while retaining run assets until completion.
+    /// Dungeon の Unity 参照を戦闘生成処理へ接続し、フレーム入力を Application の進行処理へ渡します。
+    /// [KO] Dungeon의 Unity 참조를 전투 생성 처리에 연결하고 프레임 입력을 Application 진행 처리에 전달합니다.
+    /// [EN] Connects Dungeon Unity references to battle creation and forwards frame input to Application progression.
     /// </summary>
     public sealed class RunBattleEntryPoint : IStartable, ITickable, IRunBattle
     {
-
         /// <summary>
-        /// 開始バナーの実時間秒。戦闘 tick には含めません。
-        /// [KO] 시작 배너의 실제 초이며 전투 tick에는 포함하지 않습니다.
-        /// [EN] Real seconds for the introduction, excluded from battle ticks.
-        /// </summary>
-        private const float IntroSeconds = 0.6f;
-
-        /// <summary>
-        /// 中間クリア案内の実時間秒。
-        /// [KO] 중간 클리어 안내의 실제 초입니다.
-        /// [EN] Real seconds for intermediate-clear guidance.
-        /// </summary>
-        private const float ClearSeconds = 0.5f;
-
-        /// <summary>
-        /// Run の進行状態と終了処理を借ります。
-        /// [KO] Run 진행 상태·종료 처리를 빌립니다.
-        /// [EN] Borrowed run flow and cleanup coordinator.
+        /// 操作画面の Presenter に渡す Run と共通音量の調整役。
+        /// [KO] 조작 화면 Presenter에 전달할 Run·공통 음량 조정자입니다.
+        /// [EN] Run and shared-volume coordinator supplied to the controls presenter.
         /// </summary>
         private readonly RunFlowCoordinator _flow;
 
         /// <summary>
-        /// この Dungeon が動かす Run と取消の所有者。
-        /// [KO] 이 Dungeon이 진행할 Run·취소의 소유자입니다.
-        /// [EN] Owner of this Dungeon's run and cancellation.
+        /// この Dungeon の開始許可と識別子を持つ Run。
+        /// [KO] 이 Dungeon의 시작 허용 상태·식별자를 가진 Run입니다.
+        /// [EN] Run holding this Dungeon's startup permission and identity.
         /// </summary>
         private readonly RunSession _session;
 
         /// <summary>
-        /// 全ウェーブで共有し、Run 終了後に解放する資産。
-        /// [KO] 모든 웨이브에서 공유하고 Run 종료 후 해제할 자산입니다.
-        /// [EN] Assets shared across waves and released after the run.
+        /// 戦闘と操作画面の生成に借りる資産。セッションの終了処理が解放します。
+        /// [KO] 전투·조작 화면 생성에 빌리는 자산이며 세션 종료 처리가 해제합니다.
+        /// [EN] Borrowed assets for combat and controls, released by session cleanup.
         /// </summary>
         private readonly RunAssetScope _resources;
 
@@ -72,9 +57,9 @@ namespace UnityCombatLab.Bootstrap
         private readonly Transform _unitsRoot;
 
         /// <summary>
-        /// Dungeon の既存 Canvas。新しい Canvas は作りません。
-        /// [KO] Dungeon의 기존 Canvas이며 새 Canvas는 만들지 않습니다.
-        /// [EN] Existing Dungeon canvas used for combat UI.
+        /// 戦闘 HUD と操作画面を置く Dungeon の Canvas。
+        /// [KO] 전투 HUD·조작 화면을 배치할 Dungeon Canvas입니다.
+        /// [EN] Dungeon canvas hosting battle HUDs and controls.
         /// </summary>
         private readonly Transform _hudParent;
 
@@ -93,86 +78,51 @@ namespace UnityCombatLab.Bootstrap
         private readonly GameColorPalette _colors;
 
         /// <summary>
-        /// Runner の再利用バッファから値として複写した Run 全体のイベント。
-        /// [KO] Runner 재사용 버퍼에서 값으로 복사한 전체 Run 이벤트입니다.
-        /// [EN] Whole-run events copied by value from the runner's reusable buffer.
+        /// ウェーブの時間・戦闘交換・完了判定を所有する Application の実行処理。
+        /// [KO] 웨이브 시간·전투 교체·완료 판정을 소유하는 Application 실행 처리입니다.
+        /// [EN] Application coordinator owning wave timing, battle replacement and completion.
         /// </summary>
-        private readonly List<BattleEvent> _events = new();
+        private readonly RunBattleCoordinator _coordinator;
 
         /// <summary>
-        /// この Dungeon 内に生成し、終了時に破棄する操作画面。
-        /// [KO] 이 Dungeon에 생성하고 종료 시 파괴할 조작 화면입니다.
-        /// [EN] Controls spawned in this Dungeon and destroyed at cleanup.
+        /// Dungeon 内に生成し、この EntryPoint が破棄する操作画面。
+        /// [KO] Dungeon에 생성하고 이 EntryPoint가 파괴할 조작 화면입니다.
+        /// [EN] Controls created in Dungeon and destroyed by this entry point.
         /// </summary>
         private RunBattleView _view;
 
         /// <summary>
-        /// 操作画面と Controller の購読をまとめて解除する Presenter。
-        /// [KO] 조작 화면·Controller 구독을 함께 해제하는 Presenter입니다.
+        /// 操作画面と Controller の購読を所有する Presenter。
+        /// [KO] 조작 화면·Controller 구독을 소유하는 Presenter입니다.
         /// [EN] Presenter owning subscriptions between controls and controller.
         /// </summary>
         private RunBattlePresenter _presenter;
 
         /// <summary>
-        /// 現在生成している戦闘のウェーブ番号。
-        /// [KO] 현재 생성한 전투의 웨이브 번호입니다.
-        /// [EN] Wave number of the currently spawned battle.
-        /// </summary>
-        private int _wave;
-
-        /// <summary>
-        /// 同じ秒の文字列を作り直さないための最終表示秒。
-        /// [KO] 같은 초의 문자열을 다시 만들지 않기 위한 마지막 표시 초입니다.
-        /// [EN] Last displayed second, avoiding repeated formatting within the same second.
-        /// </summary>
-        private int _lastClockSecond = -1;
-
-        /// <summary>
-        /// 開始またはクリアの案内に残った実時間秒。
-        /// [KO] 시작·클리어 안내에 남은 실제 초입니다.
-        /// [EN] Remaining real seconds of introduction or clear guidance.
-        /// </summary>
-        private float _remainingBannerSeconds;
-
-        /// <summary>
-        /// 画面と戦闘の生成がすべて成功したか。
-        /// [KO] 화면·전투 생성이 모두 성공했는지 나타냅니다.
-        /// [EN] Whether controls and battle creation both succeeded.
+        /// 接続完了前の Tick と重複 Start を拒否します。
+        /// [KO] 연결 완료 전 Tick·중복 Start를 거부합니다.
+        /// [EN] Rejects ticks before connection completes and duplicate starts.
         /// </summary>
         private bool _isStarted;
 
         /// <summary>
-        /// 終了後の Start と Tick を拒否する状態。
-        /// [KO] 종료 후 Start·Tick을 거부하는 상태입니다.
-        /// [EN] State rejecting Start and Tick after disposal.
+        /// 破棄後の Start と Tick を拒否します。
+        /// [KO] 파괴 후 Start·Tick을 거부합니다.
+        /// [EN] Rejects startup and ticks after disposal.
         /// </summary>
         private bool _isDisposed;
 
         /// <summary>
-        /// 勝敗確定直後にボタンを一度更新するための前回状態。
-        /// [KO] 승패 확정 직후 버튼을 한 번 갱신하기 위한 이전 상태입니다.
-        /// [EN] Prior control state used to refresh buttons once when combat ends.
-        /// </summary>
-        private bool _wereControlsEnabled;
-
-        /// <summary>
-        /// フォーカス変化直後の経過時間を取り込まない指定。
-        /// [KO] 포커스 변경 직후 경과 시간을 받지 않는 지정입니다.
-        /// [EN] Flag excluding elapsed time immediately after a focus change.
-        /// </summary>
-        private bool _shouldSkipDelta;
-
-        /// <summary>
-        /// 現在の一ウェーブだけを所有する戦闘。ウェーブ変更時に交換します。
-        /// [KO] 현재 한 웨이브만 소유하는 전투이며 웨이브 변경 시 교체합니다.
-        /// [EN] Battle owning only the current wave, replaced at wave transitions.
+        /// Application が交換・解放を管理する、現在の Unity 戦闘表示。
+        /// [KO] Application이 교체·해제를 관리하는 현재 Unity 전투 표시입니다.
+        /// [EN] Current Unity battle presentation whose replacement and disposal are managed by Application.
         /// </summary>
         public BattleEntryPoint Battle { get; private set; }
 
         /// <summary>
-        /// Run と Dungeon の既存参照を受け取ります。生成物はこの EntryPoint が解放します。
-        /// [KO] Run·Dungeon의 기존 참조를 받으며 생성물은 이 EntryPoint가 해제합니다.
-        /// [EN] Receives existing run and Dungeon references and owns spawned objects.
+        /// Run と Dungeon の参照を受け取り、Unity 戦闘の生成関数を Application に接続します。
+        /// [KO] Run·Dungeon 참조를 받아 Unity 전투 생성 함수를 Application에 연결합니다.
+        /// [EN] Receives run and Dungeon references and connects a Unity battle factory to Application.
         /// </summary>
         public RunBattleEntryPoint(RunFlowCoordinator flow, RunSession session, RunAssetScope resources,
             Transform[] spawnPoints, Transform unitsRoot, Transform hudParent, Camera camera, GameColorPalette colors)
@@ -185,12 +135,13 @@ namespace UnityCombatLab.Bootstrap
             _hudParent = hudParent != null ? hudParent : throw new ArgumentNullException(nameof(hudParent));
             _camera = camera != null ? camera : throw new ArgumentNullException(nameof(camera));
             _colors = colors != null ? colors : throw new ArgumentNullException(nameof(colors));
+            _coordinator = new RunBattleCoordinator(_flow.Controller, _session, CreateBattle);
         }
 
         /// <summary>
-        /// 操作 UI と最初のウェーブを生成し、重複 Start を無視します。
-        /// [KO] 조작 UI·첫 웨이브를 생성하고 중복 Start를 무시합니다.
-        /// [EN] Creates controls and the first wave, ignoring duplicate Start calls.
+        /// 操作画面を作って進行通知へ接続し、最初の戦闘の開始を Application に任せます。
+        /// [KO] 조작 화면을 만들고 진행 알림에 연결한 뒤 첫 전투 시작을 Application에 맡깁니다.
+        /// [EN] Creates controls, connects progression notifications and delegates first-battle startup to Application.
         /// </summary>
         public void Start()
         {
@@ -207,8 +158,11 @@ namespace UnityCombatLab.Bootstrap
                 _view.name = "UI_RunBattleView";
                 _view.ApplyPalette(_colors);
                 _view.FocusChanged += HandleFocusChanged;
-                CreateWave();
-                _presenter = new RunBattlePresenter(_flow, _view, _session.InitialState.Id, CanControlBattle, ApplyPlayback);
+                _coordinator.ClockChanged += _view.ShowClock;
+                _coordinator.BattleChanged += HandleBattleChanged;
+                _coordinator.Start();
+                _presenter = new RunBattlePresenter(_flow, _view, _session.InitialState.Id,
+                    () => _coordinator.CanControlBattle, ApplyPlayback);
                 _isStarted = true;
             }
             catch
@@ -219,179 +173,89 @@ namespace UnityCombatLab.Bootstrap
         }
 
         /// <summary>
-        /// 前の戦闘を破棄し、現在の強化で全回復した味方と次の敵を生成します。
-        /// [KO] 이전 전투를 파괴하고 현재 강화로 완전히 회복한 아군·다음 적을 생성합니다.
-        /// [EN] Replaces the previous battle with fully healed upgraded allies and the next enemies.
+        /// Application が用意した開始値と Dungeon の参照から、Runner を所有する未開始の戦闘を組み立てます。
+        /// [KO] Application이 준비한 시작값·Dungeon 참조로 Runner를 소유하는 미시작 전투를 조립합니다.
+        /// [EN] Assembles an unstarted battle owning its runner from Application-prepared inputs and Dungeon references.
         /// </summary>
-        private void CreateWave()
+        private IWaveBattle CreateBattle(int wave, IReadOnlyList<BattleUnitInput> inputs, RunRewards rewards)
         {
-            // 表示と購読を先に止める。資産 lease は全五ウェーブを所有する RunAssetScope に残す。
-            Battle?.Dispose();
-            var progress = _flow.Controller.Progress;
-            var inputs = progress.Data.CreateUnits(_session.InitialState.Configuration, progress.Wave, progress.Rewards);
             var runId = _session.InitialState.Id;
-            _wave = progress.Wave;
-            var runner = new BattleRunner(runId, _wave, inputs, progress.Rewards);
-            runner.EventOccurred += HandleEventOccurred;
-            Battle = new BattleEntryPoint
-            (runner,
-                runId,
-                _wave,
-                () => BattleUnitFactory.Create(inputs, _resources, _spawnPoints, _unitsRoot),
-                _resources.HudPrefab.GetComponent<BattleHudView>(),
-                _hudParent,
-                _camera,
-                _colors,
-                _resources.Icons,
-                showResult: false);
-            Battle.Start();
-            Battle.SetPlaybackSpeed(0);
-            _view.transform.SetAsLastSibling();
-            _view.ShowClock(0);
-            _lastClockSecond = 0;
-            _remainingBannerSeconds = IntroSeconds;
-            _wereControlsEnabled = false;
+            var runner = new BattleRunner(runId, wave, inputs, rewards);
+            try
+            {
+                Battle = new BattleEntryPoint
+                (runner,
+                    runId,
+                    wave,
+                    () => BattleUnitFactory.Create(inputs, _resources, _spawnPoints, _unitsRoot),
+                    _resources.HudPrefab.GetComponent<BattleHudView>(),
+                    _hudParent,
+                    _camera,
+                    _colors,
+                    _resources.Icons,
+                    showResult: false);
+                return Battle;
+            }
+            catch
+            {
+                // 戦闘へ所有権を渡す前の組立失敗では、この生成処理が Runner を解放する。
+                runner.Dispose();
+                throw;
+            }
         }
 
         /// <summary>
-        /// 同期受信したイベントを再現記録へ値として追加します。
-        /// [KO] 동기 수신 이벤트를 재현 기록에 값으로 추가합니다.
-        /// [EN] Copies a synchronously received event into the replay record.
+        /// 生成した HUD より操作画面を手前に置き、Presenter に状態の再表示を頼みます。
+        /// [KO] 생성한 HUD보다 조작 화면을 앞에 두고 Presenter에 상태 재표시를 요청합니다.
+        /// [EN] Keeps controls above the created HUD and asks the presenter to refresh state.
         /// </summary>
-        private void HandleEventOccurred(BattleEvent item)
-            => _events.Add(item);
+        private void HandleBattleChanged()
+        {
+            _view.transform.SetAsLastSibling();
+            _presenter?.Refresh();
+        }
 
         /// <summary>
-        /// 復帰時の時間ジャンプを防ぎ、すぐに表示速度を更新します。
-        /// [KO] 복귀 시 시간 점프를 막고 표시 속도를 즉시 갱신합니다.
-        /// [EN] Prevents a time jump on return and immediately refreshes presentation speed.
+        /// OS のフォーカス通知を、経過時間を管理する進行処理へ渡します。
+        /// [KO] OS 포커스 알림을 경과 시간을 관리하는 진행 처리에 전달합니다.
+        /// [EN] Forwards OS focus notifications to the coordinator managing elapsed time.
         /// </summary>
         private void HandleFocusChanged()
-        {
-            // 復帰フレームの大きな unscaledDelta を、バナーや戦闘時間へ加えない。
-            _shouldSkipDelta = true;
-            ApplyPlayback();
-        }
+            => _coordinator.NotifyFocusChanged(_view.HasFocus);
 
         /// <summary>
-        /// 現在の Run の未終了戦闘だけが操作を受け付けます。
-        /// [KO] 현재 Run의 종료 전 전투만 조작을 받습니다.
-        /// [EN] Accepts controls only for the current run's unfinished battle.
-        /// </summary>
-        private bool CanControlBattle()
-            => !_isDisposed && _session.IsBattleAllowed && _flow.Controller.Current?.Phase == Define.RunPhase.Battle &&
-               Battle != null && Battle.Runner.Result == Define.BattleResult.Ongoing;
-
-        /// <summary>
-        /// 状態とフォーカスから、自分の戦闘表示だけの速度を決めます。
-        /// [KO] 상태·포커스로 자신의 전투 표시에만 적용할 속도를 정합니다.
-        /// [EN] Derives speed for owned combat presentation from phase and focus.
+        /// 操作変更時のフォーカス状態を Application の再生速度判断へ渡します。
+        /// [KO] 조작 변경 시 포커스 상태를 Application의 재생 속도 판단에 전달합니다.
+        /// [EN] Supplies current focus to Application playback decisions when controls change.
         /// </summary>
         private void ApplyPlayback()
-        {
-            var controller = _flow.Controller;
-            var canAdvance = !_isDisposed && _session.IsBattleAllowed && _view != null && _view.HasFocus &&
-                             !controller.IsPaused && controller.Current?.Phase == Define.RunPhase.Battle;
-            Battle?.SetPlaybackSpeed(canAdvance ? controller.Speed : 0);
-        }
+            => _coordinator.ApplyPlayback(_view != null && _view.HasFocus);
 
         /// <summary>
-        /// 開始バナー・戦闘・中間クリアを進め、報酬と停止中は時間を蓄積しません。
-        /// [KO] 시작 배너·전투·중간 클리어를 진행하고 보상·정지 중에는 시간을 쌓지 않습니다.
-        /// [EN] Advances introductions, combat and intermediate clear, accumulating no time during rewards or pause.
+        /// Unity の実経過秒とフォーカスを渡し、進行処理が終了したら画面の接続も解除します。
+        /// [KO] Unity 실제 경과 초·포커스를 전달하고 진행 처리가 종료되면 화면 연결도 해제합니다.
+        /// [EN] Forwards Unity elapsed seconds and focus, releasing screen connections when progression is disposed.
         /// </summary>
         public void Tick()
         {
-            if (!_isStarted || _isDisposed || !_session.IsBattleAllowed)
+            if (!_isStarted || _isDisposed)
                 return;
 
             try
             {
-                var controller = _flow.Controller;
-                var phase = controller.Current?.Phase;
-                if (phase == Define.RunPhase.WaveIntro && _wave != controller.Progress.Wave)
-                {
-                    CreateWave();
-                    _presenter.Refresh();
-                }
-
-                if (!_view.HasFocus && (phase == Define.RunPhase.WaveIntro || CanControlBattle()))
-                    controller.TryPause(_session.InitialState.Id);
-
-                ApplyPlayback();
-                if (!_view.HasFocus || controller.IsPaused)
-                    return;
-
-                if (_shouldSkipDelta)
-                {
-                    _shouldSkipDelta = false;
-                    return;
-                }
-
-                if (phase == Define.RunPhase.WaveIntro)
-                {
-                    _remainingBannerSeconds -= Time.unscaledDeltaTime;
-                    if (_remainingBannerSeconds <= 0)
-                        controller.TryBeginWave(_session.InitialState.Id, _wave);
-
-                    return;
-                }
-
-                if (phase == Define.RunPhase.WaveClear)
-                {
-                    _remainingBannerSeconds -= Time.unscaledDeltaTime;
-                    if (_remainingBannerSeconds <= 0)
-                        controller.TryOpenRewards(_session.InitialState.Id);
-
-                    return;
-                }
-
-                if (phase != Define.RunPhase.Battle)
-                    return;
-
-                Battle.Advance(Time.unscaledDeltaTime * controller.Speed);
-                // 20 tick が1秒。警告開始の75秒も同じ秒境界なので、表示は秒が変わる時だけ更新する。
-                var clockSecond = Battle.Runner.CurrentTick / Define.TicksPerSecond;
-                if (_lastClockSecond != clockSecond)
-                {
-                    _lastClockSecond = clockSecond;
-                    _view.ShowClock(Battle.Runner.CurrentTick);
-                }
-
-                var controlsEnabled = CanControlBattle();
-                if (_wereControlsEnabled != controlsEnabled)
-                {
-                    _wereControlsEnabled = controlsEnabled;
-                    _presenter.Refresh();
-                }
-
-                if (!Battle.Presenter.IsComplete)
-                    return;
-
-                if (!controller.TryFinishWave(_session.InitialState.Id, _wave, Battle.Runner.Result, Battle.Runner.CurrentTick))
-                    throw new InvalidOperationException("The current wave completion was rejected.");
-
-                if (controller.Progress.IsFinished)
-                {
-                    var result = controller.Result;
-                    _session.QueueResult(result, new RunReplayRecord(controller.Progress.Data, result, _events));
-                }
-                else
-                {
-                    _remainingBannerSeconds = ClearSeconds;
-                }
+                _coordinator.Advance(Time.unscaledDeltaTime, _view.HasFocus);
             }
-            catch (Exception exception)
+            finally
             {
-                Dispose();
-                _session.QueueFailure(exception);
+                if (_coordinator.IsDisposed)
+                    Dispose();
             }
         }
 
         /// <summary>
-        /// 購読・現在ウェーブ・操作 UI を解放します。資産は既存 Run 終了処理が次フレームに解放します。
-        /// [KO] 구독·현재 웨이브·조작 UI를 해제하며 자산은 기존 Run 종료 처리가 다음 프레임에 해제합니다.
-        /// [EN] Releases subscriptions, current wave and controls; existing run cleanup releases assets next frame.
+        /// Presenter と進行通知を外してから戦闘と操作画面を解放し、Run 資産はセッションに残します。
+        /// [KO] Presenter·진행 알림을 해제한 뒤 전투·조작 화면을 해제하고 Run 자산은 세션에 남깁니다.
+        /// [EN] Detaches the presenter and progression notifications, then releases combat and controls while leaving run assets with the session.
         /// </summary>
         public void Dispose()
         {
@@ -400,13 +264,22 @@ namespace UnityCombatLab.Bootstrap
 
             _isDisposed = true;
             _presenter?.Dispose();
-            Battle?.Dispose();
-            _events.Clear();
+            _coordinator.BattleChanged -= HandleBattleChanged;
             if (_view != null)
+                _coordinator.ClockChanged -= _view.ShowClock;
+
+            try
             {
-                _view.FocusChanged -= HandleFocusChanged;
-                _view.gameObject.SetActive(false);
-                UnityEngine.Object.Destroy(_view.gameObject);
+                _coordinator.Dispose();
+            }
+            finally
+            {
+                if (_view != null)
+                {
+                    _view.FocusChanged -= HandleFocusChanged;
+                    _view.gameObject.SetActive(false);
+                    UnityEngine.Object.Destroy(_view.gameObject);
+                }
             }
         }
     }
