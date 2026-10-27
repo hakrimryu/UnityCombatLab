@@ -424,19 +424,141 @@ namespace UnityCombatLab.Tests.PlayMode
             var view = Object.FindFirstObjectByType<RunBattleView>();
             var continueButton = (ActionButtonView)typeof(RunBattleView)
                 .GetField("_continue", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
+            var cards = (RewardCardView[])typeof(RunBattleView)
+                .GetField("_cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
             for (var count = 0; count <= 3; count++)
             {
-                view.ShowOfferCount(count);
-                Assert.That(view.Cards.Count(card => card.gameObject.activeSelf), Is.EqualTo(count));
+                var displays = Enumerable.Range(0, count).Select(index => RunBattlePresenter.CreateRewardDisplay(1,
+                    new RewardData((Define.RewardKind)index, 1500), RunRewards.Empty, 10000)).ToArray();
+                view.ShowRewards(displays);
+                Assert.That(cards.Count(card => card.gameObject.activeSelf), Is.EqualTo(count));
                 Assert.That(continueButton.gameObject.activeSelf, Is.EqualTo(count == 0));
-                var positions = view.Cards.Where(card => card.gameObject.activeSelf)
+                var positions = cards.Where(card => card.gameObject.activeSelf)
                     .Select(card => ((RectTransform)card.transform).anchoredPosition.x).ToArray();
                 Assert.That(positions.Sum(), Is.EqualTo(0).Within(0.001f));
                 for (var index = 1; index < positions.Length; index++)
                     Assert.That(positions[index] - positions[index - 1], Is.GreaterThanOrEqualTo(
-                        ((RectTransform)view.Cards[index].transform).rect.width));
+                        ((RectTransform)cards[index].transform).rect.width));
             }
 
+            yield break;
+        }
+
+        /// <summary>
+        /// 再表示しても受け取った文章・宝石数をそのまま描き、現在の候補だけを一度通知します。
+        /// [KO] 다시 표시해도 받은 문구·보석 수를 그대로 그리고 현재 후보만 한 번 알립니다.
+        /// [EN] Renders supplied text and gem counts on rebind and reports only the current offer once.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RewardCardsDisplayPreparedValuesAndForwardSelectionOnce()
+        {
+            var view = Object.FindFirstObjectByType<RunBattleView>();
+            var cards = (RewardCardView[])typeof(RunBattleView)
+                .GetField("_cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
+            var calls = 0;
+            var selectedWave = 0;
+            var selectedKind = Define.RewardKind.Power;
+            void HandleSelected(int wave, Define.RewardKind kind)
+            {
+                calls++;
+                selectedWave = wave;
+                selectedKind = kind;
+            }
+
+            view.RewardSelected += HandleSelected;
+            try
+            {
+                // 数値の整合性を解釈せず、Presenter から届いた文章と宝石数を使う境界を確認する。
+                var first = new RewardCardDisplay
+                (1,
+                    Define.RewardKind.Power,
+                    "力の紋章",
+                    "+16.5%",
+                    "攻撃力 +16.5%",
+                    "15% → 31.5%\n重複：1 / 3 → 2 / 3",
+                    3);
+                var second = new RewardCardDisplay
+                (3,
+                    Define.RewardKind.Haste,
+                    "迅速の紋章",
+                    "+10%",
+                    "攻撃速度 +10%",
+                    "0% → 10%\n重複：0 / 3 → 1 / 3",
+                    1);
+                foreach (var display in new[] { first, second })
+                {
+                    view.ShowRewards(new[] { display });
+                    var card = cards[0];
+                    foreach (var label in new[] { ("_title", display.Title), ("_value", display.Value),
+                                 ("_details", display.Details), ("_totals", display.Totals) })
+                    {
+                        var text = (TMPro.TMP_Text)typeof(RewardCardView)
+                            .GetField(label.Item1, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(card);
+                        Assert.That(text.text, Is.EqualTo(label.Item2));
+                    }
+
+                    var gems = (UnityEngine.UI.Image[])typeof(RewardCardView)
+                        .GetField("_stackGems", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(card);
+                    Assert.That(gems.Select(gem => gem.gameObject.activeSelf),
+                        Is.EqualTo(Enumerable.Range(0, 3).Select(index => index < display.StacksAfter)));
+                    var icons = (Sprite[])typeof(RewardCardView)
+                        .GetField("_rewardIcons", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(card);
+                    var icon = (UnityEngine.UI.Image)typeof(RewardCardView)
+                        .GetField("_icon", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(card);
+                    Assert.That(icon.sprite, Is.SameAs(icons[(int)display.Kind]));
+                    card.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+                    Assert.That(selectedWave, Is.EqualTo(display.Wave));
+                    Assert.That(selectedKind, Is.EqualTo(display.Kind));
+                }
+
+                Assert.That(calls, Is.EqualTo(2));
+                view.ShowRewards(Array.Empty<RewardCardDisplay>());
+                Assert.That(cards.All(card => !card.gameObject.activeSelf), Is.True);
+            }
+            finally
+            {
+                view.RewardSelected -= HandleSelected;
+            }
+
+            yield break;
+        }
+
+        /// <summary>
+        /// 実際の Presenter 経由の選択は一度だけ適用され、購読解除後のカード入力は届きません。
+        /// [KO] 실제 Presenter를 거친 선택은 한 번만 적용되고 구독 해제 후 카드 입력은 전달되지 않습니다.
+        /// [EN] Applies a choice through the real presenter once and stops card input after its subscriptions are disposed.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RewardClicksApplyOnceAndStopAfterPresenterDisposal()
+        {
+            var flow = Object.FindFirstObjectByType<AppLifetimeScope>().Container.Resolve<RunFlowCoordinator>();
+            var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>();
+            var view = Object.FindFirstObjectByType<RunBattleView>();
+            var cards = (RewardCardView[])typeof(RunBattleView)
+                .GetField("_cards", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
+            var presenter = (RunBattlePresenter)typeof(RunBattleEntryPoint)
+                .GetField("_presenter", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(entry);
+            var controller = flow.Controller;
+            var id = controller.Current.Id;
+            Assert.That(controller.TryFinishWave(id, 1, Define.BattleResult.Victory, 100), Is.True);
+            Assert.That(controller.TryOpenRewards(id), Is.True);
+            var kind = controller.Progress.GetOffers()[0];
+            presenter.Refresh();
+            presenter.Refresh();
+            cards[0].GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            Assert.That(controller.Progress.Rewards.History.Count, Is.EqualTo(1));
+            Assert.That(controller.Progress.Rewards.History[0].Kind, Is.EqualTo(kind));
+            Assert.That(controller.Progress.Wave, Is.EqualTo(2));
+            cards[0].GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            Assert.That(controller.Progress.Rewards.History.Count, Is.EqualTo(1));
+
+            Assert.That(controller.TryBeginWave(id, 2), Is.True);
+            Assert.That(controller.TryFinishWave(id, 2, Define.BattleResult.Victory, 100), Is.True);
+            Assert.That(controller.TryOpenRewards(id), Is.True);
+            presenter.Dispose();
+            cards[0].GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            Assert.That(controller.Progress.Rewards.History.Count, Is.EqualTo(1));
+            Assert.That(controller.Current.Phase, Is.EqualTo(Define.RunPhase.RewardSelection));
             yield break;
         }
 

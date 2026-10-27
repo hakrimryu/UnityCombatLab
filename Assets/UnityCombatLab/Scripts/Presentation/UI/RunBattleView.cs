@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityCombatLab.Common;
+using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -218,11 +219,11 @@ namespace UnityCombatLab.Presentation.UI
         public bool HasFocus => _hasFocus && !_isAppPaused;
 
         /// <summary>
-        /// 同じ報酬表示の三候補。
-        /// [KO] 같은 보상 화면의 세 후보입니다.
-        /// [EN] Three card views belonging to the same reward offer.
+        /// カードが保持する提示ウェーブと種類を、そのまま Presenter へ通知します。
+        /// [KO] 카드가 보관한 제시 웨이브·종류를 그대로 Presenter에 알립니다.
+        /// [EN] Reports the offering wave and kind retained by a card directly to the presenter.
         /// </summary>
-        public IReadOnlyList<RewardCardView> Cards => _cards;
+        public event Action<int, Define.RewardKind> RewardSelected;
 
         /// <summary>
         /// 速度ボタンの入力を通知します。
@@ -368,20 +369,42 @@ namespace UnityCombatLab.Presentation.UI
         }
 
         /// <summary>
-        /// 候補数に合わせてカードを中央へ並べ、候補ゼロ時だけ次へボタンを表示します。
-        /// [KO] 후보 수에 맞춰 카드를 중앙에 배치하고 후보가 없을 때만 다음 버튼을 표시합니다.
-        /// [EN] Centers cards for the offer count and displays Continue only when no offers exist.
+        /// 計算済み候補をカードへ渡して中央に並べ、候補ゼロ時だけ次へボタンを表示します。
+        /// [KO] 계산한 후보를 카드에 전달해 중앙에 배치하고 후보가 없을 때만 다음 버튼을 표시합니다.
+        /// [EN] Binds prepared offers to centered cards and displays Continue only when no offers exist.
         /// </summary>
-        public void ShowOfferCount(int count)
+        public void ShowRewards(IReadOnlyList<RewardCardDisplay> displays)
         {
+            if (displays == null)
+                throw new ArgumentNullException(nameof(displays));
+
+            if (displays.Count > _cards.Length)
+                throw new ArgumentException("Reward offers exceed the available cards.", nameof(displays));
+
+            foreach (var display in displays)
+                if (display == null)
+                    throw new ArgumentException("A reward display is missing.", nameof(displays));
+
+            var count = displays.Count;
             _continue.gameObject.SetActive(count == 0);
             for (var index = 0; index < _cards.Length; index++)
             {
+                if (index < count)
+                    _cards[index].Bind(displays[index], HandleRewardSelected);
+
                 _cards[index].gameObject.SetActive(index < count);
                 var card = (RectTransform)_cards[index].transform;
                 card.anchoredPosition = new Vector2((index - (count - 1) * 0.5f) * 400, card.anchoredPosition.y);
             }
         }
+
+        /// <summary>
+        /// 共通カードのクリックを、この画面を購読する Presenter へ渡します。
+        /// [KO] 공통 카드의 클릭을 이 화면을 구독하는 Presenter에 전달합니다.
+        /// [EN] Forwards card clicks to the presenter subscribed to this screen.
+        /// </summary>
+        private void HandleRewardSelected(int wave, Define.RewardKind kind)
+            => RewardSelected?.Invoke(wave, kind);
 
         /// <summary>
         /// 現在の累積強化を表示します。
@@ -472,6 +495,7 @@ namespace UnityCombatLab.Presentation.UI
             CancelExitRequested = null;
             ConfirmExitRequested = null;
             ContinueRequested = null;
+            RewardSelected = null;
             EscapeRequested = null;
             FocusChanged = null;
             VolumeRequested = null;

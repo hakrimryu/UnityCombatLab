@@ -1,7 +1,7 @@
 using System;
 using TMPro;
 using UnityCombatLab.Common;
-using UnityCombatLab.Domain.Run;
+using UnityCombatLab.Presentation.ReadModels;
 using UnityCombatLab.Presentation.Styling;
 using UnityEngine;
 
@@ -130,23 +130,22 @@ namespace UnityCombatLab.Presentation.UI
         /// [KO] 후보 고정값을 표시하고 클릭하면 같은 웨이브·종류를 반환합니다.
         /// [EN] Displays fixed offer values and returns that wave and kind on click.
         /// </summary>
-        public void Bind(int wave, RewardData reward, RunRewards current, int strengthBp, Action<int, Define.RewardKind> selected)
+        public void Bind(RewardCardDisplay display, Action<int, Define.RewardKind> selected)
         {
             if (_title == null || _details == null || _totals == null || _value == null || _icon == null || _accent == null ||
                 _rewardIcons == null || _rewardIcons.Length != 6 || _rewardColors == null || _rewardColors.Length != 6 ||
                 _accentParts == null || _accentParts.Length == 0 || _stackGems == null || _stackGems.Length != 3 ||
-                reward == null || current == null || selected == null)
+                display == null || selected == null)
             {
                 throw new InvalidOperationException("A reward card requires its labels, data and selection callback.");
             }
 
             InitializeButton();
-            _wave = wave;
-            _kind = reward.Kind;
+            _wave = display.Wave;
+            _kind = display.Kind;
             _selected = selected;
-            _title.text = GameText.RewardName(reward.Kind);
-            var increase = reward.GetIncrease(strengthBp);
-            var kindIndex = (int)reward.Kind;
+            _title.text = display.Title;
+            var kindIndex = (int)display.Kind;
             if (_rewardIcons[kindIndex] == null)
                 throw new InvalidOperationException("A reward kind requires its authored icon.");
 
@@ -162,16 +161,15 @@ namespace UnityCombatLab.Presentation.UI
                 part.color = Color.HSVToRGB(hue, saturation, brightness);
             }
 
-            _value.text = $"+{GameText.Percent(increase)}";
-            _details.text = GameText.RewardEffect(reward.Kind, increase);
-            _totals.text = $"{GameText.Percent(current.GetEffect(reward.Kind))} → {GameText.Percent(current.GetEffect(reward.Kind) + increase)}\n" +
-                           $"重複：{current.GetStacks(reward.Kind)} / {reward.MaxStacks} → {current.GetStacks(reward.Kind) + 1} / {reward.MaxStacks}";
+            _value.text = display.Value;
+            _details.text = display.Details;
+            _totals.text = display.Totals;
             for (var index = 0; index < _stackGems.Length; index++)
             {
                 if (_stackGems[index] == null)
                     throw new InvalidOperationException("A reward card stack gem is missing.");
 
-                _stackGems[index].gameObject.SetActive(index <= current.GetStacks(reward.Kind));
+                _stackGems[index].gameObject.SetActive(index < display.StacksAfter);
             }
         }
 

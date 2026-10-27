@@ -1,6 +1,8 @@
 using System;
 using UnityCombatLab.Application.Run;
 using UnityCombatLab.Common;
+using UnityCombatLab.Domain.Run;
+using UnityCombatLab.Presentation.ReadModels;
 
 namespace UnityCombatLab.Presentation.UI
 {
@@ -91,6 +93,7 @@ namespace UnityCombatLab.Presentation.UI
                 _view.CancelExitRequested += HandleCancelExitRequested;
                 _view.ConfirmExitRequested += HandleConfirmExitRequested;
                 _view.ContinueRequested += HandleContinueRequested;
+                _view.RewardSelected += HandleRewardSelected;
                 _view.EscapeRequested += HandleEscapeRequested;
                 _view.FocusChanged += HandleFocusChanged;
                 _view.VolumeRequested += HandleVolumeRequested;
@@ -123,15 +126,49 @@ namespace UnityCombatLab.Presentation.UI
             if (state.Phase == Define.RunPhase.RewardSelection && _offeredWave != progress.Wave)
             {
                 var offers = progress.GetOffers();
-                _view.ShowOfferCount(offers.Count);
+                var displays = new RewardCardDisplay[offers.Count];
                 for (var index = 0; index < offers.Count; index++)
-                    _view.Cards[index].Bind(progress.Wave, progress.Data.GetReward(offers[index]), progress.Rewards,
-                        progress.Data.GetWave(progress.Wave).RewardStrengthBp, HandleRewardSelected);
+                    displays[index] = CreateRewardDisplay(progress.Wave, progress.Data.GetReward(offers[index]), progress.Rewards,
+                        progress.Data.GetWave(progress.Wave).RewardStrengthBp);
 
+                _view.ShowRewards(displays);
                 _offeredWave = progress.Wave;
             }
 
             _applyPlayback();
+        }
+
+        /// <summary>
+        /// 候補と確定済み強化から一枚分の文章と宝石数を作り、Run の選択履歴は変更しません。
+        /// [KO] 후보와 확정한 강화로 카드 한 장의 문구·보석 수를 만들고 Run 선택 이력은 변경하지 않습니다.
+        /// [EN] Prepares one card's text and gem count from an offer and committed upgrades without changing the run's choices.
+        /// </summary>
+        /// <param name="strengthBp">
+        /// この候補を提示したウェーブの強化倍率。11000 は基本増加量の1.1倍です。
+        /// [KO] 이 후보를 제시한 웨이브의 강화 배율이며 11000은 기본 증가량의 1.1배입니다.
+        /// [EN] Reward strength of the offering wave; 11000 scales the base increment by 1.1.
+        /// </param>
+        public static RewardCardDisplay CreateRewardDisplay(int wave, RewardData reward, RunRewards current, int strengthBp)
+        {
+            if (reward == null)
+                throw new ArgumentNullException(nameof(reward));
+
+            if (current == null)
+                throw new ArgumentNullException(nameof(current));
+
+            var increase = reward.GetIncrease(strengthBp);
+            var effectBefore = current.GetEffect(reward.Kind);
+            var stacksBefore = current.GetStacks(reward.Kind);
+            // 履歴の効果は選択時の倍率で確定済み。今回の倍率は新しい一回分にだけ適用する。
+            return new RewardCardDisplay
+            (wave,
+                reward.Kind,
+                GameText.RewardName(reward.Kind),
+                $"+{GameText.Percent(increase)}",
+                GameText.RewardEffect(reward.Kind, increase),
+                $"{GameText.Percent(effectBefore)} → {GameText.Percent(effectBefore + increase)}\n" +
+                $"重複：{stacksBefore} / {reward.MaxStacks} → {stacksBefore + 1} / {reward.MaxStacks}",
+                stacksBefore + 1);
         }
 
         /// <summary>
@@ -280,6 +317,7 @@ namespace UnityCombatLab.Presentation.UI
             _view.CancelExitRequested -= HandleCancelExitRequested;
             _view.ConfirmExitRequested -= HandleConfirmExitRequested;
             _view.ContinueRequested -= HandleContinueRequested;
+            _view.RewardSelected -= HandleRewardSelected;
             _view.EscapeRequested -= HandleEscapeRequested;
             _view.FocusChanged -= HandleFocusChanged;
             _view.VolumeRequested -= HandleVolumeRequested;
