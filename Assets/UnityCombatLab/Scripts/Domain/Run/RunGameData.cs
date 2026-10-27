@@ -134,8 +134,10 @@ namespace UnityCombatLab.Domain.Run
                 var enemyAttack = definition.EnemyAttack;
                 if (configuration.Difficulty == Define.Difficulty.Easy)
                 {
-                    enemyHealth = Math.Max(1, Scale(enemyHealth, 8000));
-                    enemyAttack = Math.Max(1, Scale(enemyAttack, 8000));
+                    // 表示と同じ百分率を計算用の basis point に換算する（80% → 8000）。
+                    var easyMultiplierBp = Define.EasyEnemyStatPercent * Define.BasisPoints / Define.PercentScale;
+                    enemyHealth = Math.Max(1, Scale(enemyHealth, easyMultiplierBp));
+                    enemyAttack = Math.Max(1, Scale(enemyAttack, easyMultiplierBp));
                 }
 
                 // 難易度を整数化した後で、遠距離HP75%・隊長HP250%/攻撃180%を切り捨てる。
