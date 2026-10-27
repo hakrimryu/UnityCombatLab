@@ -2,6 +2,13 @@
 
 This file records third-party resources included in this repository or its Git history. Their licenses apply to the corresponding resources.
 
+## Fulcrum Balancing Toolkit
+
+Fulcrum 0.4.0, copyright (c) 2026 Hakrim Ryu, is included as an embedded package under the MIT License. The package was copied unchanged from the source revision recorded below.
+
+- [MIT License and copyright notice](Packages/com.hakrimryu.fulcrum/LICENSE.md)
+- [Source revision and package provenance](Packages/FULCRUM_SOURCE.md)
+
 ## Zen Maru Gothic Bold
 
 Copyright 2021 The Zen Maru Gothic Project Authors (https://github.com/googlefonts/zen-marugothic).

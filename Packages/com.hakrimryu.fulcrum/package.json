@@ -1,0 +1,17 @@
+{
+  "name": "com.hakrimryu.fulcrum",
+  "version": "0.4.0",
+  "displayName": "Fulcrum Balancing Toolkit",
+  "description": "Curve-driven game balance authoring, simulation and validation for the Unity Editor.",
+  "unity": "6000.0",
+  "keywords": [
+    "balance",
+    "gamedesign",
+    "editor",
+    "tools"
+  ],
+  "author": {
+    "name": "Hakrim Ryu",
+    "url": "https://github.com/hakrimryu"
+  }
+}

@@ -1,0 +1,19 @@
+{
+    "name": "Fulcrum.Editor",
+    "rootNamespace": "Fulcrum.Editor",
+    "references": [
+        "Fulcrum.Core",
+        "Fulcrum.Simulation"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

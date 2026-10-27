@@ -1,0 +1,347 @@
+/*
+ * Colours come from Unity's built-in variables so the window follows the editor theme
+ * instead of guessing at one. Hard-coded greys look correct in exactly one skin.
+ */
+
+.fulcrum-root {
+    flex-grow: 1;
+}
+
+.fulcrum-toolbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 6px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-toolbar-border);
+    background-color: var(--unity-colors-toolbar-background);
+}
+
+.fulcrum-toolbar__left,
+.fulcrum-toolbar__right {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.fulcrum-toolbar__left {
+    flex-shrink: 0;
+}
+
+.fulcrum-toolbar__left > * {
+    margin-right: 6px;
+}
+
+.fulcrum-toolbar__right > * {
+    margin-left: 4px;
+}
+
+.fulcrum-banner {
+    display: none;
+    padding: 4px 8px;
+    background-color: var(--unity-colors-helpbox-background);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-toolbar-border);
+    white-space: normal;
+}
+
+.fulcrum-banner--visible {
+    display: flex;
+}
+
+.fulcrum-body {
+    flex-grow: 1;
+}
+
+.fulcrum-pane {
+    flex-grow: 1;
+    min-width: 120px;
+}
+
+.fulcrum-pane__title {
+    -unity-font-style: bold;
+    padding: 4px 6px;
+    color: var(--unity-colors-label-text);
+}
+
+.fulcrum-track-list {
+    flex-grow: 1;
+}
+
+.fulcrum-hint {
+    padding: 6px;
+    white-space: normal;
+    opacity: 0.6;
+}
+
+.fulcrum-graph__header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fulcrum-graph__readout {
+    padding: 4px 8px;
+    opacity: 0.8;
+}
+
+.fulcrum-graph__host {
+    flex-grow: 1;
+    margin: 0 4px;
+}
+
+.fulcrum-graph__formula {
+    padding: 4px 8px;
+    opacity: 0.7;
+    -unity-font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fulcrum-inspector {
+    flex-grow: 1;
+}
+
+.fulcrum-inspector__section {
+    -unity-font-style: bold;
+    margin: 8px 4px 2px 4px;
+}
+
+.fulcrum-track-row {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 6px;
+    height: 20px;
+}
+
+.fulcrum-track-row__name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fulcrum-track-row__badge {
+    padding: 0 4px;
+    opacity: 0.55;
+    font-size: 10px;
+}
+
+.fulcrum-track-row--broken .fulcrum-track-row__name {
+    color: var(--unity-colors-error-text);
+}
+
+.fulcrum-graph__axis-label {
+    font-size: 10px;
+    opacity: 0.55;
+}
+
+.fulcrum-legend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 2px 8px;
+}
+
+.fulcrum-legend__entry {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 12px;
+}
+
+.fulcrum-legend__swatch {
+    width: 10px;
+    height: 3px;
+    margin-right: 4px;
+}
+
+.fulcrum-issues {
+    min-height: 48px;
+    border-top-width: 1px;
+    border-top-color: var(--unity-colors-toolbar-border);
+}
+
+.fulcrum-graph__area {
+    flex-grow: 1;
+    min-height: 80px;
+}
+
+.fulcrum-issues__list {
+    flex-grow: 1;
+}
+
+.fulcrum-issue {
+    flex-direction: column;
+    padding: 3px 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(128, 128, 128, 0.15);
+}
+
+.fulcrum-issue__message {
+    white-space: normal;
+}
+
+.fulcrum-issue__suggestion {
+    white-space: normal;
+    opacity: 0.65;
+    font-size: 10px;
+    padding-left: 12px;
+}
+
+.fulcrum-issue--error .fulcrum-issue__message {
+    color: var(--unity-colors-error-text);
+}
+
+.fulcrum-issue--warning .fulcrum-issue__message {
+    color: var(--unity-colors-warning-text);
+}
+
+.fulcrum-search {
+    margin: 2px 4px;
+}
+
+.fulcrum-list-footer {
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 2px 4px;
+    border-top-width: 1px;
+    border-top-color: var(--unity-colors-toolbar-border);
+}
+
+.fulcrum-list-footer Button {
+    width: 24px;
+    margin-left: 1px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.fulcrum-empty {
+    padding: 12px;
+    white-space: normal;
+}
+
+.fulcrum-empty__title {
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+    white-space: normal;
+}
+
+.fulcrum-empty__body {
+    white-space: normal;
+    opacity: 0.75;
+    margin-bottom: 8px;
+}
+
+.fulcrum-tabs {
+    flex-direction: row;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-toolbar-border);
+}
+
+.fulcrum-tabs Button {
+    flex-grow: 1;
+    margin: 0;
+    border-width: 0;
+    border-bottom-width: 2px;
+    border-bottom-color: rgba(0, 0, 0, 0);
+    background-color: rgba(0, 0, 0, 0);
+    padding: 5px 0;
+}
+
+.fulcrum-tabs Button.fulcrum-tab--active {
+    border-bottom-color: var(--unity-colors-highlight-background);
+    -unity-font-style: bold;
+}
+
+.fulcrum-param-slider {
+    margin: -2px 4px 4px 152px;
+}
+
+.fulcrum-preview {
+    padding: 2px 4px 6px 12px;
+    opacity: 0.7;
+    font-size: 10px;
+    white-space: normal;
+}
+
+.fulcrum-table {
+    display: none;
+    flex-grow: 1;
+    margin: 0 4px;
+    overflow: hidden;
+}
+
+.fulcrum-table__header {
+    flex-direction: row;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-toolbar-border);
+    background-color: var(--unity-colors-toolbar-background);
+}
+
+.fulcrum-table__list {
+    flex-grow: 1;
+}
+
+.fulcrum-table__row {
+    flex-direction: row;
+    height: 18px;
+}
+
+.fulcrum-table__cell,
+.fulcrum-table__header-cell {
+    min-width: 72px;
+    flex-shrink: 0;
+    -unity-text-align: middle-right;
+    padding-right: 8px;
+    overflow: hidden;
+}
+
+.fulcrum-table__header-cell {
+    -unity-font-style: bold;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.fulcrum-dirty {
+    opacity: 0.7;
+    font-size: 10px;
+    -unity-text-align: middle-center;
+}
+
+/* Pin bar: editing one hand-set value without leaving the graph. */
+.fulcrum-pin {
+    flex-direction: row;
+    align-items: center;
+    padding: 2px 8px;
+    background-color: rgba(255, 199, 82, 0.10);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 199, 82, 0.45);
+}
+
+.fulcrum-pin__label {
+    -unity-font-style: bold;
+    margin-right: 6px;
+}
+
+.fulcrum-pin__field {
+    flex-grow: 1;
+    min-width: 60px;
+    max-width: 160px;
+    margin-right: 4px;
+}
+
+/* Toolbar toggles. Unity's base field reserves 120px for the label, which is right in an
+   inspector column and wrong in a toolbar: the checkbox lands 85px from the word naming
+   it, and which box belongs to which stops being obvious. */
+.fulcrum-toolbar Toggle {
+    flex-grow: 0;
+    flex-shrink: 0;
+    margin-right: 10px;
+}
+
+.fulcrum-toolbar .unity-base-field__label {
+    min-width: auto;
+    width: auto;
+    flex-grow: 0;
+    flex-shrink: 0;
+    margin-right: 3px;
+}

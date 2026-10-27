@@ -1,0 +1,267 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c650d0bcdf97de4a818af476288af2e, type: 3}
+  m_Name: MigrationFixture
+  m_EditorClassIdentifier: Fulcrum.Core::Fulcrum.BalanceProfile
+  _profileName: Migration fixture
+  _notes: Frozen asset used to detect broken [SerializeReference] links. Covers every
+    shipped model and processor. Regenerate from Window/Fulcrum/Regenerate Migration
+    Fixture when a type is added.
+  _axes:
+  - _id: stage
+    _displayName: Stage
+    _min: 1
+    _max: 200
+  - _id: char_level
+    _displayName: Character Level
+    _min: 1
+    _max: 99
+  _tracks:
+  - _id: linear
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222986
+    _postProcessors: []
+    _overrides: []
+  - _id: power
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222987
+    _postProcessors: []
+    _overrides: []
+  - _id: exponential
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222988
+    _postProcessors: []
+    _overrides: []
+  - _id: table
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222989
+    _postProcessors: []
+    _overrides: []
+  - _id: curve
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222990
+    _postProcessors: []
+    _overrides: []
+  - _id: piecewise
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222991
+    _postProcessors: []
+    _overrides: []
+  - _id: derived
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 0
+    _model:
+      rid: 2968048166099222992
+    _postProcessors: []
+    _overrides: []
+  - _id: full_chain
+    _displayName: 
+    _axisId: stage
+    _rangeMin: 1
+    _rangeMax: 60
+    _accumulate: 1
+    _model:
+      rid: 2968048166099222993
+    _postProcessors:
+    - rid: 2968048166099222994
+    - rid: 2968048166099222995
+    - rid: 2968048166099222996
+    - rid: 2968048166099222997
+    - rid: 2968048166099222998
+    _overrides:
+    - _index: 42
+      _value: 99999
+      _note: Chapter boundary spike
+  _globals:
+  - _key: difficulty
+    _value: 1.3
+    _note: Hard mode multiplier
+  _simulationSettings:
+    _iterations: 1000
+    _seed: 20260804
+  references:
+    version: 2
+    RefIds:
+    - rid: 2968048166099222986
+      type: {class: LinearModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _slope: 2.5
+        _intercept: 10
+    - rid: 2968048166099222987
+      type: {class: PowerModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _scale: 100
+        _exponent: 1.35
+        _offset: 5
+    - rid: 2968048166099222988
+      type: {class: ExponentialModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _scale: 50
+        _ratio: 1.15
+    - rid: 2968048166099222989
+      type: {class: TableModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _startX: 1
+        _values:
+        - 10
+        - 25
+        - 60
+        - 140
+    - rid: 2968048166099222990
+      type: {class: CurveModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _curve:
+          serializedVersion: 2
+          m_Curve:
+          - serializedVersion: 3
+            time: 0
+            value: 0
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          - serializedVersion: 3
+            time: 1
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          m_PreInfinity: 2
+          m_PostInfinity: 2
+          m_RotationOrder: 4
+        _timeScale: 200
+        _valueScale: 1000
+    - rid: 2968048166099222991
+      type: {class: PiecewiseModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _segments:
+        - _from: 1
+          _model:
+            rid: 2968048166099222999
+        - _from: 50
+          _model:
+            rid: 2968048166099223000
+    - rid: 2968048166099222992
+      type: {class: CompositeModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _operation: 1
+        _parts:
+        - rid: 2968048166099223001
+        - rid: 2968048166099223002
+    - rid: 2968048166099222993
+      type: {class: PowerModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _scale: 1000
+        _exponent: 1.2
+        _offset: 0
+    - rid: 2968048166099222994
+      type: {class: RoundProcessor, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _mode: 3
+        _decimals: 0
+        _significantDigits: 3
+    - rid: 2968048166099222995
+      type: {class: MultiplierProcessor, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _factor: 1.1
+        _globalKey: difficulty
+    - rid: 2968048166099222996
+      type: {class: MinDeltaProcessor, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _minDelta: 5
+    - rid: 2968048166099222997
+      type: {class: SmoothProcessor, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _windowSize: 5
+    - rid: 2968048166099222998
+      type: {class: ClampProcessor, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _hasMin: 1
+        _min: 1
+        _hasMax: 0
+        _max: 0
+    - rid: 2968048166099222999
+      type: {class: LinearModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _slope: 10
+        _intercept: 0
+    - rid: 2968048166099223000
+      type: {class: PiecewiseModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _segments:
+        - _from: 50
+          _model:
+            rid: 2968048166099223003
+        - _from: 120
+          _model:
+            rid: 2968048166099223004
+    - rid: 2968048166099223001
+      type: {class: TrackReferenceModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _trackId: linear
+        _scale: 1
+        _axisOffset: 0
+    - rid: 2968048166099223002
+      type: {class: TrackReferenceModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _trackId: power
+        _scale: 0.001
+        _axisOffset: -1
+    - rid: 2968048166099223003
+      type: {class: PowerModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _scale: 2
+        _exponent: 2
+        _offset: 0
+    - rid: 2968048166099223004
+      type: {class: ExponentialModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _scale: 3
+        _ratio: 1.05

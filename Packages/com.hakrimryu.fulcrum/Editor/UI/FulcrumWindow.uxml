@@ -1,0 +1,54 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <ui:VisualElement name="toolbar" class="fulcrum-toolbar">
+        <ui:VisualElement name="toolbar-left" class="fulcrum-toolbar__left" />
+        <ui:Label name="dirty-indicator" class="fulcrum-dirty" />
+        <ui:VisualElement name="toolbar-right" class="fulcrum-toolbar__right" />
+    </ui:VisualElement>
+
+    <ui:Label name="banner" class="fulcrum-banner" />
+
+    <ui:TwoPaneSplitView name="outer-split" fixed-pane-index="0" fixed-pane-initial-dimension="200"
+                         orientation="Horizontal" class="fulcrum-body">
+        <ui:VisualElement name="tracks-pane" class="fulcrum-pane">
+            <ui:Label text="Tracks" class="fulcrum-pane__title" />
+            <ui:TextField name="track-search" class="fulcrum-search" />
+            <ui:ListView name="track-list" class="fulcrum-track-list" />
+            <ui:Label name="tracks-empty" text="No profile selected." class="fulcrum-hint" />
+            <ui:VisualElement name="tracks-footer" class="fulcrum-list-footer" />
+        </ui:VisualElement>
+
+        <ui:TwoPaneSplitView name="inner-split" fixed-pane-index="1" fixed-pane-initial-dimension="260"
+                             orientation="Horizontal">
+            <ui:VisualElement name="graph-pane" class="fulcrum-pane">
+                <ui:VisualElement name="start-panel" class="fulcrum-empty" />
+                <ui:TwoPaneSplitView name="issues-split" fixed-pane-index="1"
+                                     fixed-pane-initial-dimension="132" orientation="Vertical">
+                    <ui:VisualElement name="graph-area" class="fulcrum-graph__area">
+                        <ui:VisualElement name="graph-header" class="fulcrum-graph__header">
+                            <ui:Label name="graph-title" text="Graph" class="fulcrum-pane__title" />
+                            <ui:Label name="graph-readout" class="fulcrum-graph__readout" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="graph-host" class="fulcrum-graph__host" />
+                        <ui:VisualElement name="table-root" class="fulcrum-table">
+                            <ui:VisualElement name="table-header" class="fulcrum-table__header" />
+                            <ui:ListView name="table-list" class="fulcrum-table__list" />
+                        </ui:VisualElement>
+                        <ui:Label name="graph-formula" class="fulcrum-graph__formula" />
+                        <ui:VisualElement name="graph-legend" class="fulcrum-legend" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement name="issues-pane" class="fulcrum-issues">
+                        <ui:Label name="issues-title" text="Issues" class="fulcrum-pane__title" />
+                        <ui:ScrollView name="issues-list" class="fulcrum-issues__list" />
+                    </ui:VisualElement>
+                </ui:TwoPaneSplitView>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="inspector-pane" class="fulcrum-pane">
+                <ui:VisualElement name="inspector-tabs" class="fulcrum-tabs" />
+                <ui:ScrollView name="inspector-content" class="fulcrum-inspector" />
+                <ui:ScrollView name="profile-content" class="fulcrum-inspector" />
+            </ui:VisualElement>
+        </ui:TwoPaneSplitView>
+    </ui:TwoPaneSplitView>
+</ui:UXML>
