@@ -67,15 +67,141 @@ namespace UnityCombatLab.Tests.EditMode
             using var flow = rig.Create();
             flow.StartRunAsync(RunConfiguration.CreateDefault()).GetAwaiter().GetResult();
             Assert.That(rig.Battle.Starts, Is.EqualTo(1));
-            rig.Events.Clear();
-            flow.ActiveSession.QueueResult(Define.BattleResult.Victory, 140);
-            flow.Tick();
-            Assert.That(rig.Events, Is.EqualTo(new[] { "battle-dispose", "frame", "assets-dispose", "frontend", "frame" }));
-            Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Results));
-            Assert.That(flow.Controller.Result.Ticks, Is.EqualTo(140));
-            Assert.That(flow.ActiveSession, Is.Null);
-            Assert.That(flow.IsBusy, Is.False);
+            var session = flow.ActiveSession;
+            var resources = rig.Resources;
+            var cleanupFrame = new UniTaskCompletionSource();
+            rig.FrameWaits.Enqueue(cleanupFrame);
+            try
+            {
+                rig.Events.Clear();
+                session.QueueResult(Define.BattleResult.Victory, 140);
+                flow.Tick();
+                Assert.That(rig.Events, Is.EqualTo(new[] { "battle-dispose", "frame" }));
+                Assert.That(resources.IsDisposed, Is.False);
+                Assert.That(resources.DisposeCalls, Is.Zero);
+                Assert.That(session.Token.IsCancellationRequested, Is.True);
+                Assert.That(session.IsBattleAllowed, Is.False);
+                Assert.That(flow.Controller.Current.Phase, Is.EqualTo(Define.RunPhase.CleaningUp));
+                Assert.That(flow.IsBusy, Is.True);
+                flow.StartRunAsync(RunConfiguration.CreateDefault()).GetAwaiter().GetResult();
+                flow.Tick();
+                Assert.That(flow.ActiveSession, Is.SameAs(session));
+                Assert.That(rig.Resources, Is.SameAs(resources));
+
+                cleanupFrame.TrySetResult();
+                Assert.That(rig.Events, Is.EqualTo(new[] { "battle-dispose", "frame", "assets-dispose", "frontend", "frame" }));
+                Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Results));
+                Assert.That(flow.Controller.Result.Ticks, Is.EqualTo(140));
+                Assert.That(flow.ActiveSession, Is.Null);
+                Assert.That(flow.Controller.Current, Is.Null);
+                Assert.That(flow.IsBusy, Is.False);
+                Assert.That(rig.Failures, Is.Empty);
+            }
+            finally
+            {
+                // 途中の検証が失敗しても、保留した終了処理を次のテストへ持ち越さない。
+                cleanupFrame.TrySetResult();
+            }
         }
+
+        /// <summary>
+        /// 終了処理のフレーム待機中にアプリを破棄し、完了順や解放例外にかかわらず一度だけ資産を解放します。
+        /// [KO] 종료 처리의 프레임 대기 중 앱을 파괴하고 완료 순서나 해제 예외와 무관하게 자산을 한 번만 해제하는지 확인합니다.
+        /// [EN] Disposes the app during cleanup's frame wait and checks one resource release regardless of completion order or disposal failure.
+        /// </summary>
+        /// <param name="shouldCompleteDisposalFrameFirst">
+        /// true ならアプリ破棄側、false なら通常終了側のフレーム待機を先に完了します。
+        /// [KO] true이면 앱 파괴 쪽, false이면 정상 종료 쪽의 프레임 대기를 먼저 완료합니다.
+        /// [EN] Completes the app-disposal frame first when true, or the normal-cleanup frame first when false.
+        /// </param>
+        /// <param name="shouldFailDisposal">
+        /// 資産を解放済みと記録した直後に例外を発生させます。
+        /// [KO] 자산을 해제한 것으로 기록한 직후 예외를 발생시킵니다.
+        /// [EN] Throws immediately after recording that resources were released.
+        /// </param>
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void DisposalDuringCleanupFrameReleasesResourcesOnce(bool shouldCompleteDisposalFrameFirst, bool shouldFailDisposal)
+        {
+            var rig = new FlowRig { ShouldFailDisposal = shouldFailDisposal };
+            var flow = rig.Create();
+            var cleanupFrame = new UniTaskCompletionSource();
+            var disposalFrame = new UniTaskCompletionSource();
+            Action<Exception> observeFailure = rig.Failures.Add;
+            // Dispose が開始した Forget の例外も記録する。共通イベントの購読は finally で必ず外す。
+            UniTaskScheduler.UnobservedTaskException += observeFailure;
+            try
+            {
+                flow.StartRunAsync(RunConfiguration.CreateDefault()).GetAwaiter().GetResult();
+                var session = flow.ActiveSession;
+                var resources = rig.Resources;
+                var changes = 0;
+                // 破棄後に Frontend の所有者へ表示更新を通知していないか数える。
+                flow.Changed += () => changes++;
+                rig.Events.Clear();
+                rig.FrameWaits.Enqueue(cleanupFrame);
+                rig.FrameWaits.Enqueue(disposalFrame);
+                session.QueueResult(Define.BattleResult.Victory, 140);
+                var pendingResult = session.PendingResult;
+                flow.Tick();
+                Assert.That(flow.IsBusy, Is.True);
+                Assert.That(resources.DisposeCalls, Is.Zero);
+
+                flow.Dispose();
+                flow.Dispose();
+                var viewCalls = rig.View.Calls;
+                Assert.That(flow.ActiveSession, Is.Null);
+                Assert.That(session.Token.IsCancellationRequested, Is.True);
+                Assert.That(session.IsBattleAllowed, Is.False);
+                Assert.That(resources.IsDisposed, Is.False);
+                Assert.That(resources.DisposeCalls, Is.Zero);
+                Assert.That(rig.FrameWaits, Is.Empty);
+                Assert.That(rig.Events, Is.EqualTo(new[] { "battle-dispose", "frame", "battle-dispose", "frame" }));
+
+                var firstFrame = shouldCompleteDisposalFrameFirst ? disposalFrame : cleanupFrame;
+                var secondFrame = shouldCompleteDisposalFrameFirst ? cleanupFrame : disposalFrame;
+                firstFrame.TrySetResult();
+                Assert.That(resources.IsDisposed, Is.True);
+                Assert.That(resources.DisposeCalls, Is.EqualTo(1));
+                Assert.That(session.Battle, Is.Null);
+                flow.StartRunAsync(RunConfiguration.CreateDefault()).GetAwaiter().GetResult();
+                Assert.That(flow.ActiveSession, Is.Null);
+                Assert.That(rig.Resources, Is.SameAs(resources));
+
+                secondFrame.TrySetResult();
+                session.QueueFailure(new InvalidOperationException("late battle callback"));
+                session.QueueResult(Define.BattleResult.Defeat, 1);
+                flow.Tick();
+                Assert.That(resources.DisposeCalls, Is.EqualTo(1));
+                Assert.That(session.Failure, Is.Null);
+                Assert.That(session.PendingResult, Is.SameAs(pendingResult));
+                Assert.That(flow.Controller.Current, Is.Null);
+                Assert.That(flow.IsBusy, Is.False);
+                Assert.That(rig.View.Calls, Is.EqualTo(viewCalls));
+                Assert.That(changes, Is.Zero);
+                Assert.That(rig.Events, Is.EqualTo(new[] { "battle-dispose", "frame", "battle-dispose", "frame", "assets-dispose" }));
+                if (shouldFailDisposal)
+                    Assert.That(rig.Failures, Is.EqualTo(new[] { resources.DisposalFailure }));
+                else
+                    Assert.That(rig.Failures, Is.Empty);
+            }
+            finally
+            {
+                try
+                {
+                    flow.Dispose();
+                    cleanupFrame.TrySetResult();
+                    disposalFrame.TrySetResult();
+                }
+                finally
+                {
+                    UniTaskScheduler.UnobservedTaskException -= observeFailure;
+                }
+            }
+        }
+
         /// <summary>
         /// 開始失敗は資産を解放し、再試行を許可して新しいRunを作ります。
         /// [KO] 시작 실패는 자산을 해제하고 재시도를 허용해 새 Run을 만드는지 확인합니다.
@@ -290,6 +416,21 @@ namespace UnityCombatLab.Tests.EditMode
         {
             public readonly List<string> Events = new();
             public readonly FakeTransitionView View = new();
+
+            /// <summary>
+            /// 次フレーム要求ごとに一つ取り出し、テストが個別に完了させる待機を順に渡します。
+            /// [KO] 다음 프레임 요청마다 하나씩 꺼내 테스트가 개별 완료할 대기를 순서대로 전달합니다.
+            /// [EN] Supplies one queued wait per next-frame request so the test can complete each independently.
+            /// </summary>
+            public readonly Queue<UniTaskCompletionSource> FrameWaits = new();
+
+            /// <summary>
+            /// 調整役のエラー報告と、テストが購読した未観測例外を記録します。
+            /// [KO] 조정자의 오류 보고와 테스트에서 구독한 미관측 예외를 기록합니다.
+            /// [EN] Records coordinator error reports and unobserved exceptions subscribed to by the test.
+            /// </summary>
+            public readonly List<Exception> Failures = new();
+
             public FakeResources Resources;
             public FakeBattle Battle;
             public bool ShouldFailPreparation;
@@ -333,9 +474,9 @@ namespace UnityCombatLab.Tests.EditMode
                     () =>
                     {
                         Events.Add("frame");
-                        return UniTask.CompletedTask;
+                        return FrameWaits.Count > 0 ? FrameWaits.Dequeue().Task : UniTask.CompletedTask;
                     },
-                    _ => { },
+                    Failures.Add,
                     _ => { });
 
                 return _flow;
@@ -399,6 +540,21 @@ namespace UnityCombatLab.Tests.EditMode
         {
             private readonly FlowRig _rig;
             public bool IsDisposed { get; private set; }
+
+            /// <summary>
+            /// 重複要求も含めて解放の呼出しを数え、二重解放防止で隠れる再入を検出します。
+            /// [KO] 중복 요청도 포함해 해제 호출을 세고 중복 해제 방지에 가려지는 재진입을 감지합니다.
+            /// [EN] Counts all disposal calls, including repeats, to detect re-entry hidden by idempotent disposal.
+            /// </summary>
+            public int DisposeCalls { get; private set; }
+
+            /// <summary>
+            /// 解放失敗時に投げる例外を保持し、テストで同じ例外が一度だけ報告されたか確認します。
+            /// [KO] 해제 실패 시 던질 예외를 보관하여 같은 예외가 한 번만 보고됐는지 테스트에서 확인합니다.
+            /// [EN] Retains the disposal exception so tests can verify that the same failure is reported exactly once.
+            /// </summary>
+            public Exception DisposalFailure { get; } = new InvalidOperationException("dispose");
+
             /// <summary>
             /// 遅延と解放順序を管理するテスト環境を保存します。
             /// [KO] 지연과 해제 순서를 관리할 테스트 환경을 저장합니다.
@@ -428,13 +584,14 @@ namespace UnityCombatLab.Tests.EditMode
             /// </summary>
             public void Dispose()
             {
+                DisposeCalls++;
                 if (IsDisposed)
                     return;
 
                 IsDisposed = true;
                 _rig.Events.Add("assets-dispose");
                 if (_rig.ShouldFailDisposal)
-                    throw new InvalidOperationException("dispose");
+                    throw DisposalFailure;
             }
         }
         /// <summary>
