@@ -6,7 +6,10 @@
     "UnityCombatLab.Common",
     "UnityCombatLab.Application",
     "UnityCombatLab.Presentation",
-    "UniTask"
+    "UniTask",
+    "UnityCombatLab.Infrastructure",
+    "Fulcrum.Core",
+    "UnityCombatLab.Editor"
   ],
   "includePlatforms": [
     "Editor"

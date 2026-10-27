@@ -19,7 +19,8 @@ namespace UnityCombatLab.Tests.EditMode
         /// [KO] 적 세 종류를 배치하고 지정한 기본 능력과 역할 정의로 다섯 웨이브 입력을 만듭니다.
         /// [EN] Creates five-wave input with all three enemy kinds and the supplied base stats and role templates.
         /// </summary>
-        private static RunGameData CreateData(BattleUnitInput[] roles, int enemyHealth = 103, int enemyAttack = 13)
+        private static RunGameData CreateData(BattleUnitInput[] roles, int enemyHealth = 103, int enemyAttack = 13,
+            Define.Difficulty difficulty = Define.Difficulty.Standard)
         {
             var wave = new WaveData
             (new[] { Define.WaveEnemy.Melee, Define.WaveEnemy.Ranged, Define.WaveEnemy.Captain },
@@ -28,7 +29,7 @@ namespace UnityCombatLab.Tests.EditMode
                 Define.BasisPoints);
             var rewards = Enumerable.Range(0, 6)
                 .Select(index => new RewardData((Define.RewardKind)index, 1000)).ToArray();
-            return new RunGameData(Enumerable.Repeat(wave, Define.WavesPerRun).ToArray(), rewards, roles);
+            return new RunGameData(Enumerable.Repeat(wave, Define.WavesPerRun).ToArray(), rewards, roles, difficulty);
         }
 
         /// <summary>
@@ -67,22 +68,23 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 難易度を切り捨ててから敵の役割倍率を適用し、味方能力・盾・攻撃周期・配置を維持します。
-        /// [KO] 난이도를 내림한 뒤 적 역할 배율을 적용하고 아군 능력·방어막·공격 주기·배치를 유지합니다.
-        /// [EN] Floors difficulty scaling before enemy role multipliers while preserving ally stats, shields, attack intervals and formation.
+        /// 選択済みの難易度値に役割倍率だけを適用し、味方能力・盾・攻撃周期・配置を維持します。
+        /// [KO] 선택한 난이도 값에 역할 배율만 적용하고 아군 능력·방어막·공격 주기·배치를 유지합니다.
+        /// [EN] Applies only role multipliers to selected difficulty values while preserving ally stats, shields, intervals and formation.
         /// </summary>
         [Test]
-        public void EasyScalesOnlyEnemyHealthAndAttackBeforeRoleMultipliers()
+        public void EasySnapshotIsNotScaledAgainBeforeRoleMultipliers()
         {
             var data = CreateData(BattleBenchmarkTests.CreateInputs());
             var configuration = RunConfiguration.CreateDefault();
             var rewards = new RunRewards(new[] { new RewardChoice(1, Define.RewardKind.Barrier, 1500) });
             var standard = data.CreateUnits(configuration, 2, rewards);
-            var easy = data.CreateUnits(configuration.WithDifficulty(Define.Difficulty.Easy), 2, rewards);
+            var easyData = CreateData(BattleBenchmarkTests.CreateInputs(), 82, 10, Define.Difficulty.Easy);
+            var easy = easyData.CreateUnits(configuration.WithDifficulty(Define.Difficulty.Easy), 2, rewards);
             var standardEnemies = standard.Where(input => input.Team == Define.BattleTeam.Enemy).ToArray();
             var easyEnemies = easy.Where(input => input.Team == Define.BattleTeam.Enemy).ToArray();
 
-            // 前列・後列上・後列下は近接・遠距離・隊長。HP103を80%で82へ切り捨て、隊長は82×2.5で205になる。
+            // 前列・後列上・後列下は近接・遠距離・隊長。選択済みHP82に隊長係数2.5を掛けると205になる。
             Assert.That(standardEnemies.Select(input => input.MaxHealth), Is.EqualTo(new[] { 103, 77, 257 }));
             Assert.That(standardEnemies.Select(input => input.Attack), Is.EqualTo(new[] { 13, 13, 23 }));
             Assert.That(easyEnemies.Select(input => input.MaxHealth), Is.EqualTo(new[] { 82, 61, 205 }));
@@ -104,19 +106,19 @@ namespace UnityCombatLab.Tests.EditMode
         }
 
         /// <summary>
-        /// 基本能力が1でも、難易度と役割倍率それぞれの切り捨て後に敵能力の下限を維持します。
-        /// [KO] 기본 능력이 1이어도 난이도와 역할 배율 각각을 내림한 뒤 적 능력의 하한을 유지합니다.
-        /// [EN] Keeps enemy stats above zero after each difficulty and role scaling step, even with base stats of one.
+        /// 基本能力が1でも、役割倍率の切り捨て後に敵能力の下限を維持します。
+        /// [KO] 기본 능력이 1이어도 역할 배율을 내림한 뒤 적 능력의 하한을 유지합니다.
+        /// [EN] Keeps enemy stats above zero after role scaling even with base stats of one.
         /// </summary>
         [Test]
-        public void EasyKeepsMinimumStatsAfterDifficultyAndRoleScaling()
+        public void EasyKeepsMinimumStatsAfterRoleScaling()
         {
-            var data = CreateData(BattleBenchmarkTests.CreateInputs(), enemyHealth: 1, enemyAttack: 1);
+            var data = CreateData(BattleBenchmarkTests.CreateInputs(), enemyHealth: 1, enemyAttack: 1, difficulty: Define.Difficulty.Easy);
             var configuration = RunConfiguration.CreateDefault().WithDifficulty(Define.Difficulty.Easy);
             var enemies = data.CreateUnits(configuration, 1, RunRewards.Empty)
                 .Where(input => input.Team == Define.BattleTeam.Enemy).ToArray();
 
-            // 難易度適用後のHP1に役割倍率を掛け、遠距離は下限1、隊長は2へ切り捨てる。
+            // 選択済みHP1に役割倍率を掛け、遠距離は下限1、隊長は2へ切り捨てる。
             Assert.That(enemies.Select(input => input.MaxHealth), Is.EqualTo(new[] { 1, 1, 2 }));
             Assert.That(enemies.Select(input => input.Attack), Is.EqualTo(new[] { 1, 1, 1 }));
         }

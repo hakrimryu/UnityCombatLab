@@ -1,0 +1,100 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c650d0bcdf97de4a818af476288af2e, type: 3}
+  m_Name: BalanceProfile_Easy
+  m_EditorClassIdentifier: Fulcrum.Core::Fulcrum.BalanceProfile
+  _profileName: UnityCombatLab Easy
+  _notes: Enemy HP/attack are 80% of the initial standard profile; rewards are unchanged.
+    The game rounds stats AwayFromZero, then floors role multipliers. Profiles are
+    edited and exported explicitly.
+  _axes:
+  - _id: wave
+    _displayName: Wave
+    _min: 1
+    _max: 5
+  _tracks:
+  - _id: enemy_hp
+    _displayName: 
+    _axisId: wave
+    _rangeMin: 1
+    _rangeMax: 5
+    _accumulate: 0
+    _model:
+      rid: 3611899618858631246
+    _postProcessors: []
+    _overrides: []
+  - _id: enemy_attack
+    _displayName: 
+    _axisId: wave
+    _rangeMin: 1
+    _rangeMax: 5
+    _accumulate: 0
+    _model:
+      rid: 3611899618858631247
+    _postProcessors: []
+    _overrides: []
+  - _id: reward_strength
+    _displayName: 
+    _axisId: wave
+    _rangeMin: 1
+    _rangeMax: 5
+    _accumulate: 0
+    _model:
+      rid: 3611899618858631248
+    _postProcessors: []
+    _overrides: []
+  _globals: []
+  _simulationSettings:
+    _iterations: 1000
+    _seed: 20260804
+  _simulationBinding:
+    _axisId: stage
+    _monsterHp: monster_hp
+    _monsterAttack: monster_atk
+    _monsterDefense: 
+    _stageExp: 
+    _expRequired: 
+    _stageGold: 
+    _upgradeCost: 
+  references:
+    version: 2
+    RefIds:
+    - rid: 3611899618858631246
+      type: {class: TableModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _startX: 1
+        _values:
+        - 336
+        - 400
+        - 480
+        - 560
+        - 640
+    - rid: 3611899618858631247
+      type: {class: TableModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _startX: 1
+        _values:
+        - 9.600000000000001
+        - 11.200000000000001
+        - 13.600000000000001
+        - 16
+        - 19.200000000000003
+    - rid: 3611899618858631248
+      type: {class: TableModel, ns: Fulcrum, asm: Fulcrum.Core}
+      data:
+        _startX: 1
+        _values:
+        - 1
+        - 1.1
+        - 1.2
+        - 1.3
+        - 1.4

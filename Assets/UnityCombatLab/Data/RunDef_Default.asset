@@ -25,3 +25,5 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 30dd18dba878e6a4da7b7b6571394a82, type: 2}
   - {fileID: 11400000, guid: f67ce74c007816c49bfa70edb305dfdc, type: 2}
   - {fileID: 11400000, guid: 7c13d4ea6c4f8924a8e96c3aa8e747da, type: 2}
+  _standardBalance: {fileID: 11400000, guid: 9c256879433003246a65965d0c956483, type: 2}
+  _easyBalance: {fileID: 11400000, guid: 27c4264ba49c2414dbacf4cb4eaab40f, type: 2}

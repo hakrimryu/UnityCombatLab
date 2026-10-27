@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Fulcrum;
+using UnityCombatLab.Common;
 using UnityCombatLab.Domain.Battle;
 using UnityCombatLab.Domain.Run;
 using UnityEngine;
@@ -30,17 +32,38 @@ namespace UnityCombatLab.Infrastructure.Balance
         [SerializeField] private RewardDefinition[] _rewards;
 
         /// <summary>
-        /// アセット値とロード済みユニット定義を検査し、Run 専用の不変入力を返します。
-        /// [KO] 에셋 값·로드한 유닛 정의를 검사하고 Run 전용 불변 입력을 반환합니다.
-        /// [EN] Validates assets and loaded unit templates and returns immutable inputs dedicated to the run.
+        /// 標準難易度の Fulcrum 出力。
+        /// [KO] 표준 난이도의 Fulcrum 출력입니다.
+        /// [EN] Fulcrum output for standard difficulty.
         /// </summary>
-        public RunGameData CreateSnapshot(IReadOnlyList<BattleUnitInput> roles)
+        [SerializeField] private BalanceTable _standardBalance;
+
+        /// <summary>
+        /// 敵能力を80%にした Fulcrum 出力。
+        /// [KO] 적 능력을 80%로 만든 Fulcrum 출력입니다.
+        /// [EN] Fulcrum output authored with enemy stats at eighty percent.
+        /// </summary>
+        [SerializeField] private BalanceTable _easyBalance;
+
+        /// <summary>
+        /// 選択難易度の Table と配置・強化・ユニット定義から、この Run だけの固定入力を作ります。
+        /// [KO] 선택한 난이도의 Table·배치·강화·유닛 정의에서 이번 Run만의 고정 입력을 만듭니다.
+        /// [EN] Builds this run's fixed inputs from the selected difficulty table, slots, upgrades and role definitions.
+        /// </summary>
+        public RunGameData CreateSnapshot(IReadOnlyList<BattleUnitInput> roles, RunConfiguration configuration)
         {
+            if (configuration == null)
+                throw new ArgumentNullException(nameof(configuration));
+
             if (_waves == null || _rewards == null || _waves.Any(wave => wave == null) || _rewards.Any(reward => reward == null))
                 throw new InvalidOperationException("Run definition has missing wave or reward references.");
 
-            return new RunGameData(_waves.Select(wave => wave.CreateSnapshot()).ToArray(),
-                _rewards.Select(reward => reward.CreateSnapshot()).ToArray(), roles);
+            var table = configuration.Difficulty == Define.Difficulty.Easy ? _easyBalance : _standardBalance;
+            return new RunGameData
+            (FulcrumBalanceAdapter.CreateWaves(table, _waves),
+                _rewards.Select(reward => reward.CreateSnapshot()).ToArray(),
+                roles,
+                configuration.Difficulty);
         }
     }
 }

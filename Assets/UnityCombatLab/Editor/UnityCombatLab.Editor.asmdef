@@ -1,0 +1,17 @@
+{
+  "name": "UnityCombatLab.Editor",
+  "rootNamespace": "UnityCombatLab.Editor",
+  "references": [
+    "UnityCombatLab.Application",
+    "UnityCombatLab.Bootstrap",
+    "UnityCombatLab.Common",
+    "UnityCombatLab.Domain",
+    "UnityCombatLab.Infrastructure",
+    "VContainer",
+    "Fulcrum.Core",
+    "Fulcrum.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

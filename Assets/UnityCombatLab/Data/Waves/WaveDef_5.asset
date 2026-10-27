@@ -13,6 +13,3 @@ MonoBehaviour:
   m_Name: WaveDef_5
   m_EditorClassIdentifier: UnityCombatLab.Infrastructure::UnityCombatLab.Infrastructure.Balance.WaveDefinition
   _enemies: 030000000200000000000000
-  _enemyHealth: 800
-  _enemyAttack: 24
-  _rewardStrengthBp: 14000

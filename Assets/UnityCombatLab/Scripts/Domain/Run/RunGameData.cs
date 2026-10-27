@@ -12,6 +12,12 @@ namespace UnityCombatLab.Domain.Run
     /// </summary>
     public sealed class RunGameData
     {
+        /// <summary>
+        /// このスナップショットの数値を選んだ難易度。
+        /// [KO] 이 스냅샷의 수치를 선택한 난이도입니다.
+        /// [EN] Difficulty whose values were selected for this snapshot.
+        /// </summary>
+        public Define.Difficulty Difficulty { get; }
 
         /// <summary>
         /// ウェーブ番号順にコピーした五つの定義。
@@ -39,14 +45,19 @@ namespace UnityCombatLab.Domain.Run
         /// [KO] 검사한 데이터를 복사하고 누락된 정의가 있으면 시작을 거부합니다.
         /// [EN] Copies validated data and rejects starting when a definition is missing.
         /// </summary>
-        public RunGameData(IReadOnlyList<WaveData> waves, IReadOnlyList<RewardData> rewards, IReadOnlyList<BattleUnitInput> roles)
+        public RunGameData(IReadOnlyList<WaveData> waves, IReadOnlyList<RewardData> rewards, IReadOnlyList<BattleUnitInput> roles,
+            Define.Difficulty difficulty = Define.Difficulty.Standard)
         {
+            if (difficulty != Define.Difficulty.Standard && difficulty != Define.Difficulty.Easy)
+                throw new ArgumentOutOfRangeException(nameof(difficulty));
+
             if (waves == null || waves.Count != Define.WavesPerRun || rewards == null || rewards.Count != _rewards.Length ||
                 roles == null || roles.Count != _roles.Length)
             {
                 throw new ArgumentException("Run data requires five waves, six upgrades and six roles.");
             }
 
+            Difficulty = difficulty;
             _waves = new WaveData[waves.Count];
             for (var index = 0; index < _waves.Length; index++)
                 _waves[index] = waves[index] ?? throw new ArgumentException("Missing wave definition.", nameof(waves));
@@ -97,6 +108,9 @@ namespace UnityCombatLab.Domain.Run
             if (configuration == null || rewards == null)
                 throw new ArgumentNullException(configuration == null ? nameof(configuration) : nameof(rewards));
 
+            if (configuration.Difficulty != Difficulty)
+                throw new ArgumentException("Run configuration must match the balance snapshot difficulty.", nameof(configuration));
+
             var definition = GetWave(wave);
             var units = new List<BattleUnitInput>(Define.MaxBattleUnitCount);
             for (var slot = 0; slot < Define.SlotsPerTeam; slot++)
@@ -132,15 +146,7 @@ namespace UnityCombatLab.Domain.Run
                 };
                 var enemyHealth = definition.EnemyHealth;
                 var enemyAttack = definition.EnemyAttack;
-                if (configuration.Difficulty == Define.Difficulty.Easy)
-                {
-                    // 表示と同じ百分率を計算用の basis point に換算する（80% → 8000）。
-                    var easyMultiplierBp = Define.EasyEnemyStatPercent * Define.BasisPoints / Define.PercentScale;
-                    enemyHealth = Math.Max(1, Scale(enemyHealth, easyMultiplierBp));
-                    enemyAttack = Math.Max(1, Scale(enemyAttack, easyMultiplierBp));
-                }
-
-                // 難易度を整数化した後で、遠距離HP75%・隊長HP250%/攻撃180%を切り捨てる。
+                // 選択済み難易度の整数値に、遠距離HP75%・隊長HP250%/攻撃180%を掛けて切り捨てる。
                 var healthMultiplier = role switch
                 {
                     Define.UnitRole.SkeletonRanged => 7500,

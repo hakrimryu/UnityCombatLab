@@ -46,6 +46,13 @@ namespace UnityCombatLab.Infrastructure.Assets
         private readonly RunDefinition _runDefinition;
 
         /// <summary>
+        /// 出発時に選んだ不変の編成・難易度・シード。
+        /// [KO] 출발 시 선택한 불변 편성·난이도·시드입니다.
+        /// [EN] Immutable formation, difficulty and seed selected at departure.
+        /// </summary>
+        private readonly RunConfiguration _configuration;
+
+        /// <summary>
         /// この Run の五ウェーブに共通する検査済み入力。
         /// [KO] 이 Run의 다섯 웨이브가 공유하는 검사된 입력입니다.
         /// [EN] Validated input shared across this run's five waves.
@@ -105,8 +112,10 @@ namespace UnityCombatLab.Infrastructure.Assets
         /// [KO] App Scope의 공통 서비스에서 이번 Run만의 소유 범위를 만듭니다.
         /// [EN] Creates this run's ownership scope from the app's shared service.
         /// </summary>
-        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog, UnitAssetCatalog unitCatalog, RunDefinition runDefinition)
+        public RunAssetScope(AddressableAssetManager assets, UiAssetCatalog catalog, UnitAssetCatalog unitCatalog,
+            RunDefinition runDefinition, RunConfiguration configuration)
         {
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _scope = (assets ?? throw new ArgumentNullException(nameof(assets))).CreateScope();
             _catalog = catalog;
             _unitCatalog = unitCatalog;
@@ -164,7 +173,7 @@ namespace UnityCombatLab.Infrastructure.Assets
                         (Define.BattleSlot)(index % Define.SlotsPerTeam));
                 }
 
-                GameData = _runDefinition.CreateSnapshot(roles);
+                GameData = _runDefinition.CreateSnapshot(roles, _configuration);
             }
             catch
             {

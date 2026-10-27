@@ -15,6 +15,7 @@ using UnityCombatLab.Bootstrap;
 using UnityCombatLab.Presentation.UI;
 using UnityCombatLab.Presentation.Units;
 using UnityCombatLab.Domain.Battle;
+using UnityCombatLab.Domain.Run;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -31,6 +32,52 @@ namespace UnityCombatLab.Tests.PlayMode
     /// </summary>
     public sealed class BootSceneTests
     {
+        /// <summary>
+        /// 難易度の Table が欠けた出発を拒否し、取得済み UI・ユニット資産を解放して再試行画面へ戻します。
+        /// [KO] 난이도 Table이 누락된 출발을 거부하고 취득한 UI·유닛 자산을 해제해 재시도 화면으로 돌아갑니다.
+        /// [EN] Rejects departure with a missing difficulty table, releases acquired UI/unit assets and returns to the retry screen.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator MissingBalanceTableRejectsDepartureAndReleasesAssets()
+        {
+            var app = Object.FindFirstObjectByType<AppLifetimeScope>();
+            var flow = app.Container.Resolve<RunFlowCoordinator>();
+            var factory = typeof(RunFlowCoordinator).GetField("_resourcesFactory", BindingFlags.Instance | BindingFlags.NonPublic);
+            var original = factory.GetValue(flow);
+            var definition = Object.Instantiate(app.Container.Resolve<RunDefinition>());
+            typeof(RunDefinition).GetField("_standardBalance", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(definition, null);
+            typeof(RunDefinition).GetField("_easyBalance", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(definition, null);
+            RunAssetScope failedAssets = null;
+            try
+            {
+                factory.SetValue(flow, (Func<RunConfiguration, IRunResources>)(configuration => failedAssets = new RunAssetScope(
+                    app.Container.Resolve<AddressableAssetManager>(), app.Container.Resolve<UiAssetCatalog>(),
+                    app.Container.Resolve<UnitAssetCatalog>(), definition, configuration)));
+                foreach (var difficulty in new[] { Define.Difficulty.Standard, Define.Difficulty.Easy })
+                {
+                    LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("Run requires a Fulcrum balance table"));
+                    yield return flow.StartRunAsync(RunConfiguration.CreateDefault().WithDifficulty(difficulty)).ToCoroutine();
+                    Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Error));
+                    Assert.That(flow.CanRetry, Is.True);
+                    Assert.That(flow.IsBusy, Is.False);
+                    Assert.That(flow.ActiveSession, Is.Null);
+                    Assert.That(flow.Controller.Result, Is.Null);
+                    Assert.That(failedAssets.GameData, Is.Null);
+                    Assert.That(failedAssets.HudPrefab, Is.Null);
+                    Assert.That(failedAssets.RunBattlePrefab, Is.Null);
+                    Assert.That(failedAssets.Icons, Is.Empty);
+                    Assert.Throws<ObjectDisposedException>(() => failedAssets.GetUnit(Define.UnitRole.Knight));
+                    Assert.That(ReadField<System.Collections.Generic.List<IDisposable>>(
+                        ReadField<AddressableAssetScope>(failedAssets, "_scope"), "_leases"), Is.Empty);
+                }
+            }
+            finally
+            {
+                factory.SetValue(flow, original);
+                Object.Destroy(definition);
+            }
+        }
+
         /// <summary>
         /// 各テストを独立した Boot 起動から始めます。
         /// [KO] 각 테스트를 독립된 Boot 시작 상태에서 시작합니다.
@@ -216,7 +263,7 @@ namespace UnityCombatLab.Tests.PlayMode
             {
                 var app = Object.FindFirstObjectByType<AppLifetimeScope>();
                 using var assets = new RunAssetScope(app.Container.Resolve<AddressableAssetManager>(),
-                    app.Container.Resolve<UiAssetCatalog>(), app.Container.Resolve<UnitAssetCatalog>(), app.Container.Resolve<RunDefinition>());
+                    app.Container.Resolve<UiAssetCatalog>(), app.Container.Resolve<UnitAssetCatalog>(), app.Container.Resolve<RunDefinition>(), RunConfiguration.CreateDefault());
                 await assets.PrepareAsync(CancellationToken.None);
                 var root = new GameObject("PartialCreationTest");
                 var pointsRoot = new GameObject("SpawnPoints");
@@ -550,8 +597,8 @@ namespace UnityCombatLab.Tests.PlayMode
             try
             {
                 // 複製したカタログだけを壊し、HUDと先の二職業をロードした後の復帰経路を通す。
-                address.SetValue(flow, (Func<IRunResources>)(() => failedAssets = new RunAssetScope(
-                    app.Container.Resolve<AddressableAssetManager>(), app.Container.Resolve<UiAssetCatalog>(), catalog, app.Container.Resolve<RunDefinition>())));
+                address.SetValue(flow, (Func<RunConfiguration, IRunResources>)(configuration => failedAssets = new RunAssetScope(
+                    app.Container.Resolve<AddressableAssetManager>(), app.Container.Resolve<UiAssetCatalog>(), catalog, app.Container.Resolve<RunDefinition>(), configuration)));
                 LogAssert.Expect(LogType.Exception, new System.Text.RegularExpressions.Regex("Unit definition does not match catalog role Mage"));
                 yield return flow.StartRunAsync(flow.Controller.LastConfiguration).ToCoroutine();
                 Assert.That(flow.Page, Is.EqualTo(Define.FrontendPage.Error));

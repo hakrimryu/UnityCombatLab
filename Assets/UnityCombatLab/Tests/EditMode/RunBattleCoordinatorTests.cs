@@ -391,7 +391,7 @@ namespace UnityCombatLab.Tests.EditMode
                 Flow = new RunFlowCoordinator
                 (this,
                     this,
-                    () => Resources,
+                    _ => Resources,
                     () => UniTask.CompletedTask,
                     exception => Assert.Fail(exception.ToString()),
                     _ => { });

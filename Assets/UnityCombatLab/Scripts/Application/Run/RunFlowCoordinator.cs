@@ -27,11 +27,11 @@ namespace UnityCombatLab.Application.Run
         /// </summary>
         private readonly IRunTransitionView _loading;
         /// <summary>
-        /// 出発ごとに独立した資産所有者を作ります。
-        /// [KO] 출발마다 독립 자산 소유자를 만듭니다.
-        /// [EN] Creates a separate resource owner for each departure.
+        /// 出発時の配置・難易度・シードを渡し、独立した資産所有者を作ります。
+        /// [KO] 출발 편성·난이도·시드를 전달해 독립 자산 소유자를 만듭니다.
+        /// [EN] Passes departure formation, difficulty and seed to create an independent resource owner.
         /// </summary>
-        private readonly Func<IRunResources> _resourcesFactory;
+        private readonly Func<RunConfiguration, IRunResources> _resourcesFactory;
 
         /// <summary>
         /// View破棄が完了する次のフレームまで待つ実行環境の処理。
@@ -142,7 +142,7 @@ namespace UnityCombatLab.Application.Run
         /// [EN] Receives runtime operations from App Scope and initializes display and volume.
         /// </summary>
         public RunFlowCoordinator(ISceneTransition scenes, IRunTransitionView loading,
-            Func<IRunResources> resourcesFactory, Func<UniTask> nextFrame,
+            Func<RunConfiguration, IRunResources> resourcesFactory, Func<UniTask> nextFrame,
             Action<Exception> reportFailure, Action<float> applyVolume)
         {
             _scenes = scenes ?? throw new ArgumentNullException(nameof(scenes));
@@ -284,7 +284,7 @@ namespace UnityCombatLab.Application.Run
             if (configuration == null)
                 throw new ArgumentNullException(nameof(configuration));
 
-            var resources = _resourcesFactory() ?? throw new InvalidOperationException("Run resource factory returned null.");
+            var resources = _resourcesFactory(configuration) ?? throw new InvalidOperationException("Run resource factory returned null.");
 
             if (!Controller.TryStart(configuration))
             {

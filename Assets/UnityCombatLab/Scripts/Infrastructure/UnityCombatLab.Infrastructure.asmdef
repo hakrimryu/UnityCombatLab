@@ -8,6 +8,7 @@
         "UnityCombatLab.Domain",
         "Unity.Addressables",
         "Unity.ResourceManager",
-        "UnityCombatLab.Application"
+        "UnityCombatLab.Application",
+        "Fulcrum.Core"
     ]
 }

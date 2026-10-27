@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3745854c91fcf44db56c1a4c910e589, type: 3}
+  m_Name: BalanceTable_Easy
+  m_EditorClassIdentifier: Fulcrum.Core::Fulcrum.BalanceTable
+  _sourceProfileName: UnityCombatLab Easy
+  _sourceProfileHash: 51a42c5da3b03b11
+  _exportedAtUtc: 2026-10-27T12:19:13.3293088Z
+  _trackIds:
+  - enemy_hp
+  - enemy_attack
+  - reward_strength
+  _rangeMins: 010000000100000001000000
+  _lengths: 050000000500000005000000
+  _offsets: 00000000050000000a000000
+  _values:
+  - 336
+  - 400
+  - 480
+  - 560
+  - 640
+  - 9.600000000000001
+  - 11.200000000000001
+  - 13.600000000000001
+  - 16
+  - 19.200000000000003
+  - 1
+  - 1.1
+  - 1.2
+  - 1.3
+  - 1.4

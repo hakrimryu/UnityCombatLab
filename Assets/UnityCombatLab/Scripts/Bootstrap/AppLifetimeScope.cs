@@ -144,7 +144,7 @@ namespace UnityCombatLab.Bootstrap
             builder.Register(resolver => new RunFlowCoordinator
             (resolver.Resolve<SceneTransitionManager>(),
                 loading,
-                () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition),
+                configuration => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition, configuration),
                 () => UniTask.NextFrame(),
                 Debug.LogException,
                 value => AudioListener.volume = value), Lifetime.Singleton);

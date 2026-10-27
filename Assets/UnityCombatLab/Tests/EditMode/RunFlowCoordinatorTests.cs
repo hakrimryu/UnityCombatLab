@@ -18,6 +18,23 @@ namespace UnityCombatLab.Tests.EditMode
     public sealed class RunFlowCoordinatorTests
     {
         /// <summary>
+        /// 出発時の難易度・配置・シードを同じ設定オブジェクトで資産生成へ渡します。
+        /// [KO] 출발 난이도·배치·시드를 같은 설정 객체로 자원 생성에 전달합니다.
+        /// [EN] Passes departure difficulty, formation and seed to resource creation as the same configuration object.
+        /// </summary>
+        [Test]
+        public void ResourceFactoryReceivesSelectedConfiguration()
+        {
+            var rig = new FlowRig();
+            using var flow = rig.Create();
+            var configuration = RunConfiguration.CreateDefault().WithDifficulty(Define.Difficulty.Easy)
+                .Swap(Define.UnitRole.Mage, Define.BattleSlot.Front);
+            flow.StartRunAsync(configuration).GetAwaiter().GetResult();
+            Assert.That(rig.ResourceConfiguration, Is.SameAs(configuration));
+            Assert.That(flow.Controller.Current.Configuration, Is.SameAs(configuration));
+        }
+
+        /// <summary>
         /// Frontend資産の準備が終わるまで遷移を完了せず、出発も受け付けません。
         /// [KO] Frontend 자산 준비가 끝날 때까지 전환을 완료하지 않고 출발도 받지 않습니다.
         /// [EN] Keeps the transition pending and rejects departure until Frontend assets are ready.
@@ -456,6 +473,13 @@ namespace UnityCombatLab.Tests.EditMode
             /// [EN] Exercises resource-disposal failure while checking that the run lock is released.
             /// </summary>
             public bool ShouldFailDisposal;
+            /// <summary>
+            /// 資産生成に渡された出発設定。
+            /// [KO] 자원 생성에 전달된 출발 설정입니다.
+            /// [EN] Departure configuration passed to resource creation.
+            /// </summary>
+            public RunConfiguration ResourceConfiguration;
+
             public UniTaskCompletionSource Preparation;
             public UniTaskCompletionSource FrontendLoad;
             public UniTaskCompletionSource FrontendPreparation;
@@ -470,7 +494,11 @@ namespace UnityCombatLab.Tests.EditMode
                 _flow = new RunFlowCoordinator
                 (this,
                     View,
-                    () => Resources = new FakeResources(this),
+                    configuration =>
+                    {
+                        ResourceConfiguration = configuration;
+                        return Resources = new FakeResources(this);
+                    },
                     () =>
                     {
                         Events.Add("frame");
