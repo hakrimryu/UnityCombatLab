@@ -1,28 +1,45 @@
 # Unity Combat Lab
 
-[日本語](README.md) | [한국어](README.ko.md) | English
+[日本語](README.md) | [한국어](README.ko.md) | [English](README.en.md)
+
+**Contents:** [Overview](#project-overview) · [Environment](#environment-and-libraries) · [Fulcrum](#about-fulcrum) · [Code structure](#code-structure) · [Verification](#tests-and-verification-results) · [Implementation details](#implementation-and-design-decisions) · [Running the project](#running-the-project-and-restoring-assets)
+
+## Project overview
 
 **A Unity game client portfolio project where you position three heroes, choose upgrades between waves, and fight through five waves of automatic combat.**
 
-The placement of the Knight, Ranger, and Mage in the front and back rows, together with your upgrade choices, changes the outcome. The game implements a complete play loop: title → formation → combat → upgrade selection → results → retry. The game UI is in Japanese. This README explains the code and the decisions behind its design.
+The placement of the Knight, Ranger, and Mage in the front and back rows, together with your upgrade choices, changes the outcome. The game implements a complete play loop: title → formation → combat → upgrade selection → results → retry. The game UI is in Japanese. This README explains the code and the decisions behind its design. A **Run** is one attempt, from departure after formation selection through victory, defeat, or an early exit.
 
-> **This portfolio project is still in development and is not a finished release.** The main game flow is implemented. Planned work includes integration with a balance authoring tool, sound, and further review and refinement of the game logic.
+Purchased assets are excluded from the repository, so running the project in Unity requires [restoring the assets and references](#running-the-project-and-restoring-assets).
+
+> **This portfolio project is still in development and is not a finished release.** The main game flow and Fulcrum balance data integration are implemented. Sound, stability checks, and further improvements to the game logic remain future work.
 
 ![Wave 5 combat at 2× speed, showing HP, shields, and damage numbers](Docs/Images/battle-wave5.png)
 
-## Problems addressed in this project
+## Environment and libraries
 
-Even in a small auto-battler, **the moment combat is resolved and the moment it appears on screen** can differ, as can **the moment a screen closes and the moment its assets finish loading**. Reproducing the same battle also does not automatically reveal an unintended rule change. The implementation and tests focus on these three problems.
+These are the installed versions verified in this project. UPM configuration is in [manifest.json](Packages/manifest.json) and [packages-lock.json](Packages/packages-lock.json); NuGet configuration is in [packages.config](Assets/packages.config).
 
-| Problem | Approach | Key code |
+| Technology | Version | Usage and rationale |
 |---|---|---|
-| HP drops before a projectile hits, and damage and healing appear out of order | Separate resolved combat state from display state, preserving the order of changes across healing events | [UnitPresentationReadModel](Assets/UnityCombatLab/Scripts/Presentation/ReadModels/UnitPresentationReadModel.cs), [BattlePresenter](Assets/UnityCombatLab/Scripts/Presentation/Units/BattlePresenter.cs) |
-| A load completes after cancellation or screen closure, leaving asset cleanup without a clear owner | Transfer ownership of each successful load to a Lease, and immediately release results that arrive after their Scope has ended | [AddressableAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/AddressableAssetScope.cs), [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
-| An incorrectly changed combat rule still produces matching results when replayed by the same code | Combine reproducibility checks for deterministic 20Hz combat with regression tests against independent, fixed expectations | [BattleRunner](Assets/UnityCombatLab/Scripts/Application/Battle/BattleRunner.cs), [RunReplayTests](Assets/UnityCombatLab/Tests/EditMode/RunReplayTests.cs) |
+| Unity / C# | **6000.3.8f1** | Scenes, prefabs, Animator, and game client implementation. [ProjectVersion](ProjectSettings/ProjectVersion.txt) |
+| Universal Render Pipeline | **17.3.0** | Rendering the 3D combat stage and characters. [Rendering settings](Assets/UnityCombatLab/Settings) |
+| uGUI / TextMeshPro | **Included in uGUI 2.0.0** | Explicit View connections, Japanese UI, and numeric displays. [UI code](Assets/UnityCombatLab/Scripts/Presentation/UI) |
+| VContainer | **1.19.0** | Application and scene object composition, plus EntryPoint registration. Container access is concentrated in [Bootstrap](Assets/UnityCombatLab/Scripts/Bootstrap) |
+| UniTask | **2.5.11** | Asset preparation, scene transitions, next-frame waits, and cancellation. [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
+| R3 | **1.3.1** — core + Unity integration | Subscribing to HP, shield, and projected HP changes, with explicit subscription cleanup. [BattleHudPresenter](Assets/UnityCombatLab/Scripts/Presentation/UI/BattleHudPresenter.cs) |
+| DOTween Standard | **1.3.045** | UI popups, button feedback, movement, hit reactions, and damage numbers. [UiTweenUtility](Assets/UnityCombatLab/Scripts/Presentation/UI/UiTweenUtility.cs), [UnitView](Assets/UnityCombatLab/Scripts/Presentation/Units/UnitView.cs) |
+| Addressables | **2.8.1** | Loading local unit definitions, prefabs, UI, and icons. [RunAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/RunAssetScope.cs) |
+| Input System | **1.18.0** | EventSystem UI input and Esc input. [RunBattleView](Assets/UnityCombatLab/Scripts/Presentation/UI/RunBattleView.cs) |
+| Unity Test Framework / NUnit | **1.6.0 package** | EditMode tests for combat and progression; PlayMode tests for Unity objects and asset lifetimes. [Tests](Assets/UnityCombatLab/Tests) |
+| NuGetForUnity | **4.5.0** | Restoring R3 core and its .NET dependencies |
+| Fulcrum | **0.4.0 / MIT / embedded** | Authoring wave values, exporting Tables, and converting them into Run inputs. [Package source](Packages/FULCRUM_SOURCE.md) |
 
-The project uses more architectural structure than a game of this size alone would require: separate assemblies for each layer, DI, presentation read models, and asset Scopes. This is a deliberate portfolio choice to show **which code needs to change for a given requirement, and which tests verify that change**. Smaller requirements, such as combat slots and state transitions, use fixed arrays and enums.
+Development tools: Rider **2026.2.3.1** / Unity Rider Editor **3.0.39**, and Unity CLI **1.0.0-beta.14** / Pipeline **0.9.1-exp.1**. CLI and MCP were used for Editor operations and verification.
 
 ## Game structure
+
+[Full gameplay video (MP4 · 62 s · 1.9 MB)](Docs/Videos/gameplay-demo.mp4)
 
 - **Formation:** Place the Knight, Ranger, and Mage in the front slot and the two back slots (upper and lower). Select cards and slots to swap positions.
 - **Combat:** Three allies automatically fight up to three enemies. The Knight reduces incoming damage, the Ranger periodically performs a stronger single-target attack, and the Mage periodically performs an area attack.
@@ -30,11 +47,150 @@ The project uses more architectural structure than a game of this size alone wou
 - **Progression:** Allies revive and recover to their upgraded maximum HP at the start of the next wave. Upgrades last for one run and reset on a new attempt.
 - **Controls:** Switch between 1× and 2× speed, pause and resume, or confirm an exit. Losing focus automatically pauses the game; resuming requires player input.
 
-![Upgrade selection showing the increase, cumulative effect, and stack count](Docs/Images/reward-selection.png)
+## Key problems and approaches
+
+Even in a small auto-battler, **the moment combat is resolved and the moment it appears on screen** can differ, as can **the moment a screen closes and the moment its assets finish loading**. Reproducing the same battle also does not automatically reveal an unintended rule change. The implementation and tests focus on these four problems.
+
+| Problem | Approach | Key code |
+|---|---|---|
+| HP drops before a projectile hits, and damage and healing appear out of order | Separate resolved combat state from display state, preserving the order of changes across healing events | [UnitPresentationReadModel](Assets/UnityCombatLab/Scripts/Presentation/ReadModels/UnitPresentationReadModel.cs), [BattlePresenter](Assets/UnityCombatLab/Scripts/Presentation/Units/BattlePresenter.cs) |
+| A load completes after cancellation or screen closure, leaving asset cleanup without a clear owner | Transfer ownership of each successful load to a Lease, and immediately release results that arrive after their Scope has ended | [AddressableAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/AddressableAssetScope.cs), [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
+| An incorrectly changed combat rule still produces matching results when replayed by the same code | Combine reproducibility checks for deterministic 20Hz combat with regression tests against independent, fixed expectations | [BattleRunner](Assets/UnityCombatLab/Scripts/Application/Battle/BattleRunner.cs), [RunReplayTests](Assets/UnityCombatLab/Tests/EditMode/RunReplayTests.cs) |
+| Input from an old screen or previous Run state leaks into the next step, duplicating upgrades or preventing a fresh retry | Validate the Run ID, phase, and offers, and separate authoring data from each attempt's runtime state | [RunController](Assets/UnityCombatLab/Scripts/Application/Run/RunController.cs), [RunProgress](Assets/UnityCombatLab/Scripts/Domain/Run/RunProgress.cs) |
+
+Responsibilities are separated so combat rules, presentation timing, and asset loading can each be changed and checked independently. Layer assemblies and DI connect implementations, presentation read models hold what the HUD displays, and asset Scopes define cleanup ownership. The aim is to make **the code to change and the tests to check explicit**. Smaller requirements, such as combat slots and state transitions, use fixed arrays and enums.
+
+## About Fulcrum
+
+**Fulcrum is a game balance authoring tool for the Unity Editor that I develop and maintain independently.** It lets you edit growth curves and numeric data while viewing them as graphs, then export the results as Tables or CSV files that a game can read. I built it to manage frequently adjusted balance data separately from game code and make changes in the numbers easy to see.
+
+A Profile is the authoring source containing axes, tracks, and calculation models. A BalanceTable is the output obtained by evaluating that Profile. Fulcrum also has general simulation and validation features, while each game's combat core remains responsible for its actual rules and result verification.
+
+## How this project uses Fulcrum
+
+Unity Combat Lab uses Fulcrum to manage **enemy HP, attack power, and upgrade strength for each wave**. Instead of changing numbers inside the game's C# code, you edit the standard and easy difficulty Profiles, re-export the Tables, and apply them to the next Run. The following shows the actual Profile connected to this project and its workflow.
+
+![The actual Fulcrum editor with UnityCombatLab's standard Profile: tracks on the left, enemy HP by wave in the center, and model and input settings on the right](Docs/Images/fulcrum-balance-editor.png)
+
+The screenshot shows the `enemy_hp` track in the game's `BalanceProfile_Standard`. The horizontal axis covers **waves 1–5**, and the vertical axis shows **enemy HP before role coefficients**. The current model is **Hand-written values**, with five explicit entries. Expanding `Values` on the right and editing a wave's value also updates the graph. Increasing wave 1 HP, for example, increases the number of attacks needed to defeat its enemies.
+
+### From the graph to actual combat
+
+```mermaid
+flowchart LR
+    P[Edit Profile] --> E[Editor validation · Export Table]
+    E --> T[Standard · Easy BalanceTable]
+    T --> A[Start Run · Validate and round selected Table]
+    A --> S[Fixed RunGameData snapshot]
+    S --> B[Existing BattleSimulation]
+    S --> R[Replay verification with the same inputs]
+```
+
+[RunBalanceExporter](Assets/UnityCombatLab/Editor/RunBalanceExporter.cs) validates the Profile's `wave` axis from 1–5, its required tracks, and the relationship between standard and easy difficulties. Tables do not store axis names, so [FulcrumBalanceAdapter](Assets/UnityCombatLab/Scripts/Infrastructure/Balance/FulcrumBalanceAdapter.cs) checks for missing tracks, insufficient ranges, NaN/Infinity, and unsafe input values when the game starts a Run. Invalid values reject startup instead of falling back to defaults, using the existing asset cleanup and error display path.
+
+[RunDefinition](Assets/UnityCombatLab/Scripts/Infrastructure/Balance/RunDefinition.cs) selects the difficulty Table and combines it with the enemy slots in [WaveDefinition](Assets/UnityCombatLab/Scripts/Infrastructure/Balance/WaveDefinition.cs) to create pure C# [RunGameData](Assets/UnityCombatLab/Scripts/Domain/Run/RunGameData.cs). Fulcrum types do not enter Domain/Application, and the game's direct runtime dependency is limited to Infrastructure referencing `Fulcrum.Core`. Active Runs and replay records use this fixed snapshot, so later Profile edits cannot change them.
+
+**This graph shows input values; it does not predict the game's win or loss.** The `Simulation not configured` message at the bottom means this Profile does not configure Fulcrum's general simulator. The existing `BattleSimulation` runs game combat, and the game's `RunReplayVerifier` checks reproducibility. The two simulators are not synchronized, and there is no feature that overwrites active game values in real time.
+
+### Values adjusted in this game
+
+| Track | Value applied in the game | Initial standard Profile values for waves 1–5 |
+|---|---|---|
+| `enemy_hp` | Base enemy HP before role coefficients | 420 / 500 / 600 / 700 / 800 |
+| `enemy_attack` | Base enemy attack before role coefficients | 12 / 14 / 17 / 20 / 24 |
+| `reward_strength` | Multiplier applied to an upgrade's base effect when selected | 1.00 / 1.10 / 1.20 / 1.30 / 1.40 |
+
+`reward_strength` is **the strength multiplier for a selected upgrade**, rather than a currency reward for defeating an enemy. If the base attack upgrade grants +15% and the wave multiplier is 1.10, that choice is fixed at +16.5% and stored in the Run. The wave 5 value is also present in the Table, although there is no upgrade selection after the final victory.
+
+### Applying edited values to the game
+
+1. Open **Window → Fulcrum → Balance Editor** in Unity.
+2. Assign [BalanceProfile_Standard](Assets/UnityCombatLab/Data/Balance/BalanceProfile_Standard.asset) to the top `Profile` field, select a track on the left, and edit the model's `Values` on the right. The entries correspond to waves 1–5 in order.
+3. Update [BalanceProfile_Easy](Assets/UnityCombatLab/Data/Balance/BalanceProfile_Easy.asset) so enemy HP and attack are 80% of standard and upgrade strength is identical. The two Profiles do not synchronize automatically.
+4. **Exit Play mode, then run Tools → UnityCombatLab → Export Run Balance Tables.** This validates both Profiles and updates the existing standard and easy Tables. Use this game-specific menu instead of the graph window's general `Export Table` button to check the axis, input ranges, and difficulty ratio as well.
+5. Enter Play mode, select a difficulty on the formation screen, and **start a new Run**. It reads the latest Table for the selected difficulty.
+
+**Editing and saving a Profile alone does not apply the change to the game.** You must explicitly export the Table, and an active Run retains the values it read at startup. `BalanceTable_Standard` and `BalanceTable_Easy` are generated outputs; edit the Profiles instead.
+
+For example, changing standard wave 1 HP from `420 → 500` requires matching easy from `336 → 400` before re-exporting. Melee enemies in the next Run start with 500 / 400 HP respectively. Changes to outcomes and clear times are then checked with the actual game core.
+
+### Input conversion and package layout
+
+The easy difficulty Profile uses **standard enemy HP and attack ×0.8**, with identical upgrade strength. HP and attack are converted to integers with `MidpointRounding.AwayFromZero` when reading the Table, giving easy base attack values of `10 / 11 / 14 / 16 / 19`. Existing integer flooring still applies to ranged/captain role coefficients and damage calculations afterward. Easy wave 1 attack, for example, is `12 × 0.8 = 9.6 → 10`; the game does not apply another 80% multiplier.
+
+Fulcrum **0.4.0** is embedded under `Packages/com.hakrimryu.fulcrum`, containing only the package from the verified source revision. It does not depend on a personal machine's absolute path or access to a private repository. The revision and source are recorded in [FULCRUM_SOURCE](Packages/FULCRUM_SOURCE.md), and the MIT copyright and permission notice are preserved in [LICENSE](Packages/com.hakrimryu.fulcrum/LICENSE.md). Integration regression tests are in [FulcrumBalanceAdapterTests](Assets/UnityCombatLab/Tests/EditMode/FulcrumBalanceAdapterTests.cs).
+
+## Code structure
+
+Combat rule changes, impact timing changes, and changes to asset loading each have distinct places in the code. These responsibilities are organized using **Clean Architecture Lite + MVP/Passive View**, with R3 for frequently changing HUD values. Clicks and screen transitions use C# events and explicit method calls.
+
+The arrows below show the main code dependencies. References to Common enums and fixed conventions are omitted.
+
+```mermaid
+flowchart TD
+    B[Bootstrap / VContainer] --> P[Presentation / View · Presenter]
+    B --> A[Application / Run · BattleRunner · Ports]
+    B --> I[Infrastructure / Assets · Scenes · Data]
+    P --> A
+    P --> D[Domain / Combat · Rewards · Replay]
+    I --> A
+    I --> D
+    A --> D
+```
+
+The [Domain asmdef](Assets/UnityCombatLab/Scripts/Domain/UnityCombatLab.Domain.asmdef) sets `noEngineReferences: true` and references only Common. Combat rules and replay verification can run without a Unity view. [Application](Assets/UnityCombatLab/Scripts/Application/UnityCombatLab.Application.asmdef) also has no UnityEngine reference, but uses UniTask and R3 for progression, asynchronous flow, and read models.
+
+Wave progression policy lives in [RunBattleCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunBattleCoordinator.cs), while [RunBattleEntryPoint](Assets/UnityCombatLab/Scripts/Bootstrap/RunBattleEntryPoint.cs) connects Unity object creation, frame updates, and focus input. Conditions for advancing to the next wave can therefore be tested without setting up a scene or characters.
+
+**VContainer is used where concrete implementations are assembled.** [AppLifetimeScope.Configure](Assets/UnityCombatLab/Scripts/Bootstrap/AppLifetimeScope.cs) connects the flow coordinator to scene transitions, an asset factory, frame waiting, and error reporting:
+
+```csharp
+builder.Register(resolver => new RunFlowCoordinator
+(resolver.Resolve<SceneTransitionManager>(),
+    loading,
+    configuration => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition, configuration),
+    () => UniTask.NextFrame(),
+    Debug.LogException,
+    value => AudioListener.volume = value), Lifetime.Singleton);
+builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
+```
+
+Tests replace these connections with doubles to control when loads and frame waits complete. Domain does not query the container. VContainer's scene Scopes and Run asset lifetimes are managed separately: assets needed for an entire Run are distinguished from combat objects replaced each wave, [as shown in the lifetime table in the implementation details](#2-the-screen-has-closed-but-its-assets-finish-loading-later).
+
+Data structures and state representations match the actual scale of the game. [BattleSimulation.FindTarget](Assets/UnityCombatLab/Scripts/Domain/Battle/BattleSimulation.cs) examines at most three enemy slots in a fixed order. Dictionaries are used where a Unit ID is needed to look up a View. `RunController` represents phases with an enum and explicit checks for allowed transitions.
+
+## Tests and verification results
+
+**These checks were executed in the Unity Editor on 2026-10-27, including the Fulcrum integration.** Actual combat advanced on Editor frames, with development input APIs selecting formation, speed, and upgrades. This was not a full automated mouse interaction test.
+
+| Check | Result |
+|---|---|
+| EditMode | **177 / 177 passed** |
+| PlayMode | **47 / 47 passed** |
+| Actual Editor combat — standard | Victory across 5/5 waves, **1090 ticks / 455 events**, replay **MATCH** (`3F80450CE314E9DB`) |
+| Actual Editor combat — easy | Victory across 5/5 waves, **872 ticks / 371 events**, replay **MATCH** (`E504B1BB12FD5095`) |
+| Departure with an invalid Table | Missing required tracks, insufficient ranges, and abnormal values rejected; missing Table releases acquired assets and returns to the error screen |
+| Runtime environment | Unity 6000.3.8f1, Addressables Asset Database / Fast Mode |
+
+The actual play result of 1090 ticks/455 events and the test-specific fixed input result of 386 ticks/152 events come from different inputs.
+
+Relevant test code is linked from each example in [Implementation and design decisions](#implementation-and-design-decisions) below. Besides numeric calculations, the checks cover presentation order, late async completion, duplicate input, and retries.
+
+The following also confirms that Fulcrum output reaches actual combat. The formation is Mage/Ranger/Knight, the seed is `20261024`, and the upgrade order is attack → attack → healing on a kill → attack.
+
+| Verification stage | Observed behavior |
+|---|---|
+| Re-export Profile after starting a standard Run | Change wave 1 HP from 420 to 1,000,000 for verification, matching easy at 80%, and export. The active Run retains HP 420 and wins with its original result |
+| New standard Run after the change | Reads HP 1,000,000 from the new Table, changing the result to **timeout at 1800 ticks / 501 events**. Replay **MATCH** (`3646720722658195`) |
+| Easy Run after restoring the base values | Starts wave 1 at HP 336 and attack 10, wins all five waves, and cleans up units after completion |
+
+1,000,000 HP is a **verification value used to prove that an input change affects the actual result**, rather than a suggested balance setting. This re-export check used development Editor APIs; the normal authoring menu runs in Edit mode as described above. After verification, all Profiles, Tables, and their meta files were restored byte-for-byte to their previous contents.
+
+The current submission scope is the GitHub repository. Android/WebGL builds, deployment, and device performance checks are on hold and are not replaced by these Editor results. Full restoration from a fresh clone without the purchased assets has not been verified either.
 
 ## Implementation and design decisions
 
-The code blocks below are excerpts from the implementation. Each example links to the full source and relevant tests. A **Run** is one attempt, from departure after formation selection through victory, defeat, or an early exit.
+The code blocks below are excerpts from the implementation. Each example links to the full source and relevant tests.
 
 ### 1. The hit is resolved, but the arrow has not arrived
 
@@ -209,87 +365,6 @@ Authoring data and runtime state are also separate. ScriptableObject settings in
 
 **Relevant tests:** [RunProgressTests](Assets/UnityCombatLab/Tests/EditMode/RunProgressTests.cs) checks offers and duplicate choices. [RunControllerTests](Assets/UnityCombatLab/Tests/EditMode/RunControllerTests.cs) checks state transitions and reset on retry. [RunBattleCoordinatorTests](Assets/UnityCombatLab/Tests/EditMode/RunBattleCoordinatorTests.cs) checks five-wave progression without a view, focus recovery, and waiting for presentation to finish.
 
-## Code structure around these responsibilities
-
-Combat rule changes, impact timing changes, and changes to asset loading each have distinct places in the code. These responsibilities are organized using **Clean Architecture Lite + MVP/Passive View**, with R3 for frequently changing HUD values. Clicks and screen transitions use C# events and explicit method calls.
-
-The arrows below show the main code dependencies. References to Common enums and fixed conventions are omitted.
-
-```mermaid
-flowchart TD
-    B[Bootstrap / VContainer] --> P[Presentation / View · Presenter]
-    B --> A[Application / Run · BattleRunner · Ports]
-    B --> I[Infrastructure / Assets · Scenes · Data]
-    P --> A
-    P --> D[Domain / Combat · Rewards · Replay]
-    I --> A
-    I --> D
-    A --> D
-```
-
-The [Domain asmdef](Assets/UnityCombatLab/Scripts/Domain/UnityCombatLab.Domain.asmdef) sets `noEngineReferences: true` and references only Common. Combat rules and replay verification can run without a Unity view. [Application](Assets/UnityCombatLab/Scripts/Application/UnityCombatLab.Application.asmdef) also has no UnityEngine reference, but uses UniTask and R3 for progression, asynchronous flow, and read models.
-
-Wave progression policy lives in [RunBattleCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunBattleCoordinator.cs), while [RunBattleEntryPoint](Assets/UnityCombatLab/Scripts/Bootstrap/RunBattleEntryPoint.cs) connects Unity object creation, frame updates, and focus input. Conditions for advancing to the next wave can therefore be tested without setting up a scene or characters.
-
-**VContainer is used where concrete implementations are assembled.** [AppLifetimeScope.Configure](Assets/UnityCombatLab/Scripts/Bootstrap/AppLifetimeScope.cs) connects the flow coordinator to scene transitions, an asset factory, frame waiting, and error reporting:
-
-```csharp
-builder.Register(resolver => new RunFlowCoordinator
-(resolver.Resolve<SceneTransitionManager>(),
-    loading,
-    () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition),
-    () => UniTask.NextFrame(),
-    Debug.LogException,
-    value => AudioListener.volume = value), Lifetime.Singleton);
-builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
-```
-
-Tests replace these connections with doubles to control when loads and frame waits complete. Domain does not query the container. VContainer's scene Scopes and Run asset lifetimes are managed separately: assets needed for an entire Run are distinguished from combat objects replaced each wave, as shown in the lifetime table above.
-
-Data structures and state representations match the actual scale of the game. [BattleSimulation.FindTarget](Assets/UnityCombatLab/Scripts/Domain/Battle/BattleSimulation.cs) examines at most three enemy slots in a fixed order. Dictionaries are used where a Unit ID is needed to look up a View. `RunController` represents phases with an enum and explicit checks for allowed transitions.
-
-## Environment and libraries
-
-These are the installed versions verified in this project. UPM configuration is in [manifest.json](Packages/manifest.json) and [packages-lock.json](Packages/packages-lock.json); NuGet configuration is in [packages.config](Assets/packages.config).
-
-| Technology | Version | Usage and rationale |
-|---|---|---|
-| Unity / C# | **6000.3.8f1** | Scenes, prefabs, Animator, and game client implementation. [ProjectVersion](ProjectSettings/ProjectVersion.txt) |
-| Universal Render Pipeline | **17.3.0** | Rendering the 3D combat stage and characters. [Rendering settings](Assets/UnityCombatLab/Settings) |
-| uGUI / TextMeshPro | **Included in uGUI 2.0.0** | Explicit View connections, Japanese UI, and numeric displays. [UI code](Assets/UnityCombatLab/Scripts/Presentation/UI) |
-| VContainer | **1.19.0** | Application and scene object composition, plus EntryPoint registration. Container access is concentrated in [Bootstrap](Assets/UnityCombatLab/Scripts/Bootstrap) |
-| UniTask | **2.5.11** | Asset preparation, scene transitions, next-frame waits, and cancellation. [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
-| R3 | **1.3.1** — core + Unity integration | Subscribing to HP, shield, and projected HP changes, with explicit subscription cleanup. [BattleHudPresenter](Assets/UnityCombatLab/Scripts/Presentation/UI/BattleHudPresenter.cs) |
-| DOTween Standard | **1.3.045** | UI popups, button feedback, movement, hit reactions, and damage numbers. [UiTweenUtility](Assets/UnityCombatLab/Scripts/Presentation/UI/UiTweenUtility.cs), [UnitView](Assets/UnityCombatLab/Scripts/Presentation/Units/UnitView.cs) |
-| Addressables | **2.8.1** | Loading local unit definitions, prefabs, UI, and icons. [RunAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/RunAssetScope.cs) |
-| Input System | **1.18.0** | EventSystem UI input and Esc input. [RunBattleView](Assets/UnityCombatLab/Scripts/Presentation/UI/RunBattleView.cs) |
-| Unity Test Framework / NUnit | **1.6.0 package** | EditMode tests for combat and progression; PlayMode tests for Unity objects and asset lifetimes. [Tests](Assets/UnityCombatLab/Tests) |
-| NuGetForUnity | **4.5.0** | Restoring R3 core and its .NET dependencies |
-
-Development tools: Rider **2026.2.3.1** / Unity Rider Editor **3.0.39**, and Unity CLI **1.0.0-beta.14** / Pipeline **0.9.1-exp.1**. CLI and MCP were used for Editor operations and verification.
-
-## Tests and reproducibility checks
-
-The following results are from **Unity Editor validation on 2026-10-26**.
-
-| Check | Result |
-|---|---|
-| EditMode | **110 / 110 passed** |
-| PlayMode | **44 / 44 passed** |
-| Actual Editor playthrough | Standard difficulty, all 5/5 waves won, **1090 ticks** and **455 events** in total |
-| Replay of that playthrough | **MATCH**; expected and actual hashes both `3F80450CE314E9DB` |
-| Environment | Unity 6000.3.8f1, 1920×1080, Addressables Asset Database / Fast Mode |
-
-The actual playthrough's 1090 ticks / 455 events and the test fixture's 386 ticks / 152 events come from different inputs.
-
-Test code is linked within each example above. The suite covers numeric calculations along with display ordering, late asynchronous completion, duplicate input, and retries.
-
-## Planned work
-
-- **Balance tool integration:** Connect the game to data from **Fulcrum**, a tool I developed for **curve-driven game balance authoring, simulation, and validation in the Unity Editor**. Fulcrum is maintained in a personal private repository.
-- **Sound:** Add background music and combat/UI sound effects. The current demo has no sound.
-- **Logic improvements:** Review the existing logic against actual play flows and tests, then refactor and fix it where needed.
-
 ## Running the project and restoring assets
 
 Purchased assets are excluded from this repository in accordance with their licenses. Running the project in Unity requires restoring models, textures, animations, GUI assets, fonts, and the project's derived materials and VFX.
@@ -321,3 +396,8 @@ The custom implementation covers combat, upgrades, progression rules, UI and eff
 Excluded paths are listed in [.gitignore](.gitignore). Custom wrappers reference external resources, so both the original assets and project-derived assets must be restored.
 
 Development includes implementation drafts, Editor operations, and automated verification using Codex and Unity CLI/MCP. Changes have been incorporated through design and scope decisions, code review and revision, and play checks.
+
+## Planned work
+
+- **Sound:** Add background music and combat/UI sound effects. The current demo has no sound.
+- **Logic improvements:** Review the existing logic against actual play flows and tests, then refactor and fix it where needed.

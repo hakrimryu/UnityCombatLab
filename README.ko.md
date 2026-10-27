@@ -1,26 +1,45 @@
 # Unity Combat Lab
 
+[日本語](README.md) | [한국어](README.ko.md) | [English](README.en.md)
+
+**목차:** [소개](#프로젝트-소개) · [사용 환경](#사용-환경과-라이브러리) · [Fulcrum](#fulcrum-소개) · [코드 구조](#코드-구조) · [검증 결과](#테스트와-검증-결과) · [구현 상세](#구현과-설계-판단) · [실행 안내](#프로젝트-실행과-에셋-복원)
+
+## 프로젝트 소개
+
 **3명의 영웅을 배치하고, 웨이브 사이의 강화를 선택해 5번의 자동전투를 돌파하는 Unity 클라이언트 포트폴리오입니다.**
 
-기사·궁수·마법사의 전열/후열 배치와 강화 조합이 전투 결과를 바꿉니다. 타이틀 → 편성 → 전투 → 강화 선택 → 결과 → 재도전까지 한 판의 흐름을 구현했습니다. 게임 UI는 일본어이며, 이 README는 코드와 설계 의도를 설명하는 한국어 문서입니다.
+기사·궁수·마법사의 전열/후열 배치와 강화 조합이 전투 결과를 바꿉니다. 타이틀 → 편성 → 전투 → 강화 선택 → 결과 → 재도전까지 한 판의 흐름을 구현했습니다. 게임 UI는 일본어이며, 이 README는 코드와 설계 의도를 설명하는 한국어 문서입니다. **Run**은 편성을 마치고 출발한 뒤 클리어·패배·중도 종료에 이르기까지의 한 판을 뜻합니다.
 
-> **현재 개발 중인 포트폴리오이며, 최종 완성본은 아닙니다.** 주요 게임 흐름을 구현한 상태로, 이후 밸런스 도구 연동·사운드 추가·로직 개선을 진행할 예정입니다.
+구매 에셋은 저장소에 포함하지 않으므로 Unity에서 실행하려면 [에셋과 참조를 복원](#프로젝트-실행과-에셋-복원)해야 합니다.
+
+> **현재 개발 중인 포트폴리오이며, 최종 완성본은 아닙니다.** 주요 게임 흐름과 Fulcrum 밸런스 데이터 연동을 구현했습니다. 사운드 추가·안정성 점검·로직 개선은 이후 작업입니다.
 
 ![5웨이브 전투와 2배속, HP·방어막·피해 숫자 표시](Docs/Images/battle-wave5.png)
 
-## 이 프로젝트에서 다룬 문제
+## 사용 환경과 라이브러리
 
-작은 자동전투 게임에서도 **전투가 확정되는 시점과 화면에 보이는 시점**, **화면이 끝나는 시점과 로딩이 끝나는 시점**은 다릅니다. 또한 같은 전투를 재현할 수 있어도, 규칙을 잘못 바꾼 사실까지 자동으로 발견되는 것은 아닙니다. 이 프로젝트는 다음 세 문제를 중심으로 구현과 테스트를 구성했습니다.
+버전은 이 프로젝트에서 확인한 설치 버전입니다. UPM 구성은 [manifest.json](Packages/manifest.json)과 [packages-lock.json](Packages/packages-lock.json), NuGet 구성은 [packages.config](Assets/packages.config)에 있습니다.
 
-| 문제 | 해결 방식 | 주요 코드 |
+| 기술 | 버전 | 실제 사용처와 선택 이유 |
 |---|---|---|
-| 투사체가 닿기 전에 HP가 줄고, 피해·회복의 표시 순서가 어긋남 | 확정된 전투 상태와 표시 상태를 분리하고, 회복 전후의 적용 순서를 보존 | [UnitPresentationReadModel](Assets/UnityCombatLab/Scripts/Presentation/ReadModels/UnitPresentationReadModel.cs), [BattlePresenter](Assets/UnityCombatLab/Scripts/Presentation/Units/BattlePresenter.cs) |
-| 취소하거나 화면을 닫은 뒤 로딩이 완료되어 자산의 해제 책임이 사라짐 | 성공한 로드의 소유권을 Lease로 넘기고, 종료된 Scope에 도착한 결과는 즉시 해제 | [AddressableAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/AddressableAssetScope.cs), [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
-| 잘못 변경한 전투 규칙도 현재 코드로 재실행하면 같은 결과가 나옴 | 20Hz 결정론 전투의 재현 검사와 독립된 고정 기대값의 회귀 검사를 함께 구성 | [BattleRunner](Assets/UnityCombatLab/Scripts/Application/Battle/BattleRunner.cs), [RunReplayTests](Assets/UnityCombatLab/Tests/EditMode/RunReplayTests.cs) |
+| Unity / C# | **6000.3.8f1** | 씬·프리팹·Animator와 게임 클라이언트 구현. [ProjectVersion](ProjectSettings/ProjectVersion.txt) |
+| Universal Render Pipeline | **17.3.0** | 3D 전투 무대와 캐릭터 렌더링. [렌더링 설정](Assets/UnityCombatLab/Settings) |
+| uGUI / TextMeshPro | **uGUI 2.0.0에 포함** | 명시적으로 연결하는 View, 일본어 UI와 숫자 표시. [UI 코드](Assets/UnityCombatLab/Scripts/Presentation/UI) |
+| VContainer | **1.19.0** | 앱·씬의 객체 조립과 EntryPoint 연결. 컨테이너 접근을 [Bootstrap](Assets/UnityCombatLab/Scripts/Bootstrap)에 모음 |
+| UniTask | **2.5.11** | 자산 준비, 씬 전환, 다음 프레임 대기, 취소 처리. [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
+| R3 | **1.3.1** — core + Unity 연동 | HP·방어막·예고 HP의 변경 구독과 해제. [BattleHudPresenter](Assets/UnityCombatLab/Scripts/Presentation/UI/BattleHudPresenter.cs) |
+| DOTween Standard | **1.3.045** | UI 팝업, 버튼 반응, 이동·피격·피해 숫자 연출. [UiTweenUtility](Assets/UnityCombatLab/Scripts/Presentation/UI/UiTweenUtility.cs), [UnitView](Assets/UnityCombatLab/Scripts/Presentation/Units/UnitView.cs) |
+| Addressables | **2.8.1** | 로컬 유닛 정의·프리팹·UI·아이콘 로딩. [RunAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/RunAssetScope.cs) |
+| Input System | **1.18.0** | EventSystem의 UI 입력과 Esc 입력. [RunBattleView](Assets/UnityCombatLab/Scripts/Presentation/UI/RunBattleView.cs) |
+| Unity Test Framework / NUnit | **1.6.0 패키지** | 전투·진행의 EditMode 테스트와 Unity 객체·자산 수명의 PlayMode 테스트. [Tests](Assets/UnityCombatLab/Tests) |
+| NuGetForUnity | **4.5.0** | R3 core 및 관련 .NET 의존성 복원 |
+| Fulcrum | **0.4.0 / MIT / embedded** | 웨이브별 수치 작성·Table 출력과 Run 입력 변환. [패키지 출처](Packages/FULCRUM_SOURCE.md) |
 
-게임 규모에 비해 계층별 어셈블리, DI, 표시 전용 읽기 모델, 자산 Scope 등 설계 요소를 폭넓게 적용했습니다. 포트폴리오에서 **무엇이 바뀔 때 어느 코드를 수정하고, 어떤 테스트로 확인할지** 드러내기 위한 선택입니다. 전투 슬롯과 상태 전이처럼 요구가 작은 부분은 고정 배열과 enum으로 구현했습니다.
+개발 환경은 Rider **2026.2.3.1** / Unity Rider Editor **3.0.39**, Unity CLI **1.0.0-beta.14** / Pipeline **0.9.1-exp.1**입니다. CLI·MCP는 에디터 작업과 검증에 사용했습니다.
 
 ## 게임 구성
+
+[전체 플레이 영상 (MP4 · 62 s · 1.9 MB)](Docs/Videos/gameplay-demo.mp4)
 
 - **편성:** 기사·궁수·마법사를 전열, 위쪽 후열, 아래쪽 후열에 배치합니다. 카드와 슬롯을 선택해 위치를 교환합니다.
 - **전투:** 아군 3명과 최대 3명의 적이 자동으로 싸웁니다. 기사는 피해 감소, 궁수는 주기적인 강한 단일 공격, 마법사는 주기적인 광역 공격을 사용합니다.
@@ -28,11 +47,150 @@
 - **진행:** 다음 웨이브에서 아군은 부활하고 강화된 최대 HP로 회복합니다. 강화는 한 판 동안 유지되며 새 도전에서는 초기화됩니다.
 - **조작:** 1배/2배속, 일시정지·재개, 종료 확인을 제공합니다. 포커스를 잃으면 자동 일시정지하고 직접 재개합니다.
 
-![증가량과 누적 효과, 중첩 수를 보여주는 강화 선택 화면](Docs/Images/reward-selection.png)
+## 핵심 문제와 해결 요약
+
+작은 자동전투 게임에서도 **전투가 확정되는 시점과 화면에 보이는 시점**, **화면이 끝나는 시점과 로딩이 끝나는 시점**은 다릅니다. 또한 같은 전투를 재현할 수 있어도, 규칙을 잘못 바꾼 사실까지 자동으로 발견되는 것은 아닙니다. 이 프로젝트는 다음 네 문제를 중심으로 구현과 테스트를 구성했습니다.
+
+| 문제 | 해결 방식 | 주요 코드 |
+|---|---|---|
+| 투사체가 닿기 전에 HP가 줄고, 피해·회복의 표시 순서가 어긋남 | 확정된 전투 상태와 표시 상태를 분리하고, 회복 전후의 적용 순서를 보존 | [UnitPresentationReadModel](Assets/UnityCombatLab/Scripts/Presentation/ReadModels/UnitPresentationReadModel.cs), [BattlePresenter](Assets/UnityCombatLab/Scripts/Presentation/Units/BattlePresenter.cs) |
+| 취소하거나 화면을 닫은 뒤 로딩이 완료되어 자산의 해제 책임이 사라짐 | 성공한 로드의 소유권을 Lease로 넘기고, 종료된 Scope에 도착한 결과는 즉시 해제 | [AddressableAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/AddressableAssetScope.cs), [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
+| 잘못 변경한 전투 규칙도 현재 코드로 재실행하면 같은 결과가 나옴 | 20Hz 결정론 전투의 재현 검사와 독립된 고정 기대값의 회귀 검사를 함께 구성 | [BattleRunner](Assets/UnityCombatLab/Scripts/Application/Battle/BattleRunner.cs), [RunReplayTests](Assets/UnityCombatLab/Tests/EditMode/RunReplayTests.cs) |
+| 이전 화면의 입력이나 Run 상태가 다음 진행에 섞여 강화가 중복 적용되거나 재도전이 초기화되지 않음 | Run ID·상태·후보를 검증하고, 편집 데이터와 한 판의 실행 상태를 분리 | [RunController](Assets/UnityCombatLab/Scripts/Application/Run/RunController.cs), [RunProgress](Assets/UnityCombatLab/Scripts/Domain/Run/RunProgress.cs) |
+
+전투 규칙, 화면의 표시 타이밍, 자산 로딩 방식을 각각 수정하고 검사할 수 있도록 책임을 나눴습니다. 계층별 어셈블리와 DI는 구현의 연결을, 표시 전용 읽기 모델은 HUD에 보여줄 상태를, 자산 Scope는 해제 범위를 담당합니다. **변경할 코드와 확인할 테스트의 범위를 분명히 하는 것**이 목적입니다. 전투 슬롯과 상태 전이처럼 요구가 작은 부분은 고정 배열과 enum으로 구현했습니다.
+
+## Fulcrum 소개
+
+**Fulcrum은 개인적으로 개발하고 관리하는 Unity Editor용 게임 밸런스 제작 도구입니다.** 성장 곡선과 수치 데이터를 그래프로 확인하면서 편집하고, 결과를 게임이 읽을 수 있는 Table이나 CSV로 내보냅니다. 반복해서 수정하는 밸런스 데이터를 코드와 분리해 관리하고, 수치가 어떻게 변하는지 한눈에 확인하기 위해 만들었습니다.
+
+Profile은 축·트랙·계산 모델을 담는 편집 원본이고, BalanceTable은 그 Profile을 평가해 얻은 출력 데이터입니다. Fulcrum 자체에는 범용 시뮬레이션·검증 기능도 있지만, 실제 게임 규칙과 결과 검증은 각 게임의 전투 코어가 담당하도록 구분합니다.
+
+## 이 프로젝트에서의 Fulcrum 활용
+
+Unity Combat Lab에서는 Fulcrum으로 **웨이브별 적 HP·공격력과 강화 효과 배율**을 관리합니다. 게임 C# 코드의 수치를 직접 고치는 대신 표준·완화 난이도 Profile을 편집하고, Table을 재출력해 다음 Run에 반영합니다. 아래는 이 프로젝트에 연결한 실제 Profile과 사용 흐름입니다.
+
+![UnityCombatLab의 표준 Profile을 연 실제 Fulcrum 에디터. 왼쪽은 트랙, 중앙은 웨이브별 적 HP 그래프, 오른쪽은 모델과 입력값 설정입니다.](Docs/Images/fulcrum-balance-editor.png)
+
+위 화면은 이 게임에서 사용하는 `BalanceProfile_Standard`의 `enemy_hp` 트랙입니다. 가로축은 **1~5웨이브**, 세로축은 **역할 계수 적용 전 적 HP**입니다. 현재 모델은 다섯 값을 직접 입력하는 **Hand-written values**이며, 오른쪽 `Values`를 펼쳐 각 웨이브 값을 수정하면 중앙 그래프도 바뀝니다. 예를 들어 1웨이브 HP를 올리면 해당 웨이브의 적을 쓰러뜨리는 데 필요한 공격 횟수가 늘어납니다.
+
+### 그래프에서 실제 전투까지의 연결
+
+```mermaid
+flowchart LR
+    P[Profile 편집] --> E[Editor 검사 · Table 내보내기]
+    E --> T[표준 · 완화 BalanceTable]
+    T --> A[Run 시작 · 선택 Table 검사와 정수화]
+    A --> S[RunGameData 고정 스냅샷]
+    S --> B[기존 BattleSimulation]
+    S --> R[동일 입력으로 replay 검증]
+```
+
+[RunBalanceExporter](Assets/UnityCombatLab/Editor/RunBalanceExporter.cs)는 Profile의 `wave` 축 1~5, 필수 트랙과 표준·완화 관계를 검사합니다. Table에는 축 이름이 저장되지 않으므로 [FulcrumBalanceAdapter](Assets/UnityCombatLab/Scripts/Infrastructure/Balance/FulcrumBalanceAdapter.cs)는 게임 시작 시 트랙 누락·범위 부족·NaN/Infinity·입력 안전 범위를 확인합니다. 잘못된 값은 기본값으로 바꾸지 않고 Run 시작을 거부하며 기존 자원 정리와 오류 안내 경로로 연결합니다.
+
+[RunDefinition](Assets/UnityCombatLab/Scripts/Infrastructure/Balance/RunDefinition.cs)은 난이도별 Table을 고르고, 적 배치를 가진 [WaveDefinition](Assets/UnityCombatLab/Scripts/Infrastructure/Balance/WaveDefinition.cs)과 결합해 순수 C#의 [RunGameData](Assets/UnityCombatLab/Scripts/Domain/Run/RunGameData.cs)를 만듭니다. Domain/Application에는 Fulcrum 타입을 전달하지 않으며, 게임 런타임의 직접 참조는 Infrastructure의 `Fulcrum.Core`로 제한합니다. 진행 중인 Run과 replay는 이 고정 스냅샷을 사용하므로 이후 Profile 편집의 영향을 받지 않습니다.
+
+**이 그래프는 입력 수치를 보여주며 게임 승패를 예측하는 그래프가 아닙니다.** 화면 하단의 `Simulation not configured`는 Fulcrum 자체의 범용 시뮬레이터를 이 Profile에 설정하지 않았다는 뜻입니다. 게임 전투는 기존 `BattleSimulation`이 수행하고, 결과의 재현성은 게임의 `RunReplayVerifier`로 확인합니다. 두 시뮬레이터를 동기화하거나 실시간으로 게임 수치를 덮어쓰는 기능은 없습니다.
+
+### 이 게임에서 조정하는 값
+
+| 트랙 | 게임에 적용되는 값 | 표준 Profile의 1~5웨이브 초깃값 |
+|---|---|---|
+| `enemy_hp` | 적 역할 계수를 곱하기 전 기본 HP | 420 / 500 / 600 / 700 / 800 |
+| `enemy_attack` | 적 역할 계수를 곱하기 전 기본 공격력 | 12 / 14 / 17 / 20 / 24 |
+| `reward_strength` | 강화 선택 시 기본 효과에 곱할 배율 | 1.00 / 1.10 / 1.20 / 1.30 / 1.40 |
+
+`reward_strength`는 적 처치 보상 금액이 아니라 **선택하는 강화의 효과 배율**입니다. 기본 공격력 강화가 +15%이고 해당 웨이브 배율이 1.10이면, 그 선택은 +16.5%로 확정되어 Run에 저장됩니다. 5웨이브 값도 Table에는 있지만 최종 승리 뒤에는 강화 선택이 없습니다.
+
+### 수정한 수치를 게임에 적용하는 순서
+
+1. Unity 메뉴 **Window → Fulcrum → Balance Editor**를 엽니다.
+2. 상단 `Profile`에 [BalanceProfile_Standard](Assets/UnityCombatLab/Data/Balance/BalanceProfile_Standard.asset)를 지정하고, 왼쪽 트랙을 선택해 오른쪽 모델의 `Values`를 수정합니다. 배열의 첫 번째 값부터 1~5웨이브에 대응합니다.
+3. [BalanceProfile_Easy](Assets/UnityCombatLab/Data/Balance/BalanceProfile_Easy.asset)도 적 HP·공격력이 표준의 80%, 강화 배율은 동일하도록 맞춥니다. 두 Profile은 자동으로 동기화되지 않습니다.
+4. **Play 모드를 종료한 상태에서 Tools → UnityCombatLab → Export Run Balance Tables**를 실행합니다. 두 Profile을 검사한 뒤 기존 표준·완화 Table을 갱신합니다. 그래프 창의 일반 `Export Table` 대신 이 게임 전용 메뉴를 사용하면 축·입력 범위·난이도 비율까지 확인할 수 있습니다.
+5. Play 모드에서 편성 화면의 난이도를 선택하고 **새 Run을 시작**합니다. 선택한 난이도의 최신 Table이 적용됩니다.
+
+**Profile을 수정하고 저장하는 것만으로 게임에 적용되지는 않습니다.** 명시적으로 Table을 내보내야 하며, 이미 시작한 Run은 처음 읽은 수치를 끝까지 유지합니다. `BalanceTable_Standard`와 `BalanceTable_Easy`는 출력 결과물이므로 편집은 Profile에서 합니다.
+
+예를 들어 표준 1웨이브 HP를 `420 → 500`으로 바꾸면 완화도 `336 → 400`으로 맞춘 뒤 재출력합니다. 다음 Run의 근접 적은 각각 500 / 400 HP로 시작합니다. 해당 변경이 승패나 클리어 시간에 미치는 영향은 실제 게임 코어로 다시 확인합니다.
+
+### 입력 변환과 패키지 구성
+
+완화 난이도 Profile은 표준의 **적 HP·공격력 ×0.8**, 강화 배율은 동일합니다. HP와 공격력은 Table을 읽을 때 `MidpointRounding.AwayFromZero`로 정수화합니다. 따라서 완화 기본 공격력은 `10 / 11 / 14 / 16 / 19`입니다. 이후 원거리·대장 같은 역할 계수와 전투 피해 계산에는 기존 정수 내림 규칙을 사용합니다. 예를 들어 완화 1웨이브 공격력은 `12 × 0.8 = 9.6 → 10`이며 게임에서 80%를 다시 곱하지 않습니다.
+
+Fulcrum **0.4.0**은 검증한 원본 revision의 패키지만 `Packages/com.hakrimryu.fulcrum`에 embedded로 포함했습니다. 개인 PC의 절대경로나 비공개 저장소 접근에 의존하지 않습니다. 사용 revision·출처는 [FULCRUM_SOURCE](Packages/FULCRUM_SOURCE.md), MIT 저작권·허가문은 [LICENSE](Packages/com.hakrimryu.fulcrum/LICENSE.md)에 보존했습니다. 연동 회귀 테스트는 [FulcrumBalanceAdapterTests](Assets/UnityCombatLab/Tests/EditMode/FulcrumBalanceAdapterTests.cs)에 있습니다.
+
+## 코드 구조
+
+전투 규칙을 바꾸는 작업, 화면의 명중 타이밍을 바꾸는 작업, 자산 로딩 방식을 바꾸는 작업의 수정 범위를 구분했습니다. 이 책임 분리를 **Clean Architecture Lite + MVP/Passive View**로 구성하고, 자주 바뀌는 HUD 값에 R3를 적용했습니다. 클릭·화면 전환은 C# 이벤트와 명시적 메서드 호출로 처리합니다.
+
+아래 화살표는 주요 코드 의존 방향입니다. Common의 enum·고정 규약 참조는 생략했습니다.
+
+```mermaid
+flowchart TD
+    B[Bootstrap / VContainer] --> P[Presentation / View · Presenter]
+    B --> A[Application / Run · BattleRunner · Ports]
+    B --> I[Infrastructure / Assets · Scenes · Data]
+    P --> A
+    P --> D[Domain / Combat · Rewards · Replay]
+    I --> A
+    I --> D
+    A --> D
+```
+
+[Domain asmdef](Assets/UnityCombatLab/Scripts/Domain/UnityCombatLab.Domain.asmdef)는 `noEngineReferences: true`이며 Common만 참조합니다. 전투 규칙과 replay는 Unity 화면 없이 실행할 수 있습니다. [Application](Assets/UnityCombatLab/Scripts/Application/UnityCombatLab.Application.asmdef)도 UnityEngine을 참조하지 않지만 진행·비동기 흐름·읽기 모델에 UniTask와 R3를 사용합니다.
+
+웨이브 진행 정책은 [RunBattleCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunBattleCoordinator.cs)에 두고, [RunBattleEntryPoint](Assets/UnityCombatLab/Scripts/Bootstrap/RunBattleEntryPoint.cs)는 Unity 객체 생성과 프레임·포커스 입력을 연결합니다. 덕분에 다음 웨이브로 넘어가는 조건을 검사할 때 씬과 캐릭터를 준비할 필요가 없습니다.
+
+**VContainer는 구체 구현을 조립하는 위치에 사용합니다.** [AppLifetimeScope.Configure](Assets/UnityCombatLab/Scripts/Bootstrap/AppLifetimeScope.cs)에서 흐름 조정 객체에 씬 전환, 자산 생성 함수, 프레임 대기와 오류 보고를 연결합니다.
+
+```csharp
+builder.Register(resolver => new RunFlowCoordinator
+(resolver.Resolve<SceneTransitionManager>(),
+    loading,
+    configuration => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition, configuration),
+    () => UniTask.NextFrame(),
+    Debug.LogException,
+    value => AudioListener.volume = value), Lifetime.Singleton);
+builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
+```
+
+테스트에서는 이 연결을 대역으로 바꿔 로드 완료와 프레임 대기 시점을 직접 제어합니다. Domain은 컨테이너를 조회하지 않습니다. VContainer의 씬 Scope와 Run 자산의 수명은 별도로 관리하며, [구현 상세의 소유 기간 표](#2-화면은-종료됐는데-자산-로딩은-나중에-끝난다)처럼 한 판 동안 유지할 자산과 웨이브마다 교체할 전투 객체를 구분합니다.
+
+자료구조와 상태 표현은 실제 크기에 맞췄습니다. [BattleSimulation.FindTarget](Assets/UnityCombatLab/Scripts/Domain/Battle/BattleSimulation.cs)은 최대 3개 적 슬롯을 정해진 순서로 검사하고, Unit ID로 View를 찾는 곳에는 Dictionary를 사용합니다. `RunController`의 상태는 enum과 허용 전이 검사로 표현합니다.
+
+## 테스트와 검증 결과
+
+**2026-10-27 Unity Editor에서 Fulcrum 연동을 포함해 실행한 검증 결과**입니다. 실제 전투는 Editor 프레임으로 진행하고, 개발용 입력 API로 편성·배속·강화를 선택했습니다. 마우스 조작 전체를 자동화한 검증은 아닙니다.
+
+| 검증 | 결과 |
+|---|---|
+| EditMode | **177 / 177 통과** |
+| PlayMode | **47 / 47 통과** |
+| 실제 Editor 전투 — 표준 | 5/5웨이브 승리, **1090tick / 455이벤트**, replay **MATCH** (`3F80450CE314E9DB`) |
+| 실제 Editor 전투 — 완화 | 5/5웨이브 승리, **872tick / 371이벤트**, replay **MATCH** (`E504B1BB12FD5095`) |
+| 잘못된 Table의 출발 | 필수 트랙·범위·비정상 값 거부, Table 누락 시 취득 자산 정리·오류 화면 복귀 확인 |
+| 실행 환경 | Unity 6000.3.8f1, Addressables Asset Database / Fast Mode |
+
+실제 플레이의 1090tick/455이벤트와 테스트 전용 고정 입력의 386tick/152이벤트는 서로 다른 입력에 대한 결과입니다.
+
+관련 테스트 코드는 아래 [구현과 설계 판단](#구현과-설계-판단)의 각 사례에 연결했습니다. 값의 계산뿐 아니라 표시 순서, 늦은 비동기 완료, 중복 입력과 재시작을 함께 검사하도록 구성했습니다.
+
+Fulcrum의 출력이 실제 전투에 연결되는지도 다음과 같이 확인했습니다. 편성은 마법사/궁수/기사, 시드는 `20261024`, 강화 순서는 공격력 → 공격력 → 처치 회복 → 공격력입니다.
+
+| 검증 단계 | 실제 확인한 동작 |
+|---|---|
+| 표준 Run 시작 후 Profile 재출력 | 검증용으로 1웨이브 HP를 420에서 1,000,000으로 바꾸고 완화도 80%로 맞춰 출력. 이미 진행 중인 Run은 기존 HP 420을 유지하고 기존 결과로 승리 |
+| 변경 후 새 표준 Run | 새 Table의 HP 1,000,000을 사용해 **1800tick 시간초과 / 501이벤트**로 결과 변경. replay **MATCH** (`3646720722658195`) |
+| 기본 수치 복원 후 완화 Run | 1웨이브 HP 336·공격력 10으로 시작하고 5웨이브 승리. 종료 뒤 유닛 정리 확인 |
+
+1,000,000 HP는 밸런스 추천값이 아니라 **입력 변경이 실제 결과에 반영되는지 확인하기 위한 검증값**입니다. 이 재출력 검증은 개발용 Editor API로 실행했으며, 일반 사용 메뉴는 앞의 절차처럼 Edit 모드에서 실행합니다. 검증 후 Profile·Table과 meta는 모두 검증 전 파일과 바이트가 같도록 복원했습니다.
+
+현재 제출 범위는 GitHub 저장소입니다. Android/WebGL 빌드·배포와 실기기 성능 검증은 보류 상태이며 위 Editor 결과로 대체하지 않습니다. 외부 구매 에셋을 제외한 새 clone의 전체 복원도 검증하지 않았습니다.
 
 ## 구현과 설계 판단
 
-아래 코드 블록은 실제 구현의 핵심 부분을 발췌했습니다. 각 사례에 전체 소스와 관련 테스트를 연결했습니다. **Run**은 편성 후 출발부터 클리어·패배·중도 종료까지의 한 판을 뜻합니다.
+아래 코드 블록은 실제 구현의 핵심 부분을 발췌했습니다. 각 사례에 전체 소스와 관련 테스트를 연결했습니다.
 
 ### 1. 전투 결과는 확정됐지만, 화살은 아직 도착하지 않았다
 
@@ -207,87 +365,6 @@ public bool TrySelectReward(Guid runId, int wave, Define.RewardKind? kind)
 
 **확인하는 테스트:** [RunProgressTests](Assets/UnityCombatLab/Tests/EditMode/RunProgressTests.cs)는 후보·중복 선택을, [RunControllerTests](Assets/UnityCombatLab/Tests/EditMode/RunControllerTests.cs)는 상태 전이와 재시작 초기화를 검사합니다. [RunBattleCoordinatorTests](Assets/UnityCombatLab/Tests/EditMode/RunBattleCoordinatorTests.cs)는 화면 없이 5웨이브 진행, 포커스 복귀, 연출 완료 대기를 검사합니다.
 
-## 이 문제들을 나눈 코드 구조
-
-전투 규칙을 바꾸는 작업, 화면의 명중 타이밍을 바꾸는 작업, 자산 로딩 방식을 바꾸는 작업의 수정 범위를 구분했습니다. 이 책임 분리를 **Clean Architecture Lite + MVP/Passive View**로 구성하고, 자주 바뀌는 HUD 값에 R3를 적용했습니다. 클릭·화면 전환은 C# 이벤트와 명시적 메서드 호출로 처리합니다.
-
-아래 화살표는 주요 코드 의존 방향입니다. Common의 enum·고정 규약 참조는 생략했습니다.
-
-```mermaid
-flowchart TD
-    B[Bootstrap / VContainer] --> P[Presentation / View · Presenter]
-    B --> A[Application / Run · BattleRunner · Ports]
-    B --> I[Infrastructure / Assets · Scenes · Data]
-    P --> A
-    P --> D[Domain / Combat · Rewards · Replay]
-    I --> A
-    I --> D
-    A --> D
-```
-
-[Domain asmdef](Assets/UnityCombatLab/Scripts/Domain/UnityCombatLab.Domain.asmdef)는 `noEngineReferences: true`이며 Common만 참조합니다. 전투 규칙과 replay는 Unity 화면 없이 실행할 수 있습니다. [Application](Assets/UnityCombatLab/Scripts/Application/UnityCombatLab.Application.asmdef)도 UnityEngine을 참조하지 않지만 진행·비동기 흐름·읽기 모델에 UniTask와 R3를 사용합니다.
-
-웨이브 진행 정책은 [RunBattleCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunBattleCoordinator.cs)에 두고, [RunBattleEntryPoint](Assets/UnityCombatLab/Scripts/Bootstrap/RunBattleEntryPoint.cs)는 Unity 객체 생성과 프레임·포커스 입력을 연결합니다. 덕분에 다음 웨이브로 넘어가는 조건을 검사할 때 씬과 캐릭터를 준비할 필요가 없습니다.
-
-**VContainer는 구체 구현을 조립하는 위치에 사용합니다.** [AppLifetimeScope.Configure](Assets/UnityCombatLab/Scripts/Bootstrap/AppLifetimeScope.cs)에서 흐름 조정 객체에 씬 전환, 자산 생성 함수, 프레임 대기와 오류 보고를 연결합니다.
-
-```csharp
-builder.Register(resolver => new RunFlowCoordinator
-(resolver.Resolve<SceneTransitionManager>(),
-    loading,
-    () => new RunAssetScope(resolver.Resolve<AddressableAssetManager>(), _uiAssets, _unitAssets, _runDefinition),
-    () => UniTask.NextFrame(),
-    Debug.LogException,
-    value => AudioListener.volume = value), Lifetime.Singleton);
-builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
-```
-
-테스트에서는 이 연결을 대역으로 바꿔 로드 완료와 프레임 대기 시점을 직접 제어합니다. Domain은 컨테이너를 조회하지 않습니다. VContainer의 씬 Scope와 Run 자산의 수명은 별도로 관리하며, 앞의 수명 표처럼 한 판 동안 유지할 자산과 웨이브마다 교체할 전투 객체를 구분합니다.
-
-자료구조와 상태 표현은 실제 크기에 맞췄습니다. [BattleSimulation.FindTarget](Assets/UnityCombatLab/Scripts/Domain/Battle/BattleSimulation.cs)은 최대 3개 적 슬롯을 정해진 순서로 검사하고, Unit ID로 View를 찾는 곳에는 Dictionary를 사용합니다. `RunController`의 상태는 enum과 허용 전이 검사로 표현합니다.
-
-## 사용 환경과 라이브러리
-
-버전은 이 프로젝트에서 확인한 설치 버전입니다. UPM 구성은 [manifest.json](Packages/manifest.json)과 [packages-lock.json](Packages/packages-lock.json), NuGet 구성은 [packages.config](Assets/packages.config)에 있습니다.
-
-| 기술 | 버전 | 실제 사용처와 선택 이유 |
-|---|---|---|
-| Unity / C# | **6000.3.8f1** | 씬·프리팹·Animator와 게임 클라이언트 구현. [ProjectVersion](ProjectSettings/ProjectVersion.txt) |
-| Universal Render Pipeline | **17.3.0** | 3D 전투 무대와 캐릭터 렌더링. [렌더링 설정](Assets/UnityCombatLab/Settings) |
-| uGUI / TextMeshPro | **uGUI 2.0.0에 포함** | 명시적으로 연결하는 View, 일본어 UI와 숫자 표시. [UI 코드](Assets/UnityCombatLab/Scripts/Presentation/UI) |
-| VContainer | **1.19.0** | 앱·씬의 객체 조립과 EntryPoint 연결. 컨테이너 접근을 [Bootstrap](Assets/UnityCombatLab/Scripts/Bootstrap)에 모음 |
-| UniTask | **2.5.11** | 자산 준비, 씬 전환, 다음 프레임 대기, 취소 처리. [RunFlowCoordinator](Assets/UnityCombatLab/Scripts/Application/Run/RunFlowCoordinator.cs) |
-| R3 | **1.3.1** — core + Unity 연동 | HP·방어막·예고 HP의 변경 구독과 해제. [BattleHudPresenter](Assets/UnityCombatLab/Scripts/Presentation/UI/BattleHudPresenter.cs) |
-| DOTween Standard | **1.3.045** | UI 팝업, 버튼 반응, 이동·피격·피해 숫자 연출. [UiTweenUtility](Assets/UnityCombatLab/Scripts/Presentation/UI/UiTweenUtility.cs), [UnitView](Assets/UnityCombatLab/Scripts/Presentation/Units/UnitView.cs) |
-| Addressables | **2.8.1** | 로컬 유닛 정의·프리팹·UI·아이콘 로딩. [RunAssetScope](Assets/UnityCombatLab/Scripts/Infrastructure/Assets/RunAssetScope.cs) |
-| Input System | **1.18.0** | EventSystem의 UI 입력과 Esc 입력. [RunBattleView](Assets/UnityCombatLab/Scripts/Presentation/UI/RunBattleView.cs) |
-| Unity Test Framework / NUnit | **1.6.0 패키지** | 전투·진행의 EditMode 테스트와 Unity 객체·자산 수명의 PlayMode 테스트. [Tests](Assets/UnityCombatLab/Tests) |
-| NuGetForUnity | **4.5.0** | R3 core 및 관련 .NET 의존성 복원 |
-
-개발 환경은 Rider **2026.2.3.1** / Unity Rider Editor **3.0.39**, Unity CLI **1.0.0-beta.14** / Pipeline **0.9.1-exp.1**입니다. CLI·MCP는 에디터 작업과 검증에 사용했습니다.
-
-## 테스트와 재현 검증
-
-**2026-10-26 Unity Editor 검증 결과**입니다.
-
-| 검증 | 결과 |
-|---|---|
-| EditMode | **110 / 110 통과** |
-| PlayMode | **44 / 44 통과** |
-| 실제 Editor 플레이 | 표준 난이도 5/5웨이브 승리, 누적 **1090tick**, **455이벤트** |
-| 해당 플레이의 replay | **MATCH**, 예상/실제 해시 `3F80450CE314E9DB` 일치 |
-| 실행 환경 | Unity 6000.3.8f1, 1920×1080, Addressables Asset Database / Fast Mode |
-
-실제 플레이의 1090tick/455이벤트와 테스트 전용 고정 입력의 386tick/152이벤트는 서로 다른 입력에 대한 결과입니다.
-
-테스트 코드는 위 사례마다 연결했습니다. 값의 계산뿐 아니라 표시 순서, 늦은 비동기 완료, 중복 입력과 재시작을 함께 검사하도록 구성했습니다.
-
-## 이후 개발 계획
-
-- **밸런스 도구 연동:** 직접 개발한 **Fulcrum**의 데이터를 게임에 연동할 예정입니다. Fulcrum은 Unity Editor에서 **커브 기반 게임 밸런스 데이터를 작성하고 시뮬레이션·검증하는 도구**이며, 개인 비공개 저장소에서 관리하고 있습니다.
-- **사운드 추가:** BGM과 전투·UI 효과음을 추가할 예정입니다. 현재 데모는 사운드 없이 동작합니다.
-- **로직 개선:** 실제 사용 흐름과 테스트를 바탕으로 기존 로직을 다시 검토하고, 필요한 부분을 리팩토링·수정할 예정입니다.
-
 ## 프로젝트 실행과 에셋 복원
 
 구매 에셋은 라이선스에 따라 저장소에서 제외했습니다. Unity에서 실행하려면 모델·텍스처·애니메이션·GUI·폰트와 프로젝트용 파생 재질/VFX를 복원해야 합니다.
@@ -319,3 +396,8 @@ builder.RegisterEntryPoint<AppEntryPoint>().AsSelf();
 공개 제외 경로는 [.gitignore](.gitignore)에 명시했습니다. 자체 wrapper는 외부 리소스를 참조하므로 해당 원본과 프로젝트용 파생 자산을 함께 복원해야 합니다.
 
 개발 과정에는 Codex와 Unity CLI/MCP를 활용한 구현 초안 작성·에디터 작업·검증 자동화가 포함됩니다. 설계와 범위 결정, 코드 리뷰·수정, 플레이 확인을 거쳐 반영했습니다.
+
+## 이후 개발 계획
+
+- **사운드 추가:** BGM과 전투·UI 효과음을 추가할 예정입니다. 현재 데모는 사운드 없이 동작합니다.
+- **로직 개선:** 실제 사용 흐름과 테스트를 바탕으로 기존 로직을 다시 검토하고, 필요한 부분을 리팩토링·수정할 예정입니다.
