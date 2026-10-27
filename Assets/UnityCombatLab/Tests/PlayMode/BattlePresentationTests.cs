@@ -282,7 +282,9 @@ namespace UnityCombatLab.Tests.PlayMode
         public IEnumerator ConcurrentAttacksPresentDamageAtTheirOwnImpact()
         {
             var entry = Object.FindFirstObjectByType<BattleLifetimeScope>().Container.Resolve<RunBattleEntryPoint>().Battle;
-            entry.Runner.Advance(0.5);
+            // 一回の上限は8 tickなので、0.4秒と0.1秒に分けて初撃の10 tickまで進める。
+            entry.Runner.Advance(0.4);
+            entry.Runner.Advance(0.1);
             Assert.That(entry.Presenter.PendingAttackCount, Is.EqualTo(6));
             var views = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None);
             Assert.That(views.All(v => v.IsAttacking && v.CurrentAnimation == "Attack"), Is.True);
@@ -450,7 +452,9 @@ namespace UnityCombatLab.Tests.PlayMode
             var ranger = Object.FindObjectsByType<UnitView>(FindObjectsSortMode.None)
                 .Single(view => view.name == "Unit_Ranger");
             var motionField = typeof(UnitView).GetField("_motion", BindingFlags.Instance | BindingFlags.NonPublic);
-            entry.Runner.Advance(0.5);
+            // 一回の上限は8 tickなので、0.4秒と0.1秒に分けて初撃の10 tickまで進める。
+            entry.Runner.Advance(0.4);
+            entry.Runner.Advance(0.1);
             var firstMotion = motionField.GetValue(ranger);
             Assert.That(firstMotion, Is.Not.Null);
             // 表示時計を進めずに次の三回分の計算を届け、同じユニットに待機予約を作る。
